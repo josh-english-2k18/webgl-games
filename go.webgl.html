@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Matrix Go</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Courier New', monospace;
+        }
+        canvas {
+            display: block;
+        }
+        #ui-overlay {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            color: #00ff00;
+            background: rgba(0, 20, 0, 0.8);
+            padding: 15px;
+            border: 1px solid #00ff00;
+            border-radius: 5px;
+            z-index: 1000;
+        }
+        #status {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+        #score {
+            font-size: 1em;
+        }
+        .matrix-button {
+            background: #001400;
+            color: #00ff00;
+            border: 1px solid #00ff00;
+            padding: 8px 15px;
+            margin: 5px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            transition: all 0.3s ease;
+        }
+        .matrix-button:hover {
+            background: #003000;
+            box-shadow: 0 0 10px #00ff00;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+</head>
+<body>
+    <div id="ui-overlay">
+        <div id="status">Black's Turn</div>
+        <div id="score">Black: 0 | White: 0</div>
+        <button class="matrix-button" id="pass-button">Pass</button>
+        <button class="matrix-button" id="reset-button">Reset</button>
+    </div>
+
+    <script>
+        // Constants
+        const BOARD_SIZE = 13;
+        const AI_SIMULATIONS = 3; // Adjust this for AI strength
+        const STONE_RADIUS = 0.4;
+        const CELL_SIZE = 1;
+
+        // Three.js setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000);
+        document.body.appendChild(renderer.domElement);
+
+        // Matrix background effect
+        class MatrixBackground {
+            constructor() {
+                this.canvas = document.createElement('canvas');
+                this.canvas.width = 1024;
+                this.canvas.height = 1024;
+                this.ctx = this.canvas.getContext('2d');
+                this.characters = "日月火水木金土あいうえお天地人";
+                this.drops = [];
+                this.fontSize = 16;
+                this.columns = this.canvas.width / this.fontSize;
+                
+                for(let i = 0; i < this.columns; i++) {
+                    this.drops[i] = 1;
+                }
+
+                this.texture = new THREE.CanvasTexture(this.canvas);
+                this.material = new THREE.MeshBasicMaterial({
+                    map: this.texture,
+                    transparent: true,
+                    opacity: 0.2
+                });
+
+                const geometry = new THREE.PlaneGeometry(50, 50);
+                this.mesh = new THREE.Mesh(geometry, this.material);
+                this.mesh.position.z = -20;
+                scene.add(this.mesh);
+            }
+
+            update() {
+                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                this.ctx.fillStyle = '#0F0';
+                this.ctx.font = this.fontSize + 'px monospace';
+
+                for(let i = 0; i < this.drops.length; i++) {
+                    const text = this.characters[Math.floor(Math.random() * this.characters.length)];
+                    this.ctx.fillText(text, i * this.fontSize, this.drops[i] * this.fontSize);
+                    if(this.drops[i] * this.fontSize > this.canvas.height && Math.random() > 0.975) {
+                        this.drops[i] = 0;
+                    }
+                    this.drops[i]++;
+                }
+                this.texture.needsUpdate = true;
+            }
+        }
+
+        // Initialize matrix background
+        const matrixBg = new MatrixBackground();
+
+        // Create board geometry
+        function createBoard() {
+            const boardGroup = new THREE.Group();
+            
+            // Create board surface
+            const boardGeometry = new THREE.BoxGeometry(BOARD_SIZE + 1, BOARD_SIZE + 1, 0.2);
+            const boardMaterial = new THREE.MeshPhongMaterial({
+                color: 0x001a00,
+                specular: 0x004400,
+                shininess: 50
+            });
+            const board = new THREE.Mesh(boardGeometry, boardMaterial);
+            boardGroup.add(board);
+
+            // Create grid lines
+            const lineMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+            for(let i = 0; i < BOARD_SIZE; i++) {
+                // Vertical lines
+                const verticalGeometry = new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(i - BOARD_SIZE/2 + 0.5, -BOARD_SIZE/2 + 0.5, 0.11),
+                    new THREE.Vector3(i - BOARD_SIZE/2 + 0.5, BOARD_SIZE/2 - 0.5, 0.11)
+                ]);
+                const verticalLine = new THREE.Line(verticalGeometry, lineMaterial);
+                boardGroup.add(verticalLine);
+
+                // Horizontal lines
+                const horizontalGeometry = new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(-BOARD_SIZE/2 + 0.5, i - BOARD_SIZE/2 + 0.5, 0.11),
+                    new THREE.Vector3(BOARD_SIZE/2 - 0.5, i - BOARD_SIZE/2 + 0.5, 0.11)
+                ]);
+                const horizontalLine = new THREE.Line(horizontalGeometry, lineMaterial);
+                boardGroup.add(horizontalLine);
+            }
+
+            return boardGroup;
+        }
+
+        // Initialize scene
+        const board = createBoard();
+        scene.add(board);
+
+        // Add lighting
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0x00ff00, 0.5);
+        directionalLight.position.set(5, 5, 5);
+        scene.add(directionalLight);
+
+        camera.position.set(0, -12, 12);
+        //camera.position.set(0, -15, 12);
+        camera.lookAt(0, 0, 0);
+		
+		// Add some additional lighting to make stones more visible
+		const pointLight = new THREE.PointLight(0x00ff00, 0.5);
+		pointLight.position.set(0, 0, 10);
+		//scene.add(pointLight);
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            matrixBg.update();
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Window resize handler
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+// Add this code after the previous section
+
+// Game state
+const gameState = {
+    board: Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(null)),
+    currentPlayer: 'black',
+    lastMove: null,
+    passed: false,
+    gameOver: false,
+    captures: { black: 0, white: 0 }
+};
+
+// Stone materials
+const stoneMaterials = {
+    black: new THREE.MeshPhongMaterial({
+        color: 0x000000,
+        specular: 0x222222,
+        shininess: 100,
+        emissive: 0x003300,
+        transparent: true,
+        opacity: 0.9
+    }),
+    white: new THREE.MeshPhongMaterial({
+        color: 0xffffff,
+        specular: 0x999999,
+        shininess: 100,
+        emissive: 0x002200,
+        transparent: true,
+        opacity: 0.9
+    })
+};
+
+// Stone geometry (created once and reused)
+const stoneGeometry = new THREE.SphereGeometry(STONE_RADIUS, 32, 32);
+
+// Store stone meshes for easy access
+const stoneMeshes = new Map();
+
+// Raycaster for mouse interaction
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+// Helper function to get board coordinates from 3D position
+function getBoardCoordinates(position) {
+    const x = Math.floor(position.x + BOARD_SIZE/2);
+    const y = Math.floor(position.y + BOARD_SIZE/2);
+    return { x, y };
+}
+
+// Check if a move is valid
+function isValidMove(x, y, color) {
+    if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) return false;
+    if (gameState.board[y][x] !== null) return false;
+
+    // Place stone temporarily
+    gameState.board[y][x] = color;
+    
+    // Check for captures and liberties
+    const hasLiberties = checkLiberties(x, y);
+    const captures = getCapturedStones(color === 'black' ? 'white' : 'black');
+    
+    // Undo temporary placement
+    gameState.board[y][x] = null;
+
+    // Move is valid if it either has liberties or captures opponent stones
+    return hasLiberties || captures.length > 0;
+}
+
+// Check if a group has liberties
+function checkLiberties(x, y, visited = new Set()) {
+    const key = `${x},${y}`;
+    if (visited.has(key)) return false;
+    visited.add(key);
+
+    const color = gameState.board[y][x];
+    if (!color) return true;
+
+    const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    
+    for (const [dx, dy] of directions) {
+        const newX = x + dx;
+        const newY = y + dy;
+        
+        if (newX < 0 || newX >= BOARD_SIZE || newY < 0 || newY >= BOARD_SIZE) continue;
+        
+        if (gameState.board[newY][newX] === null) return true;
+        if (gameState.board[newY][newX] === color && 
+            checkLiberties(newX, newY, visited)) return true;
+    }
+
+    return false;
+}
+
+// Get all stones that would be captured by a move
+function getCapturedStones(targetColor) {
+    const captured = [];
+    const visited = new Set();
+
+    for (let y = 0; y < BOARD_SIZE; y++) {
+        for (let x = 0; x < BOARD_SIZE; x++) {
+            if (gameState.board[y][x] === targetColor && !visited.has(`${x},${y}`)) {
+                const group = getGroup(x, y, targetColor);
+                if (!hasGroupLiberties(group)) {
+                    captured.push(...group);
+                }
+                group.forEach(pos => visited.add(`${pos.x},${pos.y}`));
+            }
+        }
+    }
+
+    return captured;
+}
+
+// Get all stones in a group
+function getGroup(x, y, color, group = []) {
+    const key = `${x},${y}`;
+    if (group.some(pos => pos.x === x && pos.y === y)) return group;
+    
+    group.push({x, y});
+    
+    const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+    for (const [dx, dy] of directions) {
+        const newX = x + dx;
+        const newY = y + dy;
+        
+        if (newX < 0 || newX >= BOARD_SIZE || newY < 0 || newY >= BOARD_SIZE) continue;
+        if (gameState.board[newY][newX] === color) {
+            getGroup(newX, newY, color, group);
+        }
+    }
+    
+    return group;
+}
+
+// Check if a group has any liberties
+function hasGroupLiberties(group) {
+    return group.some(({x, y}) => {
+        const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+        return directions.some(([dx, dy]) => {
+            const newX = x + dx;
+            const newY = y + dy;
+            return newX >= 0 && newX < BOARD_SIZE && 
+                   newY >= 0 && newY < BOARD_SIZE && 
+                   gameState.board[newY][newX] === null;
+        });
+    });
+}
+
+// Place a stone on the board
+function placeStone(x, y, color) {
+    if (!isValidMove(x, y, color)) return false;
+
+    // Create and place the stone mesh
+    const stone = new THREE.Mesh(stoneGeometry, stoneMaterials[color].clone());
+    stone.position.set(
+        x - BOARD_SIZE/2 + 0.5, 
+        y - BOARD_SIZE/2 + 0.5, 
+        0.2 // Adjust this value to make stones sit on the board
+    );
+    
+    // Add placement animation
+    stone.scale.set(0.1, 0.1, 0.1);
+    board.add(stone); // Change this from scene.add to board.add
+    
+    // Animate stone placement
+    new TWEEN.Tween(stone.scale)
+        .to({x: 1, y: 1, z: 1}, 200)
+        .easing(TWEEN.Easing.Bounce.Out)
+        .start();
+
+    // Update game state
+    gameState.board[y][x] = color;
+    stoneMeshes.set(`${x},${y}`, stone);
+
+    // Handle captures
+    const captures = getCapturedStones(color === 'black' ? 'white' : 'black');
+    captures.forEach(({x, y}) => {
+        const stone = stoneMeshes.get(`${x},${y}`);
+        if (stone) {
+            // Animate stone removal
+            new TWEEN.Tween(stone.position)
+                .to({z: 5}, 500)
+                .easing(TWEEN.Easing.Quadratic.In)
+                .onComplete(() => {
+                    board.remove(stone);
+                })
+                .start();
+            
+            stoneMeshes.delete(`${x},${y}`);
+            gameState.board[y][x] = null;
+            gameState.captures[color]++;
+        }
+    });
+
+    updateScoreDisplay();
+    return true;
+}
+
+// Handle mouse interaction
+function onMouseMove(event) {
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+}
+
+function onMouseClick(event) {
+    if (gameState.gameOver || gameState.currentPlayer === 'white') return;
+
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const intersects = raycaster.intersectObject(board, true);
+
+    if (intersects.length > 0) {
+        const point = intersects[0].point;
+        const boardPos = getBoardCoordinates(point);
+        
+        if (boardPos.x >= 0 && boardPos.x < BOARD_SIZE && 
+            boardPos.y >= 0 && boardPos.y < BOARD_SIZE) {
+            if (placeStone(boardPos.x, boardPos.y, gameState.currentPlayer)) {
+                gameState.lastMove = boardPos;
+                gameState.passed = false;
+                gameState.currentPlayer = gameState.currentPlayer === 'black' ? 'white' : 'black';
+                updateStatusDisplay();
+                
+                // Trigger AI move
+                if (gameState.currentPlayer === 'white') {
+                    setTimeout(makeAIMove, 500);
+                }
+            }
+        }
+    }
+}
+
+// Update UI displays
+function updateStatusDisplay() {
+    document.getElementById('status').textContent = 
+        `${gameState.currentPlayer.charAt(0).toUpperCase() + gameState.currentPlayer.slice(1)}'s Turn`;
+}
+
+function updateScoreDisplay() {
+    document.getElementById('score').textContent = 
+        `Black: ${gameState.captures.black} | White: ${gameState.captures.white}`;
+}
+
+// Event listeners
+window.addEventListener('mousemove', onMouseMove, false);
+window.addEventListener('click', onMouseClick, false);
+
+// Pass button handler
+document.getElementById('pass-button').addEventListener('click', () => {
+    if (gameState.gameOver) return;
+    
+    if (gameState.passed) {
+        gameState.gameOver = true;
+        const winner = calculateWinner();
+        document.getElementById('status').textContent = 
+            `Game Over - ${winner.charAt(0).toUpperCase() + winner.slice(1)} wins!`;
+    } else {
+        gameState.passed = true;
+        gameState.currentPlayer = gameState.currentPlayer === 'black' ? 'white' : 'black';
+        updateStatusDisplay();
+        
+        if (gameState.currentPlayer === 'white') {
+            setTimeout(makeAIMove, 500);
+        }
+    }
+});
+
+// Reset button handler
+document.getElementById('reset-button').addEventListener('click', () => {
+    // Clear the board
+    stoneMeshes.forEach(stone => scene.remove(stone));
+    stoneMeshes.clear();
+    
+    // Reset game state
+    gameState.board = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(null));
+    gameState.currentPlayer = 'black';
+    gameState.lastMove = null;
+    gameState.passed = false;
+    gameState.gameOver = false;
+    gameState.captures = { black: 0, white: 0 };
+    
+    updateStatusDisplay();
+    updateScoreDisplay();
+});
+
+// Add TWEEN.js animation update to the animation loop
+function animate() {
+    requestAnimationFrame(animate);
+    TWEEN.update();
+    matrixBg.update();
+    renderer.render(scene, camera);
+}
+
+// Add this code after the previous sections
+
+// AI Implementation using Monte Carlo Tree Search (MCTS)
+class MCTSNode {
+    constructor(state, parent = null, move = null) {
+        this.state = JSON.parse(JSON.stringify(state));
+        this.parent = parent;
+        this.move = move;
+        this.children = [];
+        this.wins = 0;
+        this.visits = 0;
+        this.untriedMoves = this.getValidMoves();
+    }
+
+    getValidMoves() {
+        const moves = [];
+        for (let y = 0; y < BOARD_SIZE; y++) {
+            for (let x = 0; x < BOARD_SIZE; x++) {
+                if (isValidMove(x, y, this.state.currentPlayer)) {
+                    moves.push({x, y});
+                }
+            }
+        }
+        // Add pass move
+        moves.push(null);
+        return moves;
+    }
+
+    UCTSelectChild() {
+        const C = 1.41; // UCT constant
+        return this.children.reduce((selected, child) => {
+            const uctValue = (child.wins / child.visits) + 
+                C * Math.sqrt(Math.log(this.visits) / child.visits);
+            if (uctValue > selected.uctValue) {
+                return { node: child, uctValue };
+            }
+            return selected;
+        }, { node: null, uctValue: -Infinity }).node;
+    }
+
+    addChild(move) {
+        const childState = JSON.parse(JSON.stringify(this.state));
+        if (move) {
+            childState.board[move.y][move.x] = childState.currentPlayer;
+            // Handle captures
+            const captures = getCapturedStones(
+                childState.currentPlayer === 'black' ? 'white' : 'black'
+            );
+            captures.forEach(({x, y}) => {
+                childState.board[y][x] = null;
+                childState.captures[childState.currentPlayer]++;
+            });
+        }
+        childState.currentPlayer = childState.currentPlayer === 'black' ? 'white' : 'black';
+        
+        const child = new MCTSNode(childState, this, move);
+        this.untriedMoves = this.untriedMoves.filter(m => 
+            !m || m.x !== move?.x || m.y !== move?.y
+        );
+        this.children.push(child);
+        return child;
+    }
+
+    update(result) {
+        this.visits++;
+        this.wins += result;
+    }
+}
+
+// MCTS algorithm
+class MCTS {
+    constructor(iterations = 1000) {
+        this.iterations = iterations;
+    }
+
+    getMove(gameState) {
+        const root = new MCTSNode(gameState);
+        
+        for (let i = 0; i < this.iterations; i++) {
+            let node = root;
+            let state = JSON.parse(JSON.stringify(gameState));
+
+            // Selection
+            while (node.untriedMoves.length === 0 && node.children.length > 0) {
+                node = node.UCTSelectChild();
+                if (node.move) {
+                    this.applyMove(state, node.move);
+                }
+            }
+
+            // Expansion
+            if (node.untriedMoves.length > 0) {
+                const move = node.untriedMoves[
+                    Math.floor(Math.random() * node.untriedMoves.length)
+                ];
+                if (move) {
+                    this.applyMove(state, move);
+                }
+                node = node.addChild(move);
+            }
+
+            // Simulation
+            const result = this.rollout(state);
+
+            // Backpropagation
+            while (node !== null) {
+                node.update(result);
+                node = node.parent;
+            }
+        }
+
+        // Select best move
+        return root.children.reduce((best, child) => {
+            if (child.visits > best.visits) {
+                return { move: child.move, visits: child.visits };
+            }
+            return best;
+        }, { move: null, visits: -1 }).move;
+    }
+
+    applyMove(state, move) {
+        if (!move) return; // Pass move
+        state.board[move.y][move.x] = state.currentPlayer;
+        const captures = getCapturedStones(
+            state.currentPlayer === 'black' ? 'white' : 'black'
+        );
+        captures.forEach(({x, y}) => {
+            state.board[y][x] = null;
+            state.captures[state.currentPlayer]++;
+        });
+        state.currentPlayer = state.currentPlayer === 'black' ? 'white' : 'black';
+    }
+
+    rollout(state) {
+        const tempState = JSON.parse(JSON.stringify(state));
+        let moves = 0;
+        const maxMoves = BOARD_SIZE * BOARD_SIZE * 2;
+
+        while (moves < maxMoves) {
+            const validMoves = [];
+            for (let y = 0; y < BOARD_SIZE; y++) {
+                for (let x = 0; x < BOARD_SIZE; x++) {
+                    if (isValidMove(x, y, tempState.currentPlayer)) {
+                        validMoves.push({x, y});
+                    }
+                }
+            }
+
+            if (validMoves.length === 0 || Math.random() < 0.1) {
+                // Pass or no valid moves
+                tempState.currentPlayer = tempState.currentPlayer === 'black' ? 'white' : 'black';
+                moves++;
+                continue;
+            }
+
+            const move = validMoves[Math.floor(Math.random() * validMoves.length)];
+            this.applyMove(tempState, move);
+            moves++;
+        }
+
+        // Evaluate final position
+        return this.evaluatePosition(tempState);
+    }
+
+    evaluatePosition(state) {
+        const blackScore = state.captures.black + this.countTerritory(state, 'black');
+        const whiteScore = state.captures.white + this.countTerritory(state, 'white');
+        return state.currentPlayer === 'black' ? 
+            blackScore > whiteScore ? 1 : 0 :
+            whiteScore > blackScore ? 1 : 0;
+    }
+
+    countTerritory(state, color) {
+        let territory = 0;
+        const visited = new Set();
+
+        for (let y = 0; y < BOARD_SIZE; y++) {
+            for (let x = 0; x < BOARD_SIZE; x++) {
+                if (!state.board[y][x] && !visited.has(`${x},${y}`)) {
+                    const region = this.floodFill(state, x, y, visited);
+                    if (this.isSurroundedBy(state, region, color)) {
+                        territory += region.size;
+                    }
+                }
+            }
+        }
+
+        return territory;
+    }
+
+    floodFill(state, x, y, visited) {
+        const region = new Set();
+        const queue = [{x, y}];
+        
+        while (queue.length > 0) {
+            const {x: cx, y: cy} = queue.shift();
+            const key = `${cx},${cy}`;
+            
+            if (visited.has(key)) continue;
+            visited.add(key);
+            region.add(key);
+
+            const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+            for (const [dx, dy] of directions) {
+                const nx = cx + dx;
+                const ny = cy + dy;
+                if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE &&
+                    !state.board[ny][nx] && !visited.has(`${nx},${ny}`)) {
+                    queue.push({x: nx, y: ny});
+                }
+            }
+        }
+
+        return region;
+    }
+
+    isSurroundedBy(state, region, color) {
+        const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+        
+        for (const pos of region) {
+            const [x, y] = pos.split(',').map(Number);
+            
+            for (const [dx, dy] of directions) {
+                const nx = x + dx;
+                const ny = y + dy;
+                if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE) {
+                    const stone = state.board[ny][nx];
+                    if (stone && (
+                        (color === 'black' && stone === '白') ||
+                        (color === 'white' && stone === '黒')
+                    )) {
+                        return false;
+                    }
+                }
+            }
+        }
+        
+        return true;
+    }
+}
+
+// Initialize AI
+const ai = new MCTS(AI_SIMULATIONS);
+
+// AI move function
+function makeAIMove() {
+    if (gameState.gameOver) return;
+
+    const move = ai.getMove(gameState);
+    
+    if (move) {
+        placeStone(move.x, move.y, 'white');
+        gameState.lastMove = move;
+        gameState.passed = false;
+    } else {
+        // AI decides to pass
+        gameState.passed = true;
+        if (gameState.passed) {
+            gameState.gameOver = true;
+            const winner = calculateWinner();
+            document.getElementById('status').textContent = 
+                `Game Over - ${winner.charAt(0).toUpperCase() + winner.slice(1)} wins!`;
+            return;
+        }
+    }
+    
+    gameState.currentPlayer = 'black';
+    updateStatusDisplay();
+}
+
+// Helper function to calculate winner
+function calculateWinner() {
+    const blackScore = gameState.captures.black + countTerritory('black');
+    const whiteScore = gameState.captures.white + countTerritory('white');
+    return blackScore > whiteScore ? 'black' : 'white';
+}
+
+// Helper function to count territory (simplified version)
+function countTerritory(color) {
+    let territory = 0;
+    const visited = new Set();
+
+    for (let y = 0; y < BOARD_SIZE; y++) {
+        for (let x = 0; x < BOARD_SIZE; x++) {
+            if (!gameState.board[y][x] && !visited.has(`${x},${y}`)) {
+                const region = new Set();
+                const queue = [{x, y}];
+                let isSurrounded = true;
+
+                while (queue.length > 0) {
+                    const {x: cx, y: cy} = queue.shift();
+                    const key = `${cx},${cy}`;
+                    
+                    if (visited.has(key)) continue;
+                    visited.add(key);
+                    region.add(key);
+
+                    const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+                    for (const [dx, dy] of directions) {
+                        const nx = cx + dx;
+                        const ny = cy + dy;
+                        if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE) {
+                            if (!gameState.board[ny][nx] && !visited.has(`${nx},${ny}`)) {
+                                queue.push({x: nx, y: ny});
+                            } else if (gameState.board[ny][nx]) {
+                                if ((color === 'black' && gameState.board[ny][nx] === 'white') ||
+                                    (color === 'white' && gameState.board[ny][nx] === 'black')) {
+                                    isSurrounded = false;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (isSurrounded) {
+                    territory += region.size;
+                }
+            }
+        }
+    }
+
+    return territory;
+}
+
+    </script>
+</body>
+</html>
