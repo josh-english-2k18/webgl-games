@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Modern Asteroids</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: black; }
+        #hud {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            color: #0ff;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            text-shadow: 0 0 5px #0ff;
+        }
+        .powerup {
+            display: inline-block;
+            margin-right: 20px;
+            padding: 5px 10px;
+            border: 1px solid #0ff;
+            border-radius: 5px;
+            opacity: 0.5;
+        }
+        .active { opacity: 1; background-color: rgba(0, 255, 255, 0.2); }
+    </style>
+</head>
+<body>
+    <div id="hud">
+        <div>TIME: <span id="time">0</span></div>
+        <div>SCORE: <span id="score">0</span></div>
+        <div>LIVES: <span id="lives">3</span></div>
+        <div id="powerups">
+            <span class="powerup" id="guns">GUNS</span>
+            <span class="powerup" id="missiles">MISSILES</span>
+            <span class="powerup" id="shields">SHIELDS</span>
+        </div>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        class Game {
+            constructor() {
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.renderer = new THREE.WebGLRenderer();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                document.body.appendChild(this.renderer.domElement);
+
+                this.camera.position.z = 100;
+                
+                this.player = new Player(this);
+                this.asteroids = [];
+                this.projectiles = [];
+                this.powerups = [];
+                this.stars = [];
+                
+                this.score = 0;
+                this.lives = 3;
+                this.startTime = Date.now();
+                
+                this.createStarfield();
+                this.spawnAsteroids(5);
+                
+                this.setupControls();
+                this.animate();
+            }
+
+            createStarfield() {
+                const starGeometry = new THREE.BufferGeometry();
+                const starMaterial = new THREE.PointsMaterial({
+                    color: 0xFFFFFF,
+                    size: 0.5,
+                    transparent: true
+                });
+
+                const starVertices = [];
+                for(let i = 0; i < 1000; i++) {
+                    const x = (Math.random() - 0.5) * 2000;
+                    const y = (Math.random() - 0.5) * 2000;
+                    const z = (Math.random() - 0.5) * 2000;
+                    starVertices.push(x, y, z);
+                }
+
+                starGeometry.setAttribute('position', 
+                    new THREE.Float32BufferAttribute(starVertices, 3));
+                this.starfield = new THREE.Points(starGeometry, starMaterial);
+                this.scene.add(this.starfield);
+            }
+
+            spawnAsteroids(count) {
+                for(let i = 0; i < count; i++) {
+                    const asteroid = new Asteroid(this, 'large');
+                    this.asteroids.push(asteroid);
+				}
+            }
+
+            setupControls() {
+                this.keys = {};
+                document.addEventListener('keydown', (e) => this.keys[e.key.toLowerCase()] = true);
+                document.addEventListener('keyup', (e) => this.keys[e.key.toLowerCase()] = false);
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                // Update game time
+                document.getElementById('time').textContent = 
+                    Math.floor((Date.now() - this.startTime) / 1000);
+
+                // Update player
+                if (this.keys['w']) this.player.thrust();
+                if (this.keys['a']) this.player.rotate(-0.05);
+                if (this.keys['d']) this.player.rotate(0.05);
+                if (this.keys[' ']) this.player.fire();
+
+                // Update game objects
+                this.player.update();
+                this.asteroids.forEach(asteroid => asteroid.update());
+                this.projectiles.forEach((projectile, index) => {
+                    projectile.update();
+                    if (projectile.isExpired()) {
+                        this.scene.remove(projectile.mesh);
+                        this.projectiles.splice(index, 1);
+                    }
+                });
+
+                // Auto-fire if player has both guns and missiles
+                if (this.player.hasGuns && this.player.hasMissiles) {
+                    this.player.autoFire();
+                }
+
+                // Check collisions
+                this.checkCollisions();
+
+                // Rotate starfield
+                this.starfield.rotation.z += 0.0001;
+
+                this.renderer.render(this.scene, this.camera);
+            }
+
+            checkCollisions() {
+                // Projectiles vs Asteroids
+                this.projectiles.forEach((projectile, pIndex) => {
+                    this.asteroids.forEach((asteroid, aIndex) => {
+                        if (this.detectCollision(projectile, asteroid)) {
+                            this.handleAsteroidHit(asteroid, aIndex);
+                            this.scene.remove(projectile.mesh);
+                            this.projectiles.splice(pIndex, 1);
+                        }
+                    });
+                });
+
+                // Player vs Asteroids
+                if (!this.player.isInvulnerable) {
+                    this.asteroids.forEach(asteroid => {
+                        if (this.detectCollision(this.player, asteroid)) {
+                            this.handlePlayerHit();
+                        }
+                    });
+                }
+            }
+
+            detectCollision(obj1, obj2) {
+                const distance = obj1.mesh.position.distanceTo(obj2.mesh.position);
+                return distance < (obj1.radius + obj2.radius);
+            }
+
+            handleAsteroidHit(asteroid, index) {
+                if (asteroid.size === 'large') {
+                    this.spawnAsteroidPieces(asteroid, 'medium', 2);
+                } else if (asteroid.size === 'medium') {
+                    this.spawnAsteroidPieces(asteroid, 'small', 3);
+                }
+
+                this.scene.remove(asteroid.mesh);
+                this.asteroids.splice(index, 1);
+                this.score += 100;
+                document.getElementById('score').textContent = this.score;
+
+                // Randomly spawn powerup
+                if (Math.random() < 0.1) {
+                    this.spawnPowerup(asteroid.mesh.position);
+                }
+            }
+
+            setupControls() {
+                this.keys = {};
+                document.addEventListener('keydown', (e) => this.keys[e.key.toLowerCase()] = true);
+                document.addEventListener('keyup', (e) => this.keys[e.key.toLowerCase()] = false);
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+
+                // Update game time
+                document.getElementById('time').textContent = 
+                    Math.floor((Date.now() - this.startTime) / 1000);
+
+                // Update player
+                if (this.keys['w']) this.player.thrust();
+                if (this.keys['a']) this.player.rotate(-0.05);
+                if (this.keys['d']) this.player.rotate(0.05);
+                if (this.keys[' ']) this.player.fire();
+
+                // Update game objects
+                this.player.update();
+                this.asteroids.forEach(asteroid => asteroid.update());
+                this.projectiles.forEach((projectile, index) => {
+                    projectile.update();
+                    if (projectile.isExpired()) {
+                        this.scene.remove(projectile.mesh);
+                        this.projectiles.splice(index, 1);
+                    }
+                });
+
+                // Auto-fire if player has both guns and missiles
+                if (this.player.hasGuns && this.player.hasMissiles) {
+                    this.player.autoFire();
+                }
+
+                // Check collisions
+                this.checkCollisions();
+
+                // Rotate starfield
+                this.starfield.rotation.z += 0.0001;
+
+                this.renderer.render(this.scene, this.camera);
+            }
+
+            checkCollisions() {
+                // Projectiles vs Asteroids
+                this.projectiles.forEach((projectile, pIndex) => {
+                    this.asteroids.forEach((asteroid, aIndex) => {
+                        if (this.detectCollision(projectile, asteroid)) {
+                            this.handleAsteroidHit(asteroid, aIndex);
+                            this.scene.remove(projectile.mesh);
+                            this.projectiles.splice(pIndex, 1);
+                        }
+                    });
+                });
+
+                // Player vs Asteroids
+                if (!this.player.isInvulnerable) {
+                    this.asteroids.forEach(asteroid => {
+                        if (this.detectCollision(this.player, asteroid)) {
+                            this.handlePlayerHit();
+                        }
+                    });
+                }
+            }
+
+            detectCollision(obj1, obj2) {
+                const distance = obj1.mesh.position.distanceTo(obj2.mesh.position);
+                return distance < (obj1.radius + obj2.radius);
+            }
+
+            handleAsteroidHit(asteroid, index) {
+                if (asteroid.size === 'large') {
+                    this.spawnAsteroidPieces(asteroid, 'medium', 2);
+                } else if (asteroid.size === 'medium') {
+                    this.spawnAsteroidPieces(asteroid, 'small', 3);
+                }
+
+                this.scene.remove(asteroid.mesh);
+                this.asteroids.splice(index, 1);
+                this.score += 100;
+                document.getElementById('score').textContent = this.score;
+
+                // Randomly spawn powerup
+                if (Math.random() < 0.1) {
+                    this.spawnPowerup(asteroid.mesh.position);
+                }
+            }
+
+            spawnAsteroidPieces(parentAsteroid, size, count) {
+                for (let i = 0; i < count; i++) {
+                    const asteroid = new Asteroid(this, size, parentAsteroid.mesh.position);
+                    this.asteroids.push(asteroid);
+                }
+            }
+
+            handlePlayerHit() {
+                if (this.player.shields > 0) {
+                    this.player.shields--;
+                    document.getElementById('shields').style.opacity = 
+                        this.player.shields > 0 ? "1" : "0.5";
+                    return;
+                }
+
+                this.lives--;
+                document.getElementById('lives').textContent = this.lives;
+
+                if (this.lives <= 0) {
+                    this.gameOver();
+                    return;
+                }
+
+                this.player.respawn();
+            }
+
+            spawnPowerup(position) {
+                const types = ['guns', 'missiles', 'shields'];
+                const type = types[Math.floor(Math.random() * types.length)];
+                const powerup = new Powerup(this, type, position);
+                this.powerups.push(powerup);
+            }
+
+            gameOver() {
+                alert(`Game Over! Score: ${this.score}`);
+                location.reload();
+            }
+        }
+
+        class Player {
+            constructor(game) {
+                this.game = game;
+                this.radius = 2;
+                this.velocity = new THREE.Vector3();
+                this.rotation = 0;
+                this.hasGuns = false;
+                this.hasMissiles = false;
+                this.shields = 0;
+                this.isInvulnerable = false;
+
+                // Create ship geometry
+                const geometry = new THREE.BufferGeometry();
+                const vertices = new Float32Array([
+                    0, 2, 0,    // tip
+                    -1, -1, 0,  // left
+                    1, -1, 0    // right
+                ]);
+                geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+                
+                const material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
+                this.mesh = new THREE.Line(geometry, material);
+                this.game.scene.add(this.mesh);
+
+                this.respawn();
+            }
+
+            thrust() {
+                const thrust = new THREE.Vector3(0, 0.1, 0);
+                thrust.applyAxisAngle(new THREE.Vector3(0, 0, 1), -this.rotation);
+                this.velocity.add(thrust);
+            }
+
+            rotate(angle) {
+                this.rotation += angle;
+                this.mesh.rotation.z = this.rotation;
+            }
+
+            update() {
+                this.mesh.position.add(this.velocity);
+                this.velocity.multiplyScalar(0.99); // friction
+
+                // Screen wrapping
+                if (this.mesh.position.x > 50) this.mesh.position.x = -50;
+                if (this.mesh.position.x < -50) this.mesh.position.x = 50;
+                if (this.mesh.position.y > 50) this.mesh.position.y = -50;
+                if (this.mesh.position.y < -50) this.mesh.position.y = 50;
+            }
+
+            fire() {
+                if (this.hasMissiles) {
+                    const missile = new Missile(this.game, this.mesh.position, this.rotation);
+                    this.game.projectiles.push(missile);
+                } else {
+                    const bullet = new Bullet(this.game, this.mesh.position, this.rotation);
+                    this.game.projectiles.push(bullet);
+                }
+            }
+
+            autoFire() {
+                const closestAsteroid = this.findClosestAsteroid();
+                if (closestAsteroid && 
+                    closestAsteroid.mesh.position.distanceTo(this.mesh.position) < 20) {
+					this.fire();
+                }
+            }
+
+            findClosestAsteroid() {
+                let closest = null;
+                let minDistance = Infinity;
+                
+                this.game.asteroids.forEach(asteroid => {
+                    const distance = asteroid.mesh.position.distanceTo(this.mesh.position);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closest = asteroid;
+                    }
+                });
+                
+                return closest;
+            }
+
+            respawn() {
+                this.mesh.position.set(0, 0, 0);
+                this.velocity.set(0, 0, 0);
+                this.rotation = 0;
+                this.mesh.rotation.z = 0;
+                this.isInvulnerable = true;
+                
+                setTimeout(() => {
+                    this.isInvulnerable = false;
+                }, 3000);
+            }
+        }
+
+        class Asteroid {
+            constructor(game, size, position) {
+                this.game = game;
+                this.size = size;
+                
+                // Set size-specific properties
+                switch(size) {
+                    case 'large':
+                        this.radius = 6;
+                        this.vertices = 12;
+                        break;
+                    case 'medium':
+                        this.radius = 4;
+                        this.vertices = 8;
+                        break;
+                    case 'small':
+                        this.radius = 2;
+                        this.vertices = 6;
+                        break;
+                }
+
+                // Create irregular asteroid shape
+                const geometry = new THREE.BufferGeometry();
+                const vertices = [];
+                for (let i = 0; i < this.vertices; i++) {
+                    const angle = (i / this.vertices) * Math.PI * 2;
+                    const variance = Math.random() * 0.4 + 0.8;
+                    const x = Math.cos(angle) * this.radius * variance;
+                    const y = Math.sin(angle) * this.radius * variance;
+                    vertices.push(x, y, 0);
+                }
+                vertices.push(vertices[0], vertices[1], vertices[2]); // Close the shape
+                
+                geometry.setAttribute('position', 
+                    new THREE.Float32BufferAttribute(vertices, 3));
+                
+                const material = new THREE.LineBasicMaterial({ 
+                    color: 0xaaaaaa 
+                });
+                
+                this.mesh = new THREE.Line(geometry, material);
+                
+                // Set initial position and velocity
+                if (position) {
+                    this.mesh.position.copy(position);
+                } else {
+                    // Spawn at edge of screen
+                    const angle = Math.random() * Math.PI * 2;
+                    this.mesh.position.x = Math.cos(angle) * 60;
+                    this.mesh.position.y = Math.sin(angle) * 60;
+                }
+                
+                this.velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.5,
+                    (Math.random() - 0.5) * 0.5,
+                    0
+                );
+                
+                this.rotationSpeed = (Math.random() - 0.5) * 0.05;
+                
+                game.scene.add(this.mesh);
+            }
+
+            update() {
+                this.mesh.position.add(this.velocity);
+                this.mesh.rotation.z += this.rotationSpeed;
+
+                // Screen wrapping
+				if (this.mesh.position.y > 50) this.mesh.position.y = -50;
+                if (this.mesh.position.y < -50) this.mesh.position.y = 50;
+            }
+        }
+
+        class Bullet {
+            constructor(game, position, rotation) {
+                this.game = game;
+                this.radius = 0.5;
+                
+                const geometry = new THREE.BufferGeometry();
+                geometry.setAttribute('position', 
+                    new THREE.Float32BufferAttribute([0, 0, 0, 0, 1, 0], 3));
+                
+                const material = new THREE.LineBasicMaterial({ 
+                    color: 0xff0000 
+                });
+                
+                this.mesh = new THREE.Line(geometry, material);
+                this.mesh.position.copy(position);
+                
+                this.velocity = new THREE.Vector3(0, 2, 0);
+                this.velocity.applyAxisAngle(new THREE.Vector3(0, 0, 1), -rotation);
+                
+                this.created = Date.now();
+                game.scene.add(this.mesh);
+            }
+
+            update() {
+                this.mesh.position.add(this.velocity);
+            }
+
+            isExpired() {
+                return Date.now() - this.created > 1000;
+            }
+        }
+
+        class Missile extends Bullet {
+            constructor(game, position, rotation) {
+                super(game, position, rotation);
+                this.mesh.material.color.setHex(0xff8800);
+                this.radius = 1;
+                this.tracking = true;
+                this.turnRate = 0.1;
+            }
+
+            update() {
+                if (this.tracking) {
+                    const target = this.findClosestTarget();
+                    if (target) {
+                        const targetDir = new THREE.Vector3()
+                            .subVectors(target.mesh.position, this.mesh.position)
+                            .normalize();
+                        
+                        this.velocity.lerp(targetDir.multiplyScalar(2), this.turnRate);
+                    }
+                }
+                
+                this.mesh.position.add(this.velocity);
+                
+                // Point missile in direction of travel
+                this.mesh.rotation.z = Math.atan2(
+                    this.velocity.y, 
+                    this.velocity.x
+                ) - Math.PI / 2;
+            }
+
+            findClosestTarget() {
+                let closest = null;
+                let minDistance = Infinity;
+                
+                this.game.asteroids.forEach(asteroid => {
+                    const distance = asteroid.mesh.position
+                        .distanceTo(this.mesh.position);
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        closest = asteroid;
+                    }
+                });
+                
+                return closest;
+            }
+        }
+
+        class Powerup {
+            constructor(game, type, position) {
+                this.game = game;
+                this.type = type;
+                this.radius = 2;
+
+                const geometry = new THREE.BufferGeometry();
+                const vertices = [];
+                const sides = 4;
+                
+                for (let i = 0; i <= sides; i++) {
+                    const angle = (i / sides) * Math.PI * 2;
+                    vertices.push(
+                        Math.cos(angle) * this.radius,
+                        Math.sin(angle) * this.radius,
+                        0
+                    );
+                }
+
+                geometry.setAttribute('position', 
+                    new THREE.Float32BufferAttribute(vertices, 3));
+                
+                const material = new THREE.LineBasicMaterial({ 
+                    color: this.getColorForType(type) 
+                });
+                
+                this.mesh = new THREE.Line(geometry, material);
+                this.mesh.position.copy(position);
+                
+                this.rotationSpeed = 0.02;
+                this.created = Date.now();
+                
+                game.scene.add(this.mesh);
+            }
+
+            getColorForType(type) {
+                switch(type) {
+                    case 'guns': return 0xff0000;
+                    case 'missiles': return 0xff8800;
+                    case 'shields': return 0x00ffff;
+                    default: return 0xffffff;
+                }
+            }
+
+            update() {
+                this.mesh.rotation.z += this.rotationSpeed;
+                
+                // Make powerup pulse
+                const scale = 1 + Math.sin(Date.now() * 0.005) * 0.2;
+                this.mesh.scale.set(scale, scale, 1);
+                
+                // Check if expired (15 seconds)
+                if (Date.now() - this.created > 15000) {
+                    this.game.scene.remove(this.mesh);
+                    const index = this.game.powerups.indexOf(this);
+                    if (index > -1) {
+                        this.game.powerups.splice(index, 1);
+                    }
+                }
+            }
+
+            collect(player) {
+                switch(this.type) {
+                    case 'guns':
+                        player.hasGuns = true;
+                        document.getElementById('guns').classList.add('active');
+                        break;
+                    case 'missiles':
+                        player.hasMissiles = true;
+                        document.getElementById('missiles').classList.add('active');
+                        break;
+                    case 'shields':
+                        player.shields = 2;
+                        document.getElementById('shields').classList.add('active');
+                        break;
+                }
+                
+                this.game.scene.remove(this.mesh);
+                const index = this.game.powerups.indexOf(this);
+                if (index > -1) {
+                    this.game.powerups.splice(index, 1);
+                }
+            }
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            game.camera.aspect = window.innerWidth / window.innerHeight;
+            game.camera.updateProjectionMatrix();
+            game.renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Start the game
+        const game = new Game();
+    </script>
+</body>
+</html>
