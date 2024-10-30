@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>3D Audio Visualizer</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; }
+        #audioControls { 
+            position: fixed; 
+            bottom: 20px; 
+            left: 50%; 
+            transform: translateX(-50%);
+            z-index: 100;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 10px;
+        }
+        #fileInput {
+            color: white;
+            margin-bottom: 10px;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <div id="audioControls">
+        <input type="file" id="fileInput" accept="audio/mp3">
+        <audio id="audio" controls></audio>
+    </div>
+
+    <script>
+        let scene, camera, renderer, analyser, dataArray, bars = [];
+        const COLS = 16;
+        const ROWS = 4;
+        let isMouseDown = false;
+        let mouseX = 0, mouseY = 0;
+        let targetRotationX = 0, targetRotationY = 0;
+        let autoRotate = true;
+
+        // Initialize Three.js scene
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // Set camera position
+            camera.position.z = 20;
+            camera.position.y = 10;
+            camera.lookAt(0, 0, 0);
+
+            // Add ambient light
+            const ambientLight = new THREE.AmbientLight(0x404040);
+            scene.add(ambientLight);
+
+            // Add directional light
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(1, 1, 1);
+            scene.add(directionalLight);
+
+            // Create bars
+            const geometry = new THREE.BoxGeometry(0.5, 1, 0.5);
+            const material = new THREE.MeshPhongMaterial({
+                color: 0x00ff00,
+                specular: 0x555555,
+                shininess: 30
+            });
+
+			// Create 4x16 grid of bars
+            for (let row = 0; row < ROWS; row++) {
+                for (let col = 0; col < COLS; col++) {
+                    const bar = new THREE.Mesh(geometry, material.clone());
+                    bar.position.x = (col - COLS/2) * 0.8;
+                    bar.position.z = (row - ROWS/2) * 0.8;
+                    bar.position.y = 0;
+                    bars.push(bar);
+                    scene.add(bar);
+                }
+            }
+
+            // Add ground plane
+            const groundGeometry = new THREE.PlaneGeometry(30, 30);
+            const groundMaterial = new THREE.MeshPhongMaterial({
+                color: 0x333333,
+                side: THREE.DoubleSide
+            });
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = -2;
+            scene.add(ground);
+
+            // Add mouse event listeners
+            document.addEventListener('contextmenu', (e) => e.preventDefault());
+            document.addEventListener('mousedown', onMouseDown);
+            document.addEventListener('mouseup', onMouseUp);
+            document.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('resize', onWindowResize, false);
+        }
+
+        function onMouseDown(event) {
+            if (event.button === 2) { // Right click
+                isMouseDown = true;
+                autoRotate = false;
+                mouseX = event.clientX;
+                mouseY = event.clientY;
+            }
+        }
+
+        function onMouseUp() {
+            isMouseDown = false;
+        }
+
+        function onMouseMove(event) {
+            if (isMouseDown) {
+                const deltaX = event.clientX - mouseX;
+                const deltaY = event.clientY - mouseY;
+                
+                targetRotationY += deltaX * 0.01;
+                targetRotationX += deltaY * 0.01;
+                
+                // Limit vertical rotation
+                targetRotationX = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, targetRotationX));
+                
+                mouseX = event.clientX;
+                mouseY = event.clientY;
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Set up audio context and analyzer
+        function setupAudio() {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            analyser.fftSize = 2048; // Much higher FFT size for detailed frequency analysis
+            analyser.smoothingTimeConstant = 0.85;
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+            const audio = document.getElementById('audio');
+            const source = audioContext.createMediaElementSource(audio);
+            
+            // Create additional analyzers for different frequency ranges
+            const lowpassFilter = audioContext.createBiquadFilter();
+            const highpassFilter = audioContext.createBiquadFilter();
+            
+            lowpassFilter.type = 'lowpass';
+            highpassFilter.type = 'highpass';
+            
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
+        }
+
+        // Function to get specific frequency band value
+        function getFrequencyBandValue(dataArray, startFreq, endFreq, sampleRate) {
+            const bandStartIndex = Math.floor(startFreq * dataArray.length / (sampleRate / 2));
+            const bandEndIndex = Math.floor(endFreq * dataArray.length / (sampleRate / 2));
+            let sum = 0;
+            for (let i = bandStartIndex; i <= bandEndIndex; i++) {
+                sum += dataArray[i];
+            }
+            return sum / (bandEndIndex - bandStartIndex + 1);
+        }
+
+        // Create frequency bands for each bar
+        function createFrequencyBands(totalBars) {
+            const bands = [];
+            const minFreq = 20;
+            const maxFreq = 20000;
+            const logStep = Math.pow(maxFreq / minFreq, 1 / totalBars);
+            
+            for (let i = 0; i < totalBars; i++) {
+                const startFreq = minFreq * Math.pow(logStep, i);
+                const endFreq = startFreq * logStep;
+                bands.push({ start: startFreq, end: endFreq });
+            }
+            return bands;
+        }
+
+        // Animation loop
+		function animate() {
+            requestAnimationFrame(animate);
+
+            if (analyser) {
+                analyser.getByteFrequencyData(dataArray);
+                const frequencyBands = createFrequencyBands(COLS * ROWS);
+                
+                // Update bar heights based on unique frequency bands
+                for (let row = 0; row < ROWS; row++) {
+                    for (let col = 0; col < COLS; col++) {
+                        const index = col + (row * COLS);
+                        const band = frequencyBands[index];
+                        
+                        // Get value for this specific frequency band
+                        const value = getFrequencyBandValue(
+                            dataArray, 
+                            band.start, 
+                            band.end, 
+                            analyser.context.sampleRate
+                        );
+
+                        const normalizedValue = value / 255;
+                        const height = normalizedValue * 5 + 0.1;
+
+                        // Update bar properties
+                        bars[index].scale.y = height;
+                        bars[index].position.y = height / 2 - 1;
+
+                        // Create unique color based on frequency and amplitude
+                        const hue = (band.start / 20000 + normalizedValue * 0.2) % 1;
+                        const saturation = 0.8 + normalizedValue * 0.2;
+                        const lightness = 0.4 + normalizedValue * 0.2;
+
+                        bars[index].material.color.setHSL(hue, saturation, lightness);
+                        bars[index].material.emissive.setHSL(hue, saturation, lightness * 0.5);
+
+                        // Add pulsing effect
+                        bars[index].rotation.y = normalizedValue * 0.2;
+                        bars[index].rotation.z = normalizedValue * 0.1;
+
+                        // Dynamic width based on frequency
+                        const baseScale = 0.8 + (normalizedValue * 0.2);
+                        bars[index].scale.x = baseScale;
+                        bars[index].scale.z = baseScale;
+
+                        // Add glow effect for high amplitudes
+                        if (normalizedValue > 0.7) {
+                            bars[index].material.emissiveIntensity = normalizedValue;
+                        } else {
+                            bars[index].material.emissiveIntensity = 0.2;
+                        }
+                    }
+                }
+
+                // Add subtle wave motion to all bars
+                const time = Date.now() * 0.001;
+                bars.forEach((bar, i) => {
+                    const row = Math.floor(i / COLS);
+                    const col = i % COLS;
+                    const offset = Math.sin(time + col * 0.2 + row * 0.3) * 0.1;
+                    bar.position.y += offset;
+                });
+            }
+
+            // Camera rotation
+            if (autoRotate) {
+                targetRotationY += 0.003;
+            }
+
+            // Smooth camera movement
+            const radius = 20;
+            const targetX = radius * Math.sin(targetRotationY) * Math.cos(targetRotationX);
+            const targetZ = radius * Math.cos(targetRotationY) * Math.cos(targetRotationX);
+            const targetY = radius * Math.sin(targetRotationX) + 5;
+
+            camera.position.x += (targetX - camera.position.x) * 0.05;
+            camera.position.y += (targetY - camera.position.y) * 0.05;
+            camera.position.z += (targetZ - camera.position.z) * 0.05;
+            camera.lookAt(0, 0, 0);
+
+            renderer.render(scene, camera);
+        }
+
+        // Handle file upload
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const audio = document.getElementById('audio');
+            const url = URL.createObjectURL(file);
+            audio.src = url;
+            
+            // Initialize audio context when file is selected
+            if (!analyser) {
+                setupAudio();
+            }
+        });
+
+        // Initialize the visualization
+        init();
+        animate();
+
+    </script>
+</body>
+</html>
