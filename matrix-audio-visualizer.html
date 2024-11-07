@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Matrix Audio Visualizer</title>
+    <style>
+        :root {
+            --matrix-green: #00ff41;
+            --matrix-dark-green: #003b00;
+            --matrix-black: #000;
+            --matrix-text: #ffffff;
+            --ui-background: rgba(0, 0, 0, 0.85);
+            --slider-height: 150px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Courier New', monospace;
+            color: var(--matrix-text);
+        }
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: var(--matrix-black);
+        }
+
+        #visualizer-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+
+        #ui-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 10px;
+            background: var(--ui-background);
+            z-index: 2;
+            display: grid;
+			grid-template-columns: 400px 1fr 400px;
+            gap: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        #playlist-container {
+            border-right: 1px solid var(--matrix-green);
+            padding-right: 20px;
+			max-width: 350px;
+        }
+
+        #playlist {
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+
+        .playlist-item {
+            padding: 8px;
+            margin: 4px 0;
+            background: var(--matrix-dark-green);
+            border: 1px solid var(--matrix-green);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .playlist-item:hover {
+            background: var(--matrix-green);
+            color: var(--matrix-black);
+        }
+
+        .playlist-item.active {
+            border-color: var(--matrix-text);
+            background: var(--matrix-green);
+            color: var(--matrix-black);
+        }
+
+        #player-controls {
+            text-align: center;
+        }
+
+        .control-button {
+            background: var(--matrix-dark-green);
+            border: 1px solid var(--matrix-green);
+            color: var(--matrix-green);
+            padding: 10px 20px;
+            margin: 0 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .control-button:hover {
+            background: var(--matrix-green);
+            color: var(--matrix-black);
+        }
+
+        #equalizer-container {
+            border-left: 1px solid var(--matrix-green);
+            padding-left: 20px;
+        }
+
+        #equalizer {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            grid-template-rows: repeat(2, 1fr);
+            gap: 5px;
+            margin-top: 5px;
+            height: 200px;
+        }
+
+		.eq-slider-container {
+		    display: flex;
+		    flex-direction: column;
+		    align-items: center;
+		    height: 200px;
+		}
+
+		.eq-slider {
+		    -webkit-appearance: none;
+		    appearance: none;
+		    height: 150px;
+		    width: 20px;
+		    margin: 0;
+		    writing-mode: bt-lr; /* IE */
+		    -webkit-writing-mode: bt-lr; /* Old Safari */
+		    writing-mode: vertical-lr;
+		    -webkit-appearance: slider-vertical; /* Safari/Chrome */
+		}
+
+		.eq-slider::-webkit-slider-runnable-track {
+		    background: var(--matrix-dark-green);
+		    border: 1px solid var(--matrix-green);
+		    width: 20px;
+		    cursor: pointer;
+		}
+
+		.eq-slider::-webkit-slider-thumb {
+		    -webkit-appearance: none;
+		    appearance: none;
+		    width: 20px;
+		    height: 20px;
+		    background: var(--matrix-green);
+		    cursor: pointer;
+		    border: none;
+		}
+
+		.eq-slider::-moz-range-track {
+		    background: var(--matrix-dark-green);
+		    border: 1px solid var(--matrix-green);
+		    width: 20px;
+		    cursor: pointer;
+		}
+
+		.eq-slider::-moz-range-thumb {
+		    width: 20px;
+		    height: 20px;
+		    background: var(--matrix-green);
+		    cursor: pointer;
+		    border: none;
+		}
+
+		.eq-label {
+		    font-size: 10px;
+		    margin-top: 5px;
+		}
+
+        #file-input {
+            display: none;
+        }
+
+        .file-input-label {
+            display: inline-block;
+            padding: 10px 20px;
+            background: var(--matrix-dark-green);
+            border: 1px solid var(--matrix-green);
+            color: var(--matrix-green);
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        .file-input-label:hover {
+            background: var(--matrix-green);
+            color: var(--matrix-black);
+        }
+
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--matrix-dark-green);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--matrix-green);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--matrix-text);
+        }
+
+        .control-group {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+
+        #mode-button {
+            background: var(--matrix-dark-green);
+            border: 1px solid var(--matrix-green);
+            color: var(--matrix-green);
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        #mode-button:hover {
+            background: var(--matrix-green);
+            color: var(--matrix-black);
+        }
+
+		.progress-container {
+		    width: 100%;
+		    background: var(--matrix-dark-green);
+		    height: 10px;
+		    margin: 10px 0;
+		    cursor: pointer;
+		    position: relative;
+		}
+
+		.progress-bar {
+		    height: 100%;
+		    background: var(--matrix-green);
+		    width: 0;
+		}
+
+		.volume-container {
+		    display: flex;
+		    align-items: center;
+		    gap: 10px;
+		    margin-top: 10px;
+		}
+
+		#volume-slider {
+		    -webkit-appearance: none;
+		    width: 100px;
+		    height: 5px;
+		    background: var(--matrix-dark-green);
+		    outline: none;
+		}
+
+		#volume-slider::-webkit-slider-thumb {
+		    -webkit-appearance: none;
+		    width: 15px;
+		    height: 15px;
+		    background: var(--matrix-green);
+		    cursor: pointer;
+		    border-radius: 50%;
+		}
+    </style>
+</head>
+<body>
+    <div id="visualizer-container"></div>
+    
+    <div id="ui-container">
+        <div id="playlist-container">
+            <label class="file-input-label">
+                Add Track(s)
+                <input type="file" id="file-input" accept="audio/*" multiple>
+            </label>
+            <div id="playlist"></div>
+        </div>
+
+		<div id="player-controls">
+		    <div class="control-group">
+		        <button class="control-button" id="prev-button">Previous</button>
+		        <button class="control-button" id="play-button">Play</button>
+		        <button class="control-button" id="next-button">Next</button>
+		        <button class="control-button" id="mode-button">Mode: Grid</button>
+		    </div>
+		    <div class="progress-container" id="progress-container">
+		        <div class="progress-bar" id="progress-bar"></div>
+		    </div>
+		    <div class="volume-container">
+		        <span>Volume:</span>
+		        <input type="range" id="volume-slider" min="0" max="1" step="0.1" value="1">
+		    </div>
+		    <audio id="audio" style="width: 100%; margin-top: 10px;"></audio>
+		</div>
+
+        <div id="equalizer-container">
+            <h3>Equalizer</h3>
+            <div id="equalizer"></div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/shaders/CopyShader.js"></script>
+<script>
+
+const MATRIX_THEME = {
+    primary: '#00ff41',
+    secondary: '#003b00',
+    background: '#000000',
+    text: '#ffffff',
+    highlight: '#00ff00'
+};
+
+class AudioPlayer {
+    constructor() {
+        this.playlist = [];
+        this.currentTrackIndex = 0;
+        this.audioContext = null;
+        this.audioElement = document.getElementById('audio');
+        this.equalizer = null;
+        this.analyser = null;
+        this.audioSource = null;
+        this.isPlaying = false;
+
+        this.initializeUI();
+        this.setupEventListeners();
+    }
+
+    initializeUI() {
+        this.playButton = document.getElementById('play-button');
+        this.prevButton = document.getElementById('prev-button');
+        this.nextButton = document.getElementById('next-button');
+        this.fileInput = document.getElementById('file-input');
+        this.playlistContainer = document.getElementById('playlist');
+        this.equalizerContainer = document.getElementById('equalizer');
+
+        this.createEqualizerSliders();
+    }
+
+    async initializeAudioContext() {
+        try {
+            if (!this.audioContext) {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                if (this.audioContext.state === 'suspended') {
+                    await this.audioContext.resume();
+                }
+            }
+        } catch (error) {
+            console.error('Failed to initialize audio context:', error);
+        }
+    }
+
+	async setupAudioNodes() {
+	    try {
+	        // Create audio source
+	        this.audioSource = this.audioContext.createMediaElementSource(this.audioElement);
+        
+	        // Create analyser
+	        this.analyser = this.audioContext.createAnalyser();
+	        this.analyser.fftSize = 256;
+        
+	        // Create equalizer bands
+	        const frequencies = [60, 170, 310, 600, 1000, 3000, 6000, 12000, 14000, 16000];
+	        this.equalizer = frequencies.map(freq => {
+	            const filter = this.audioContext.createBiquadFilter();
+	            filter.type = 'peaking';
+	            filter.frequency.value = freq;
+	            filter.Q.value = 1;
+	            filter.gain.value = 0;
+	            return filter;
+	        });
+        
+	        // Connect nodes: source -> filters -> analyser -> destination
+	        let prevNode = this.audioSource;
+	        this.equalizer.forEach(filter => {
+	            prevNode.connect(filter);
+	            prevNode = filter;
+	        });
+        
+	        prevNode.connect(this.analyser);
+	        this.analyser.connect(this.audioContext.destination);
+        
+        	// Reset equalizer values after setup
+	        this.resetEqualizerValues();
+
+	        console.log('Audio nodes setup complete');
+	    } catch (error) {
+	        console.error('Error setting up audio nodes:', error);
+	    }
+	}
+
+	createEqualizerSliders() {
+	    const frequencies = [60, 170, 310, 600, 1000, 3000, 6000, 12000, 14000, 16000];
+	    const labels = ['60', '170', '310', '600', '1K', '3K', '6K', '12K', '14K', '16K'];
+	    
+	    this.equalizerContainer.innerHTML = ''; // Clear existing sliders
+	    
+	    frequencies.forEach((freq, index) => {
+	        const sliderContainer = document.createElement('div');
+	        sliderContainer.className = 'eq-slider-container';
+	
+	        const slider = document.createElement('input');
+	        slider.type = 'range';
+	        slider.min = -12;
+	        slider.max = 12;
+	        slider.value = 0;
+	        slider.step = 1;
+	        slider.className = 'eq-slider';
+	        slider.setAttribute('orient', 'vertical'); // Important for Firefox
+
+	        const label = document.createElement('div');
+	        label.className = 'eq-label';
+	        label.textContent = labels[index] + 'Hz';
+	
+	        slider.addEventListener('input', (e) => {
+	            const value = parseFloat(e.target.value);
+	            if (this.equalizer && this.equalizer[index]) {
+	                this.equalizer[index].gain.value = value;
+	            }
+	        });
+	
+	        sliderContainer.appendChild(slider);
+	        sliderContainer.appendChild(label);
+	        this.equalizerContainer.appendChild(sliderContainer);
+	    });
+	}
+
+	resetEqualizerValues() {
+	    const sliders = document.querySelectorAll('.eq-slider');
+	    sliders.forEach((slider, index) => {
+	        if (this.equalizer && this.equalizer[index]) {
+	            this.equalizer[index].gain.value = parseFloat(slider.value);
+	        }
+	    });
+	}
+
+    setupEventListeners() {
+        this.fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+        this.playButton.addEventListener('click', () => this.togglePlay());
+        this.prevButton.addEventListener('click', () => this.playPrevious());
+        this.nextButton.addEventListener('click', () => this.playNext());
+        this.audioElement.addEventListener('ended', () => this.playNext());
+    
+	    // Progress bar
+	    const progressContainer = document.getElementById('progress-container');
+	    progressContainer.addEventListener('click', (e) => this.handleProgressBarClick(e));
+	    this.audioElement.addEventListener('timeupdate', () => this.updateProgressBar());
+    
+	    // Volume control
+	    const volumeSlider = document.getElementById('volume-slider');
+	    volumeSlider.addEventListener('input', (e) => {
+	        this.audioElement.volume = e.target.value;
+	    });
+    }
+
+	async togglePlay() {
+		if (this.playlist.length === 0) {
+			return;
+		}
+
+	    try {
+	        // Initialize audio context on first play
+	        if (!this.audioContext) {
+	            await this.initializeAudioContext();
+	            await this.setupAudioNodes();
+	        }
+
+	        if (this.audioContext.state === 'suspended') {
+	            await this.audioContext.resume();
+	        }
+
+	        if (this.audioElement.paused) {
+	            await this.audioElement.play();
+	            this.isPlaying = true;
+	        } else {
+	            this.audioElement.pause();
+	            this.isPlaying = false;
+    	    }
+	        this.updatePlayButton();
+	    } catch (error) {
+	        console.error('Error toggling play:', error);
+	    }
+	}
+
+    handleFileSelect(event) {
+        const files = Array.from(event.target.files);
+        
+        files.forEach(file => {
+            const track = {
+                file: file,
+                name: file.name,
+                url: URL.createObjectURL(file)
+            };
+            this.playlist.push(track);
+            this.addTrackToPlaylist(track);
+        });
+
+        if (!this.isPlaying && this.playlist.length === files.length) {
+            this.playTrack(0);
+        }
+    }
+
+	handleProgressBarClick(e) {
+	    const progressContainer = document.getElementById('progress-container');
+	    const rect = progressContainer.getBoundingClientRect();
+	    const x = e.clientX - rect.left;
+	    const width = rect.width;
+	    const duration = this.audioElement.duration;
+	    this.audioElement.currentTime = (x / width) * duration;
+	}
+
+	updateProgressBar() {
+	    const progressBar = document.getElementById('progress-bar');
+	    const currentTime = this.audioElement.currentTime;
+	    const duration = this.audioElement.duration;
+	    if (duration) {
+	        const percentage = (currentTime / duration) * 100;
+	        progressBar.style.width = percentage + '%';
+	    }
+	}
+
+    addTrackToPlaylist(track) {
+        const trackElement = document.createElement('div');
+        trackElement.className = 'playlist-item';
+        trackElement.innerHTML = `
+            <span>${track.name}</span>
+            <button class="remove-track">×</button>
+        `;
+
+        trackElement.addEventListener('click', (e) => {
+            if (!e.target.classList.contains('remove-track')) {
+                const index = Array.from(this.playlistContainer.children).indexOf(trackElement);
+                this.playTrack(index);
+            }
+        });
+
+        trackElement.querySelector('.remove-track').addEventListener('click', (e) => {
+            e.stopPropagation();
+            const index = Array.from(this.playlistContainer.children).indexOf(trackElement);
+            this.removeTrack(index);
+        });
+
+        this.playlistContainer.appendChild(trackElement);
+    }
+
+    removeTrack(index) {
+        this.playlistContainer.children[index].remove();
+        URL.revokeObjectURL(this.playlist[index].url);
+        this.playlist.splice(index, 1);
+
+        if (index === this.currentTrackIndex) {
+            if (this.playlist.length > 0) {
+                this.playTrack(Math.min(index, this.playlist.length - 1));
+            } else {
+                this.audioElement.src = '';
+                this.currentTrackIndex = 0;
+                this.isPlaying = false;
+                this.updatePlayButton();
+            }
+        } else if (index < this.currentTrackIndex) {
+            this.currentTrackIndex--;
+        }
+    }
+
+	async playTrack(index) {
+	    if (index >= 0 && index < this.playlist.length) {
+	        this.currentTrackIndex = index;
+	        this.audioElement.src = this.playlist[index].url;
+        
+	        // Ensure audio nodes are set up before playing
+	        if (!this.audioContext) {
+	            await this.initializeAudioContext();
+	            await this.setupAudioNodes();
+	        }
+        
+	        try {
+	            await this.audioElement.play();
+	            this.isPlaying = true;
+	            this.updatePlayButton();
+	            this.updateActiveTrack();
+	        } catch (error) {
+	            console.error('Error playing track:', error);
+	        }
+	    }
+	}
+
+    playNext() {
+        if (this.playlist.length === 0) return;
+        const nextIndex = (this.currentTrackIndex + 1) % this.playlist.length;
+        this.playTrack(nextIndex);
+    }
+
+    playPrevious() {
+        if (this.playlist.length === 0) return;
+        const prevIndex = (this.currentTrackIndex - 1 + this.playlist.length) % this.playlist.length;
+        this.playTrack(prevIndex);
+    }
+
+    updatePlayButton() {
+        this.playButton.textContent = this.isPlaying ? 'Pause' : 'Play';
+    }
+
+    updateActiveTrack() {
+        Array.from(this.playlistContainer.children).forEach((track, index) => {
+            track.classList.toggle('active', index === this.currentTrackIndex);
+        });
+    }
+
+    getAnalyser() {
+        return this.analyser;
+    }
+}
+
+class MatrixVisualizer {
+    constructor(audioPlayer) {
+        this.audioPlayer = audioPlayer;
+        this.scene = null;
+        this.camera = null;
+        this.renderer = null;
+        this.controls = null;
+        this.bars = [];
+        this.currentMode = 0; // Added for mode tracking
+	    this.peakMeshes = [];
+	    this.peakLevels = [];
+	    this.peakDecayRate = 0.98; // Adjust this value to control how fast peaks decay
+	    this.peakHoldTime = 40; // Number of frames to hold the peak before decay
+	    this.peakHoldCounters = [];
+        this.init();
+    }
+
+    init() {
+        // Scene setup
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x000000);
+
+        // Camera setup
+        this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        this.camera.position.set(0, 10, 15);
+        this.camera.lookAt(0, 0, 0);
+
+        // Renderer setup
+        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(window.devicePixelRatio);
+        document.getElementById('visualizer-container').appendChild(this.renderer.domElement);
+
+        // Controls
+        this.controls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+        this.controls.enableDamping = true;
+        this.controls.dampingFactor = 0.05;
+        this.controls.maxPolarAngle = Math.PI / 2;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x222222);
+        this.scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0x00ff41, 0.5);
+        directionalLight.position.set(1, 1, 1);
+        this.scene.add(directionalLight);
+
+        // Create bars
+        this.createBars();
+
+        // Event listeners
+        window.addEventListener('resize', () => this.onWindowResize(), false);
+        this.setupModeButton();
+    }
+
+    setupModeButton() {
+        const modeButton = document.getElementById('mode-button');
+        if (modeButton) {
+            modeButton.addEventListener('click', () => this.switchMode());
+        }
+    }
+
+    switchMode() {
+        this.currentMode = (this.currentMode + 1) % 3;
+        
+        // Clear existing bars
+        this.bars.forEach(bar => {
+            this.scene.remove(bar);
+            bar.geometry.dispose();
+            bar.material.dispose();
+        });
+        this.bars = [];
+        
+    // Clear existing peak meshes
+    this.peakMeshes.forEach(mesh => {
+        this.scene.remove(mesh);
+        mesh.geometry.dispose();
+        mesh.material.dispose();
+    });
+    this.peakMeshes = [];
+    this.peakLevels = [];
+    this.peakHoldCounters = [];
+    
+    // Create new bars and peaks in new mode
+    this.createBars();
+        
+        // Update button text
+        const modeButton = document.getElementById('mode-button');
+        if (modeButton) {
+            const modeNames = ['Grid', 'Circle', 'Sphere'];
+            modeButton.textContent = `Mode: ${modeNames[this.currentMode]}`;
+        }
+    }
+
+	createPeakMesh(geometry, bar) {
+	    const wireframeMaterial = new THREE.MeshBasicMaterial({
+	        color: 0x00ff41,
+	        wireframe: true,
+	        transparent: true,
+	        opacity: 0.5
+	    });
+
+	    const peakMesh = new THREE.Mesh(geometry.clone(), wireframeMaterial);
+	    peakMesh.userData.parentBar = bar; // Store reference to corresponding bar
+
+	    this.peakMeshes.push(peakMesh);
+	    this.peakLevels.push(0);
+	    this.peakHoldCounters.push(0);
+	    this.scene.add(peakMesh);
+
+	    return peakMesh;
+	}
+
+    createBars() {
+        const geometry = new THREE.BoxGeometry(0.5, 1, 0.5);
+        const material = new THREE.MeshPhongMaterial({ 
+            color: 0x00ff41,
+            emissive: 0x003300,
+            shininess: 30
+        });
+
+        switch(this.currentMode) {
+            case 0: // Grid
+                this.createGridBars(geometry, material);
+                break;
+            case 1: // Circle
+                this.createCircleBars(geometry, material);
+                break;
+            case 2: // Sphere
+                this.createSphereBars(geometry, material);
+                break;
+        }
+    }
+
+	createGridBars(geometry, material) {
+	    const GRID_SIZE = 8;
+	    const SPACING = 1;
+
+	    for (let x = 0; x < GRID_SIZE; x++) {
+	        for (let z = 0; z < GRID_SIZE; z++) {
+	            const bar = new THREE.Mesh(geometry, material.clone());
+	            bar.position.x = (x - GRID_SIZE/2) * SPACING;
+	            bar.position.z = (z - GRID_SIZE/2) * SPACING;
+	            bar.position.y = 0.5;
+	            this.bars.push(bar);
+	            this.scene.add(bar);
+
+	            const peakMesh = this.createPeakMesh(geometry, bar);
+	            peakMesh.position.copy(bar.position);
+	            peakMesh.rotation.copy(bar.rotation);
+	        }
+	    }
+	}
+
+	createCircleBars(geometry, material) {
+	    const BAR_COUNT = 64;
+	    const RADIUS = 5;
+
+	    for (let i = 0; i < BAR_COUNT; i++) {
+	        const angle = (i / BAR_COUNT) * Math.PI * 2;
+	        const bar = new THREE.Mesh(geometry, material.clone());
+        
+	        bar.position.x = Math.cos(angle) * RADIUS;
+	        bar.position.z = Math.sin(angle) * RADIUS;
+	        bar.position.y = 0.5;
+        
+	        bar.rotation.y = -angle + Math.PI/2;
+        
+	        this.bars.push(bar);
+	        this.scene.add(bar);
+
+	        const peakMesh = this.createPeakMesh(geometry, bar);
+	        peakMesh.position.copy(bar.position);
+	        peakMesh.rotation.copy(bar.rotation);
+	    }
+	}
+
+	createSphereBars(geometry, material) {
+	    const BAR_COUNT = 64;
+	    const PHI = Math.PI * (3 - Math.sqrt(5)); // Golden angle
+	    const RADIUS = 2;
+
+	    for (let i = 0; i < BAR_COUNT; i++) {
+	        const y = 1 - (i / (BAR_COUNT - 1)) * 2;
+	        const radius = Math.sqrt(1 - y * y);
+	        const angle = PHI * i;
+
+	        const bar = new THREE.Mesh(geometry, material.clone());
+        
+	        const x = Math.cos(angle) * radius;
+	        const z = Math.sin(angle) * radius;
+        
+	        bar.position.set(
+	            x * RADIUS,
+	            y * RADIUS,
+	            z * RADIUS
+	        );
+
+	        bar.userData.basePosition = bar.position.clone();
+        
+	        // Point the bar toward the center
+	        bar.lookAt(0, 0, 0);
+	        bar.rotateX(Math.PI / 2);
+        
+	        this.bars.push(bar);
+	        this.scene.add(bar);
+
+	        // Create corresponding peak mesh with reference to the bar
+	        const peakMesh = this.createPeakMesh(geometry, bar);
+	        peakMesh.position.copy(bar.position);
+	        peakMesh.rotation.copy(bar.rotation);
+	    }
+	}
+
+	updateBars(frequencyData) {
+	    if (!frequencyData || !frequencyData.length) {
+			return;
+		}
+
+	    this.bars.forEach((bar, index) => {
+	        const value = frequencyData[index % frequencyData.length] / 255;
+	        const height = value * 5 + 0.1;
+
+	        bar.scale.y = height;
+
+	        // Update peak level
+	        if (height > this.peakLevels[index]) {
+	            this.peakLevels[index] = height;
+	            this.peakHoldCounters[index] = this.peakHoldTime;
+	        } else {
+	            if (this.peakHoldCounters[index] > 0) {
+	                this.peakHoldCounters[index]--;
+	            } else {
+	                this.peakLevels[index] *= this.peakDecayRate;
+	            }
+	        }
+
+	        // Update peak mesh
+	        const peakMesh = this.peakMeshes[index];
+	        peakMesh.scale.y = this.peakLevels[index];
+
+	        if (this.currentMode === 2) { // Sphere mode
+	            // Scale position from center
+	            const basePos = bar.userData.basePosition;
+	            bar.position.copy(basePos).multiplyScalar(1 + height * 0.2);
+            
+	            // Update peak mesh position and rotation
+	            peakMesh.position.copy(basePos).multiplyScalar(1 + this.peakLevels[index] * 0.2);
+	            peakMesh.rotation.copy(bar.rotation);
+	        } else {
+	            bar.position.y = height / 2;
+	            peakMesh.position.y = this.peakLevels[index] / 2;
+	        }
+
+	        // Update colors
+	        const hue = 0.3 + value * 0.1;
+	        bar.material.emissive.setHSL(hue, 0.8, value * 0.5);
+	        peakMesh.material.opacity = Math.min(0.5, this.peakLevels[index] / height);
+	    });
+	}
+
+    animate() {
+        requestAnimationFrame(() => this.animate());
+
+        this.controls.update();
+
+        const analyser = this.audioPlayer.getAnalyser();
+        if (this.audioPlayer.isPlaying && analyser) {
+            const frequencyData = new Uint8Array(analyser.frequencyBinCount);
+            analyser.getByteFrequencyData(frequencyData);
+            this.updateBars(frequencyData);
+        }
+
+        this.renderer.render(this.scene, this.camera);
+    }
+
+    onWindowResize() {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+}
+
+// Initialize the audio player and visualizer
+const audioPlayer = new AudioPlayer();
+const visualizer = new MatrixVisualizer(audioPlayer);
+
+// Start the animation loop
+visualizer.animate();
+
+// Add this for debugging
+window.addEventListener('error', function(e) {
+    console.error('Global error:', e);
+});
+
+</script>
+</body>
+</html>
