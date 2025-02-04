@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Bouncing & Spinning Objects in a Rotating Container</title>
+    <style>
+      /* Full-window canvas with no margins */
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #000;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Include Three.js from a CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+      // ----------------------------------------------------------
+      // 1. SETUP SCENE, CAMERA, AND RENDERER
+      // ----------------------------------------------------------
+      const scene = new THREE.Scene();
+
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      camera.position.z = 120;
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      // ----------------------------------------------------------
+      // 2. SETUP LIGHTING
+      // ----------------------------------------------------------
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+      scene.add(ambientLight);
+
+      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+      directionalLight.position.set(1, 1, 1);
+      scene.add(directionalLight);
+
+      // ----------------------------------------------------------
+      // 3. CREATE THE CONTAINER SPHERE (VISUAL ONLY)
+      // ----------------------------------------------------------
+      // The container is a blue sphere of radius 50.
+      const containerRadius = 50;
+      const containerGeometry = new THREE.SphereGeometry(containerRadius, 32, 32);
+      const containerMaterial = new THREE.MeshPhongMaterial({
+        color: 0x0000ff,
+        transparent: true,
+        opacity: 0.2,
+        side: THREE.DoubleSide,
+      });
+      const containerMesh = new THREE.Mesh(containerGeometry, containerMaterial);
+
+      // Wireframe overlay for a clearly drawn mesh.
+      const wireframeGeometry = new THREE.WireframeGeometry(containerGeometry);
+      const wireframeMaterial = new THREE.LineBasicMaterial({
+        color: 0x0000ff,
+        linewidth: 2,
+      });
+      const containerWireframe = new THREE.LineSegments(wireframeGeometry, wireframeMaterial);
+
+      // Group them so they rotate together.
+      const containerGroup = new THREE.Group();
+      containerGroup.add(containerMesh);
+      containerGroup.add(containerWireframe);
+      scene.add(containerGroup);
+
+      // ----------------------------------------------------------
+      // 4. PHYSICS & OBJECT PARAMETERS
+      // ----------------------------------------------------------
+      // For clarity, we make the objects slightly larger.
+      // They will be treated as if each object has an effective collision sphere of radius:
+      const collisionRadius = 1.5;
+      // To keep an object fully inside the container, its center must remain within:
+      const maxObjectDistance = containerRadius - collisionRadius; // 50 - 1.5 = 48.5
+
+      // Speed multiplier for the objects’ translational velocity:
+      const objectSpeed = 10;
+      // Maximum angular speed (radians per second) for each rotation axis:
+      const maxAngularSpeed = 0.5;
+
+      // Helper: Generate a uniformly random point inside a sphere of radius maxR.
+      function randomPointInSphere(maxR) {
+        const u = Math.random();
+        const v = Math.random();
+        const theta = 2 * Math.PI * u;
+        const phi = Math.acos(2 * v - 1);
+        const r = maxR * Math.cbrt(Math.random());
+        const sinPhi = Math.sin(phi);
+        const x = r * sinPhi * Math.cos(theta);
+        const y = r * sinPhi * Math.sin(theta);
+        const z = r * Math.cos(phi);
+        return new THREE.Vector3(x, y, z);
+      }
+
+      // ----------------------------------------------------------
+      // 5. CREATE OBJECTS (25 Yellow Spheres, 25 Red Cubes, 25 Green Cones)
+      // ----------------------------------------------------------
+      const objects = []; // Each object: { mesh, velocity: THREE.Vector3, angularVelocity: THREE.Vector3, collisionRadius }
+
+      // ----- Yellow Spheres -----
+      // Create a sphere geometry with radius equal to our collisionRadius.
+      const sphereGeometry = new THREE.SphereGeometry(collisionRadius, 32, 32);
+      const yellowMaterial = new THREE.MeshPhongMaterial({ color: 0xffff00 });
+
+      for (let i = 0; i < 25; i++) {
+        const mesh = new THREE.Mesh(sphereGeometry, yellowMaterial);
+        mesh.position.copy(randomPointInSphere(maxObjectDistance));
+        // Random translational velocity.
+        const velocity = new THREE.Vector3(
+          Math.random() * 2 - 1,
+          Math.random() * 2 - 1,
+          Math.random() * 2 - 1
+        ).normalize().multiplyScalar(objectSpeed);
+        // Random angular velocity (radians per second) for spin on each axis.
+        const angularVelocity = new THREE.Vector3(
+          (Math.random() * 2 - 1) * maxAngularSpeed,
+          (Math.random() * 2 - 1) * maxAngularSpeed,
+          (Math.random() * 2 - 1) * maxAngularSpeed
+        );
+        objects.push({ mesh, velocity, angularVelocity, collisionRadius });
+        scene.add(mesh);
+      }
+
+      // ----- Red Cubes -----
+      // For cubes, we choose a side length so that the cube’s circumscribed sphere radius is our collisionRadius.
+      // For a cube (side length s), the circumscribed radius = s * sqrt(3)/2, so s = 2 * collisionRadius / sqrt(3)
+      const cubeSide = (2 * collisionRadius) / Math.sqrt(3);
+      const cubeGeometry = new THREE.BoxGeometry(cubeSide, cubeSide, cubeSide);
+      const redMaterial = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+
+      for (let i = 0; i < 25; i++) {
+        const mesh = new THREE.Mesh(cubeGeometry, redMaterial);
+        mesh.position.copy(randomPointInSphere(maxObjectDistance));
+        const velocity = new THREE.Vector3(
+          Math.random() * 2 - 1,
+          Math.random() * 2 - 1,
+          Math.random() * 2 - 1
+        ).normalize().multiplyScalar(objectSpeed);
+        const angularVelocity = new THREE.Vector3(
+          (Math.random() * 2 - 1) * maxAngularSpeed,
+          (Math.random() * 2 - 1) * maxAngularSpeed,
+          (Math.random() * 2 - 1) * maxAngularSpeed
+        );
+        objects.push({ mesh, velocity, angularVelocity, collisionRadius });
+        scene.add(mesh);
+      }
+
+      // ----- Green Cones -----
+      // For cones, we start with a ConeGeometry with base radius 1 and height 2, then center it and scale so its
+      // bounding sphere becomes our collisionRadius.
+      const coneGeometryOrig = new THREE.ConeGeometry(1, 2, 32);
+      coneGeometryOrig.center(); // re-center so geometry's center is (0,0,0)
+      coneGeometryOrig.computeBoundingSphere();
+      const coneScaleFactor = collisionRadius / coneGeometryOrig.boundingSphere.radius;
+      const coneGeometry = coneGeometryOrig.clone();
+      coneGeometry.scale(coneScaleFactor, coneScaleFactor, coneScaleFactor);
+      const greenMaterial = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+
+      for (let i = 0; i < 25; i++) {
+        const mesh = new THREE.Mesh(coneGeometry, greenMaterial);
+        mesh.position.copy(randomPointInSphere(maxObjectDistance));
+        const velocity = new THREE.Vector3(
+          Math.random() * 2 - 1,
+          Math.random() * 2 - 1,
+          Math.random() * 2 - 1
+        ).normalize().multiplyScalar(objectSpeed);
+        const angularVelocity = new THREE.Vector3(
+          (Math.random() * 2 - 1) * maxAngularSpeed,
+          (Math.random() * 2 - 1) * maxAngularSpeed,
+          (Math.random() * 2 - 1) * maxAngularSpeed
+        );
+        objects.push({ mesh, velocity, angularVelocity, collisionRadius });
+        scene.add(mesh);
+      }
+
+      // ----------------------------------------------------------
+      // 6. UPDATE FUNCTION FOR CONTAINER COLLISIONS (Per Object)
+      // ----------------------------------------------------------
+      // The update routine moves an object over a time step dt.
+      // If the object is about to cross the container's inner wall (allowed sphere of radius maxObjectDistance),
+      // it computes the collision time exactly, reflects the velocity, and uses the remaining time.
+      function updateObject(obj, dt) {
+        let tRemaining = dt;
+        const maxIterations = 5;
+        let iterations = 0;
+        while (tRemaining > 0 && iterations < maxIterations) {
+          const pos = obj.mesh.position.clone();
+          const v = obj.velocity.clone();
+          const pNext = pos.clone().add(v.clone().multiplyScalar(tRemaining));
+          if (pNext.length() <= maxObjectDistance) {
+            obj.mesh.position.copy(pNext);
+            break;
+          }
+          const a = v.dot(v);
+          const b = 2 * pos.dot(v);
+          const c = pos.dot(pos) - maxObjectDistance * maxObjectDistance;
+          const discriminant = b * b - 4 * a * c;
+          let tCollision = tRemaining;
+          if (discriminant >= 0) {
+            const sqrtDisc = Math.sqrt(discriminant);
+            const t1 = (-b - sqrtDisc) / (2 * a);
+            const t2 = (-b + sqrtDisc) / (2 * a);
+            if (t1 > 0 && t1 < tRemaining) {
+              tCollision = t1;
+            } else if (t2 > 0 && t2 < tRemaining) {
+              tCollision = t2;
+            }
+          }
+          const pCollision = pos.clone().add(v.clone().multiplyScalar(tCollision));
+          pCollision.setLength(maxObjectDistance);
+          obj.mesh.position.copy(pCollision);
+          const normal = pCollision.clone().normalize();
+          const vDotN = obj.velocity.dot(normal);
+          obj.velocity.sub(normal.multiplyScalar(2 * vDotN));
+          tRemaining -= tCollision;
+          iterations++;
+        }
+      }
+
+      // ----------------------------------------------------------
+      // 7. RESOLVE COLLISIONS BETWEEN TWO OBJECTS (Elastic Collision)
+      // ----------------------------------------------------------
+      // For equal-mass objects, we resolve collisions by pushing them apart and swapping the velocity components
+      // along the line joining their centers.
+      function resolveObjectCollision(objA, objB) {
+        const posA = objA.mesh.position;
+        const posB = objB.mesh.position;
+        const deltaPos = new THREE.Vector3().subVectors(posA, posB);
+        let dist = deltaPos.length();
+        const minDist = objA.collisionRadius + objB.collisionRadius;
+        if (dist === 0) {
+          deltaPos.set(Math.random(), Math.random(), Math.random()).normalize();
+          dist = 0.001;
+        }
+        if (dist < minDist) {
+          const penetration = minDist - dist;
+          const normal = deltaPos.clone().normalize();
+          posA.add(normal.clone().multiplyScalar(penetration / 2));
+          posB.sub(normal.clone().multiplyScalar(penetration / 2));
+          const relativeVelocity = new THREE.Vector3().subVectors(objA.velocity, objB.velocity);
+          const vRel = relativeVelocity.dot(normal);
+          if (vRel < 0) {
+            const impulse = -vRel;
+            objA.velocity.add(normal.clone().multiplyScalar(impulse));
+            objB.velocity.sub(normal.clone().multiplyScalar(impulse));
+          }
+        }
+      }
+
+      // ----------------------------------------------------------
+      // 8. ANIMATION LOOP
+      // ----------------------------------------------------------
+      const clock = new THREE.Clock();
+      function animate() {
+        requestAnimationFrame(animate);
+        const delta = clock.getDelta();
+
+        // Update each object's position (and resolve container collisions).
+        objects.forEach(obj => {
+          updateObject(obj, delta);
+          // Also update the object's rotation based on its angular velocity.
+          obj.mesh.rotation.x += obj.angularVelocity.x * delta;
+          obj.mesh.rotation.y += obj.angularVelocity.y * delta;
+          obj.mesh.rotation.z += obj.angularVelocity.z * delta;
+        });
+
+        // Resolve collisions between objects.
+        for (let i = 0; i < objects.length; i++) {
+          for (let j = i + 1; j < objects.length; j++) {
+            resolveObjectCollision(objects[i], objects[j]);
+          }
+        }
+
+        // Slowly rotate the container for visual effect.
+        containerGroup.rotation.y += 0.1 * delta;
+        containerGroup.rotation.x += 0.05 * delta;
+
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      // ----------------------------------------------------------
+      // 9. HANDLE WINDOW RESIZING
+      // ----------------------------------------------------------
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }, false);
+    </script>
+  </body>
+</html>
