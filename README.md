@@ -9,3 +9,4 @@ A simple repository of WebGL games, prototypes and experiments.
 - [Go (3D)](https://josh-english-2k18.github.io/webgl-games/go.webgl.html)
 - [Matrix Audio Visualizer](https://josh-english-2k18.github.io/webgl-games/matrix-audio-visualizer.html)
 - [3D Ball Physics Simulation](https://josh-english-2k18.github.io/webgl-games/ball-physics-simulation.html)
+- [Starfox 3D Space Fighter Simulator](https://josh-english-2k18.github.io/webgl-games/starfox.html)

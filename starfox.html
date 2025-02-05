@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Geo Flight – 3D Flight Shooter</title>
+    <style>
+      /* Full-window canvas with no margins; HUD overlay for score/shields/missiles */
+      body {
+        margin: 0;
+        overflow: hidden;
+        background-color: #000;
+      }
+      #hud {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        color: #fff;
+        font-family: Arial, sans-serif;
+        font-size: 20px;
+        z-index: 100;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="hud">Score: 0 | Shields: 100 | Missiles: 50</div>
+    <!-- Include Three.js from a CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+      /***********************************************************************
+       * Global Variables & Game State
+       ***********************************************************************/
+      var scene, camera, renderer;
+      var clock = new THREE.Clock();
+      
+      // Arrays holding in-game objects.
+      var bullets = [];
+      var missiles = [];
+      var enemies = [];
+      var obstacles = [];
+      var rewards = [];
+      
+      // Simple keyboard state tracker.
+      var keys = {};
+      
+      var score = 0;
+      
+      // The player's ship.
+      var player = {};
+      
+      /***********************************************************************
+       * INITIALIZATION
+       ***********************************************************************/
+      init();
+      animate();
+      
+      function init() {
+        // Create scene, camera and renderer.
+        scene = new THREE.Scene();
+        
+        camera = new THREE.PerspectiveCamera(
+          75,
+          window.innerWidth / window.innerHeight,
+          0.1,
+          2000
+        );
+        
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+        
+        // Add ambient and directional lighting.
+        var ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+        
+        var directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(1, 1, 1);
+        scene.add(directionalLight);
+        
+        // Use fog for a starfield/tunnel effect.
+        scene.fog = new THREE.FogExp2(0x000000, 0.0015);
+        
+        // Create the player's ship.
+        player = createPlayerShip();
+        player.mesh.position.set(0, 0, 0);
+        // Initial parameters:
+        player.speed = 30;         // units/second forward speed.
+        player.yaw = 0;            // rotation about Y (in radians).
+        player.gunCooldown = 0;    // seconds until next bullet.
+        player.missileCooldown = 0; // seconds until next missile.
+        player.shield = 100;       // player's hit points.
+        player.collisionRadius = 3;// approximate collision radius.
+        // NEW: Missile ammo count.
+        player.missileAmmo = 50;
+        scene.add(player.mesh);
+        
+        // Create level objects.
+        createLevelObjects();
+        
+        // Set up keyboard event listeners.
+        document.addEventListener("keydown", onKeyDown, false);
+        document.addEventListener("keyup", onKeyUp, false);
+        window.addEventListener("resize", onWindowResize, false);
+      }
+      
+      /***********************************************************************
+       * GAME OBJECT BUILDERS
+       ***********************************************************************/
+      
+      // Build the player's ship as three elongated diamond‐shaped pieces.
+      // The central diamond (blue) is longer and the side pieces (red and yellow)
+      // simulate engine pods.
+      function createPlayerShip() {
+        var ship = {};
+        var group = new THREE.Group();
+        
+        // Helper: create an elongated diamond using an octahedron scaled appropriately.
+        function createDiamond(scaleVec, color) {
+          var geo = new THREE.OctahedronGeometry(1);
+          var mat = new THREE.MeshPhongMaterial({ color: color });
+          var mesh = new THREE.Mesh(geo, mat);
+          mesh.scale.set(scaleVec.x, scaleVec.y, scaleVec.z);
+          return mesh;
+        }
+        
+        // Central diamond: elongated along Z (blue).
+        var centralDiamond = createDiamond(new THREE.Vector3(0.8, 0.8, 3), 0x0000ff);
+        centralDiamond.position.set(0, 0, 0);
+        
+        // Left engine diamond: red, smaller.
+        var leftEngine = createDiamond(new THREE.Vector3(0.6, 0.6, 2), 0xff0000);
+        leftEngine.position.set(-1.5, 0, -1.5);
+        
+        // Right engine diamond: yellow, smaller.
+        var rightEngine = createDiamond(new THREE.Vector3(0.6, 0.6, 2), 0xffff00);
+        rightEngine.position.set(1.5, 0, -1.5);
+        
+        group.add(centralDiamond);
+        group.add(leftEngine);
+        group.add(rightEngine);
+        
+        ship.mesh = group;
+        return ship;
+      }
+      
+      // Distribute level objects (obstacles, enemies, rewards) in space.
+      function createLevelObjects() {
+        // Obstacles: 20 red cubes (traps).
+        for (var i = 0; i < 20; i++) {
+          var obs = {};
+          var size = 3;
+          var geometry = new THREE.BoxGeometry(size, size, size);
+          var material = new THREE.MeshPhongMaterial({ color: 0xff0000 });
+          obs.mesh = new THREE.Mesh(geometry, material);
+          obs.collisionRadius = 2.5;
+          obs.mesh.position.set(randomRange(-20, 20), randomRange(-15, 15), randomRange(50, 500));
+          obstacles.push(obs);
+          scene.add(obs.mesh);
+        }
+        
+        // Enemies: 10 yellow tetrahedrons that oscillate horizontally.
+        for (var i = 0; i < 10; i++) {
+          var enemy = {};
+          var geometry = new THREE.TetrahedronGeometry(2);
+          var material = new THREE.MeshPhongMaterial({ color: 0xffff00 });
+          enemy.mesh = new THREE.Mesh(geometry, material);
+          enemy.collisionRadius = 2;
+          enemy.mesh.position.set(randomRange(-20, 20), randomRange(-15, 15), randomRange(100, 500));
+          enemy.baseX = enemy.mesh.position.x;
+          enemy.amplitude = randomRange(2, 5);
+          enemy.frequency = randomRange(0.5, 1.5);
+          enemies.push(enemy);
+          scene.add(enemy.mesh);
+        }
+        
+        // Rewards/Powerups: 10 green spheres that restore shields and add score.
+        for (var i = 0; i < 10; i++) {
+          var reward = {};
+          var geometry = new THREE.SphereGeometry(1.5, 16, 16);
+          var material = new THREE.MeshPhongMaterial({ color: 0x00ff00 });
+          reward.mesh = new THREE.Mesh(geometry, material);
+          reward.collisionRadius = 1.5;
+          reward.mesh.position.set(randomRange(-20, 20), randomRange(-15, 15), randomRange(50, 500));
+          rewards.push(reward);
+          scene.add(reward.mesh);
+        }
+      }
+      
+      // Utility: returns a random number between min and max.
+      function randomRange(min, max) {
+        return Math.random() * (max - min) + min;
+      }
+      
+      /***********************************************************************
+       * INPUT HANDLERS
+       ***********************************************************************/
+      function onKeyDown(event) {
+        keys[event.code] = true;
+      }
+      
+      function onKeyUp(event) {
+        keys[event.code] = false;
+      }
+      
+      /***********************************************************************
+       * MAIN GAME LOOP & UPDATES
+       ***********************************************************************/
+      function animate() {
+        requestAnimationFrame(animate);
+        var dt = clock.getDelta();
+        updatePlayer(dt);
+        updateBullets(dt);
+        updateMissiles(dt);
+        updateEnemies(dt);
+        checkCollisions();
+        updateCamera();
+        updateHUD();
+        renderer.render(scene, camera);
+      }
+      
+      // Update the player's ship.
+      // Left/right arrow keys now rotate the ship (changing its yaw).
+      // Up/down accelerate/brake; the ship moves along the direction it’s facing.
+      function updatePlayer(dt) {
+        var turnSpeed = 2; // radians per second
+        
+        if (keys["ArrowLeft"]) {
+          player.yaw -= turnSpeed * dt;
+        }
+        if (keys["ArrowRight"]) {
+          player.yaw += turnSpeed * dt;
+        }
+        
+        // Apply the yaw rotation to the ship model.
+        player.mesh.rotation.y = player.yaw;
+        
+        // Acceleration and braking.
+        var acceleration = 20;
+        var deceleration = 30;
+        if (keys["ArrowUp"]) {
+          player.speed += acceleration * dt;
+        }
+        if (keys["ArrowDown"]) {
+          player.speed -= deceleration * dt;
+          if (player.speed < 0) { player.speed = 0; }
+        }
+        
+        // Compute forward vector from yaw (with zero pitch).
+        var forward = new THREE.Vector3(Math.sin(player.yaw), 0, Math.cos(player.yaw));
+        player.mesh.position.add(forward.multiplyScalar(player.speed * dt));
+        
+        // Firing weapons with cooldowns.
+        player.gunCooldown -= dt;
+        player.missileCooldown -= dt;
+        if (keys["Space"] && player.gunCooldown <= 0) {
+          fireBullet();
+          player.gunCooldown = 0.2;
+        }
+        if (keys["KeyX"] && player.missileCooldown <= 0) {
+          // Only fire a missile if ammo remains.
+          if (player.missileAmmo > 0) {
+            fireMissile();
+            player.missileAmmo--;
+          }
+          player.missileCooldown = 1;
+        }
+      }
+      
+      // Spawn a bullet from the ship.
+      function fireBullet() {
+        var bullet = {};
+        var geometry = new THREE.SphereGeometry(0.5, 8, 8);
+        var material = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        bullet.mesh = new THREE.Mesh(geometry, material);
+        // Spawn from the ship's position offset in the forward direction.
+        var spawnPos = player.mesh.position.clone();
+        var forward = new THREE.Vector3(Math.sin(player.yaw), 0, Math.cos(player.yaw));
+        spawnPos.add(forward.clone().multiplyScalar(3));
+        bullet.mesh.position.copy(spawnPos);
+        bullet.velocity = forward.clone().multiplyScalar(150);
+        bullet.collisionRadius = 0.5;
+        bullet.life = 3; // seconds lifespan.
+        bullets.push(bullet);
+        scene.add(bullet.mesh);
+      }
+      
+      // Spawn a missile.
+      function fireMissile() {
+        var missile = {};
+        var geometry = new THREE.CylinderGeometry(0.3, 0.3, 2, 8);
+        var material = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+        missile.mesh = new THREE.Mesh(geometry, material);
+        missile.mesh.rotation.x = Math.PI / 2;
+        var spawnPos = player.mesh.position.clone();
+        var forward = new THREE.Vector3(Math.sin(player.yaw), 0, Math.cos(player.yaw));
+        spawnPos.add(forward.clone().multiplyScalar(3));
+        missile.mesh.position.copy(spawnPos);
+        missile.velocity = forward.clone().multiplyScalar(100);
+        missile.collisionRadius = 0.75;
+        missile.life = 5;
+        missiles.push(missile);
+        scene.add(missile.mesh);
+      }
+      
+      // Update bullets and remove them if expired.
+      function updateBullets(dt) {
+        for (var i = bullets.length - 1; i >= 0; i--) {
+          var b = bullets[i];
+          b.mesh.position.add(b.velocity.clone().multiplyScalar(dt));
+          b.life -= dt;
+          if (b.life <= 0) {
+            scene.remove(b.mesh);
+            bullets.splice(i, 1);
+          }
+        }
+      }
+      
+      // Update missiles.
+      function updateMissiles(dt) {
+        for (var i = missiles.length - 1; i >= 0; i--) {
+          var m = missiles[i];
+          m.mesh.position.add(m.velocity.clone().multiplyScalar(dt));
+          m.life -= dt;
+          if (m.life <= 0) {
+            scene.remove(m.mesh);
+            missiles.splice(i, 1);
+          }
+        }
+      }
+      
+      // Enemies oscillate horizontally.
+      function updateEnemies(dt) {
+        var time = Date.now() * 0.001;
+        enemies.forEach(function(enemy) {
+          enemy.mesh.position.x = enemy.baseX + enemy.amplitude * Math.sin(time * enemy.frequency);
+        });
+      }
+      
+      // Check for collisions amongst player, obstacles, enemies, rewards, and projectiles.
+      function checkCollisions() {
+        // Helper: Euclidean distance.
+        function dist(a, b) { return a.distanceTo(b); }
+        
+        // Player vs. obstacles.
+        obstacles.forEach(function(obs, index) {
+          if (dist(player.mesh.position, obs.mesh.position) < player.collisionRadius + obs.collisionRadius) {
+            player.shield -= 20;
+            scene.remove(obs.mesh);
+            obstacles.splice(index, 1);
+            if (player.shield <= 0) { gameOver(); }
+          }
+        });
+        // Player vs. enemies.
+        enemies.forEach(function(enemy, index) {
+          if (dist(player.mesh.position, enemy.mesh.position) < player.collisionRadius + enemy.collisionRadius) {
+            player.shield -= 30;
+            scene.remove(enemy.mesh);
+            enemies.splice(index, 1);
+            if (player.shield <= 0) { gameOver(); }
+          }
+        });
+        // Player vs. rewards.
+        rewards.forEach(function(reward, index) {
+          if (dist(player.mesh.position, reward.mesh.position) < player.collisionRadius + reward.collisionRadius) {
+            player.shield = Math.min(player.shield + 20, 100);
+            score += 50;
+            scene.remove(reward.mesh);
+            rewards.splice(index, 1);
+          }
+        });
+        // Bullets vs. enemies and obstacles.
+        bullets.forEach(function(bullet, bIndex) {
+          enemies.forEach(function(enemy, eIndex) {
+            if (dist(bullet.mesh.position, enemy.mesh.position) < bullet.collisionRadius + enemy.collisionRadius) {
+              score += 100;
+              scene.remove(enemy.mesh);
+              enemies.splice(eIndex, 1);
+              scene.remove(bullet.mesh);
+              bullets.splice(bIndex, 1);
+            }
+          });
+          obstacles.forEach(function(obs, oIndex) {
+            if (dist(bullet.mesh.position, obs.mesh.position) < bullet.collisionRadius + obs.collisionRadius) {
+              score += 50;
+              scene.remove(obs.mesh);
+              obstacles.splice(oIndex, 1);
+              scene.remove(bullet.mesh);
+              bullets.splice(bIndex, 1);
+            }
+          });
+        });
+        // Missiles vs. enemies and obstacles.
+        missiles.forEach(function(missile, mIndex) {
+          enemies.forEach(function(enemy, eIndex) {
+            if (dist(missile.mesh.position, enemy.mesh.position) < missile.collisionRadius + enemy.collisionRadius) {
+              score += 200;
+              scene.remove(enemy.mesh);
+              enemies.splice(eIndex, 1);
+              scene.remove(missile.mesh);
+              missiles.splice(mIndex, 1);
+            }
+          });
+          obstacles.forEach(function(obs, oIndex) {
+            if (dist(missile.mesh.position, obs.mesh.position) < missile.collisionRadius + obs.collisionRadius) {
+              score += 100;
+              scene.remove(obs.mesh);
+              obstacles.splice(oIndex, 1);
+              scene.remove(missile.mesh);
+              missiles.splice(mIndex, 1);
+            }
+          });
+        });
+      }
+      
+      // Update the camera to follow behind and above the ship.
+      // The camera offset rotates with the ship's yaw.
+      function updateCamera() {
+        var offset = new THREE.Vector3(0, 5, -15);
+        offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), player.yaw);
+        camera.position.copy(player.mesh.position).add(offset);
+        camera.lookAt(player.mesh.position);
+      }
+      
+      // Update the HUD overlay.
+      function updateHUD() {
+        var hud = document.getElementById("hud");
+        if (hud) {
+          hud.innerHTML = "Score: " + score + " | Shields: " + player.shield + " | Missiles: " + player.missileAmmo;
+        }
+      }
+      
+      // End the game.
+      function gameOver() {
+        alert("Game Over! Your Score: " + score);
+        location.reload();
+      }
+      
+      // Handle window resize events.
+      function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+    </script>
+  </body>
+</html>
