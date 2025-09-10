@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Open World Asteroids: Next-Gen Edition</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: black; font-family: 'Courier New', monospace; }
+        canvas { display: block; }
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            color: #00ffff;
+            text-shadow: 0 0 5px #00ffff, 0 0 10px #0000ff, 0 0 15px #ff00ff;
+            font-size: 28px;
+            opacity: 0.9;
+        }
+        #score { position: absolute; top: 20px; left: 20px; }
+        #health { position: absolute; top: 20px; right: 20px; }
+        #upgrades { position: absolute; bottom: 20px; left: 20px; font-size: 20px; }
+    </style>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.178.0/build/three.module.min.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.178.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="hud">
+        <div id="score">Score: 0</div>
+        <div id="health">Shield: 100</div>
+        <div id="upgrades">Upgrades: None</div>
+    </div>
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // Scene setup
+        let width = window.innerWidth;
+        let height = window.innerHeight;
+        const scene = new THREE.Scene();
+        const camera = new THREE.OrthographicCamera(width / -2, width / 2, height / 2, height / -2, 1, 1000);
+        camera.position.z = 5;
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(width, height);
+        document.body.appendChild(renderer.domElement);
+
+        // Postprocessing for bloom
+        const composer = new EffectComposer(renderer);
+        const renderPass = new RenderPass(scene, camera);
+        composer.addPass(renderPass);
+        const bloomPass = new UnrealBloomPass(new THREE.Vector2(width, height), 0.8, 0.3, 0.9);
+        composer.addPass(bloomPass);
+
+        // Resize handler
+        window.addEventListener('resize', () => {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            renderer.setSize(width, height);
+            composer.setSize(width, height);
+            camera.left = width / -2;
+            camera.right = width / 2;
+            camera.top = height / 2;
+            camera.bottom = height / -2;
+            camera.updateProjectionMatrix();
+        });
+
+        // Audio context for algorithmic SFX and music
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        document.addEventListener('keydown', () => audioCtx.resume(), { once: true });
+
+        // Algorithmic SFX: Laser (sawtooth with envelope)
+        function playLaser() {
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(440, audioCtx.currentTime + 0.05);
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.1);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        // Algorithmic SFX: Explosion (white noise with decay)
+        function playExplosion() {
+            const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.3, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < data.length; i++) {
+                data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+            }
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+            const gain = audioCtx.createGain();
+            noise.connect(gain);
+            gain.connect(audioCtx.destination);
+            gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+            noise.start();
+        }
+
+        // Algorithmic SFX: Powerup collect (rising sine)
+        function playPowerup() {
+            const osc = audioCtx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(880, audioCtx.currentTime + 0.2);
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.2);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.2);
+        }
+
+        // Algorithmic music: Ambient space synth with modulation
+        function startMusic() {
+            const osc1 = audioCtx.createOscillator();
+            osc1.type = 'sine';
+            osc1.frequency.value = 110;
+            const osc2 = audioCtx.createOscillator();
+            osc2.type = 'triangle';
+            osc2.frequency.value = 0.5; // LFO
+            const lfoGain = audioCtx.createGain();
+            lfoGain.gain.value = 20;
+            osc2.connect(lfoGain);
+            lfoGain.connect(osc1.frequency);
+            const gain = audioCtx.createGain();
+            osc1.connect(gain);
+            gain.connect(audioCtx.destination);
+            gain.gain.value = 0.1;
+            osc1.start();
+            osc2.start();
+            // Modulate over time
+            setInterval(() => {
+                osc1.frequency.value = 110 + Math.sin(Date.now() / 2000) * 50;
+            }, 100);
+        }
+        startMusic();
+
+        // Ship: Improved shape with more details
+        const shipGeometry = new THREE.BufferGeometry();
+        const shipVertices = new Float32Array([
+            0, 30, 0,   // nose
+            -18, 0, 0,  // left wing
+            -6, -18, 0, // left tail
+            0, -12, 0,  // center tail
+            6, -18, 0,  // right tail
+            18, 0, 0    // right wing
+        ]);
+        const shipIndices = new Uint16Array([
+            0, 1, 2,
+            0, 2, 3,
+            0, 3, 4,
+            0, 4, 5
+        ]);
+        shipGeometry.setAttribute('position', new THREE.BufferAttribute(shipVertices, 3));
+        shipGeometry.setIndex(new THREE.BufferAttribute(shipIndices, 1));
+        const shipMaterial = new THREE.ShaderMaterial({
+            uniforms: { time: { value: 0 } },
+            vertexShader: `
+                void main() {
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform float time;
+                void main() {
+                    float glow = sin(time * 5.0) * 0.1 + 0.9;
+                    gl_FragColor = vec4(0.2 * glow, 0.8 * glow, 1.0 * glow, 1.0);
+                }
+            `,
+            side: THREE.DoubleSide,
+            transparent: true
+        });
+        const ship = new THREE.Mesh(shipGeometry, shipMaterial);
+        scene.add(ship);
+        ship.position.set(0, 0, 0);
+        ship.velocity = new THREE.Vector2(0, 0);
+
+        // Input handling: Keyboard for thrust/shoot, mouse for aiming
+        const keys = {};
+        document.addEventListener('keydown', e => keys[e.code] = true);
+        document.addEventListener('keyup', e => keys[e.code] = false);
+        const mouse = new THREE.Vector2();
+        document.addEventListener('mousemove', e => {
+            mouse.x = (e.clientX / width) * 2 - 1;
+            mouse.y = -(e.clientY / height) * 2 + 1;
+        });
+        let shootTime = 0;
+
+        // Bullets array
+        const bullets = [];
+
+        // Create bullet or missile
+        function shoot() {
+            const bulletGeometry = new THREE.CircleGeometry(3, 8);
+            const bulletMaterial = new THREE.ShaderMaterial({
+                uniforms: { time: { value: 0 } },
+                vertexShader: `
+                    void main() {
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    void main() {
+                        float glow = sin(time * 10.0) * 0.1 + 0.9;
+                        gl_FragColor = vec4(1.0 * glow, 0.5 * glow, 0.0, 1.0);
+                    }
+                `,
+                side: THREE.DoubleSide,
+                transparent: true
+            });
+            const bullet = new THREE.Mesh(bulletGeometry, bulletMaterial);
+            bullet.position.copy(ship.position);
+            const facingDir = new THREE.Vector2(-Math.sin(ship.rotation.z), Math.cos(ship.rotation.z));
+            bullet.velocity = facingDir.clone().multiplyScalar(15);
+            bullet.lastTrailTime = Date.now();
+            bullet.isMissile = hasMissiles;
+            scene.add(bullet);
+            bullets.push(bullet);
+            playLaser();
+        }
+
+        // Asteroids array
+        const asteroids = [];
+
+        // Procedural asteroid: Irregular shape with adjusted shader
+        function createAsteroid(size, posx, posy) {
+            const points = [];
+            for (let i = 0; i < 12; i++) {
+                const angle = i / 12 * Math.PI * 2;
+                const r = size * (0.8 + Math.random() * 0.4);
+                points.push(new THREE.Vector2(Math.cos(angle) * r, Math.sin(angle) * r));
+            }
+            const shape = new THREE.Shape(points);
+            const geometry = new THREE.ShapeGeometry(shape);
+            const material = new THREE.ShaderMaterial({
+                uniforms: { time: { value: 0 } },
+                vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+                fragmentShader: `
+                    varying vec2 vUv;
+                    uniform float time;
+                    float hash(vec2 p) {
+                        return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+                    }
+                    float noise(vec2 p) {
+                        vec2 i = floor(p);
+                        vec2 f = fract(p);
+                        float a = hash(i + vec2(0.0, 0.0));
+                        float b = hash(i + vec2(1.0, 0.0));
+                        float c = hash(i + vec2(0.0, 1.0));
+                        float d = hash(i + vec2(1.0, 1.0));
+                        vec2 u = f * f * (3.0 - 2.0 * f);
+                        return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+                    }
+                    void main() {
+                        vec2 uv = vUv * 4.0; // Reduced scale for larger features
+                        float n = noise(uv) * 0.5 + noise(uv * 2.0) * 0.25 + noise(uv * 4.0) * 0.125;
+                        vec3 color = vec3(0.3 + n * 0.3); // Gray tones
+                        gl_FragColor = vec4(color, 1.0);
+                    }
+                `,
+                side: THREE.DoubleSide
+            });
+            const asteroid = new THREE.Mesh(geometry, material);
+            // Add outline
+            const edges = new THREE.EdgesGeometry(geometry);
+            const lineMaterial = new THREE.LineBasicMaterial({ color: 0x555555, linewidth: 1 });
+            const lines = new THREE.LineSegments(edges, lineMaterial);
+            asteroid.add(lines);
+            asteroid.position.set(posx, posy, 0);
+            asteroid.velocity = new THREE.Vector2(Math.random() * 4 - 2, Math.random() * 4 - 2);
+            asteroid.angularVelocity = Math.random() * 0.03 - 0.015;
+            asteroid.size = size;
+            scene.add(asteroid);
+            asteroids.push(asteroid);
+        }
+
+        // Initial asteroids
+        for (let i = 0; i < 15; i++) {
+            createAsteroid(40 + Math.random() * 60, Math.random() * width - width / 2, Math.random() * height - height / 2);
+        }
+
+        // Powerups array
+        const powerups = [];
+
+        // Create powerup: Procedural with shader for glow
+        function createPowerup(posx, posy, type) {
+            const geometry = new THREE.TorusGeometry(10, 3, 8, 6);
+            const material = new THREE.ShaderMaterial({
+                uniforms: { time: { value: 0 }, color: { value: new THREE.Color(type === 'shield' ? 0x00ffff : type === 'gun' ? 0xff00ff : 0xffff00) } },
+                vertexShader: `
+                    void main() {
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform vec3 color;
+                    void main() {
+                        float glow = sin(time * 3.0) * 0.3 + 0.7;
+                        gl_FragColor = vec4(color * glow, 1.0);
+                    }
+                `,
+                side: THREE.DoubleSide,
+                transparent: true
+            });
+            const powerup = new THREE.Mesh(geometry, material);
+            powerup.position.set(posx, posy, 0);
+            powerup.type = type;
+            scene.add(powerup);
+            powerups.push(powerup);
+        }
+
+        // Particles array for VFX (explosions, thrust, trails)
+        const particlesList = [];
+
+        // Create explosion particles with mixed colors
+        function createExplosion(posx, posy) {
+            const particleCount = 80;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+            const velocities = [];
+            for (let i = 0; i < particleCount; i++) {
+                positions[i * 3] = posx;
+                positions[i * 3 + 1] = posy;
+                positions[i * 3 + 2] = 0;
+                const col = Math.random() > 0.5 ? 0xff8c00 : 0xffffff;
+                colors[i * 3] = (col >> 16) / 255;
+                colors[i * 3 + 1] = ((col >> 8) & 255) / 255;
+                colors[i * 3 + 2] = (col & 255) / 255;
+                velocities.push(new THREE.Vector2(Math.random() * 12 - 6, Math.random() * 12 - 6));
+            }
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            const material = new THREE.PointsMaterial({ vertexColors: true, size: 4, transparent: true, opacity: 1 });
+            const particles = new THREE.Points(geometry, material);
+            scene.add(particles);
+            particles.life = 50;
+            particles.initialLife = 50;
+            particles.particleCount = particleCount;
+            particles.velocities = velocities;
+            particles.positions = positions;
+            particlesList.push(particles);
+            playExplosion();
+        }
+
+        // Create thrust particles
+        let thrustTime = 0;
+        function createThrust() {
+            if (Date.now() - thrustTime < 50) return;
+            thrustTime = Date.now();
+            const particleCount = 10;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const velocities = [];
+            const facingDir = new THREE.Vector2(-Math.sin(ship.rotation.z), Math.cos(ship.rotation.z));
+            const thrustDir = facingDir.clone().negate();
+            for (let i = 0; i < particleCount; i++) {
+                positions[i * 3] = ship.position.x + thrustDir.x * 15;
+                positions[i * 3 + 1] = ship.position.y + thrustDir.y * 15;
+                positions[i * 3 + 2] = 0;
+                velocities.push(thrustDir.clone().multiplyScalar(3 + Math.random() * 2).add(new THREE.Vector2(Math.random() - 0.5, Math.random() - 0.5)));
+            }
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const material = new THREE.PointsMaterial({ color: 0x00bfff, size: 3, transparent: true, opacity: 1 });
+            const particles = new THREE.Points(geometry, material);
+            scene.add(particles);
+            particles.life = 20;
+            particles.initialLife = 20;
+            particles.particleCount = particleCount;
+            particles.velocities = velocities;
+            particles.positions = positions;
+            particlesList.push(particles);
+        }
+
+        // Create bullet trail particles
+        function createBulletTrail(bullet) {
+            const particleCount = 5;
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(particleCount * 3);
+            const velocities = [];
+            const trailDir = bullet.velocity.clone().normalize().negate();
+            for (let i = 0; i < particleCount; i++) {
+                positions[i * 3] = bullet.position.x + trailDir.x * 5;
+                positions[i * 3 + 1] = bullet.position.y + trailDir.y * 5;
+                positions[i * 3 + 2] = 0;
+                velocities.push(trailDir.clone().multiplyScalar(1 + Math.random()).add(new THREE.Vector2(Math.random() - 0.5, Math.random() - 0.5)));
+            }
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const material = new THREE.PointsMaterial({ color: 0xff4500, size: 2, transparent: true, opacity: 0.7 });
+            const particles = new THREE.Points(geometry, material);
+            scene.add(particles);
+            particles.life = 15;
+            particles.initialLife = 15;
+            particles.particleCount = particleCount;
+            particles.velocities = velocities;
+            particles.positions = positions;
+            particlesList.push(particles);
+        }
+
+        // Background: Improved shader-based nebula with adjusted scale
+        const bgGeometry = new THREE.PlaneGeometry(5000, 5000);
+        const bgMaterial = new THREE.ShaderMaterial({
+            uniforms: { time: { value: 0 } },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform float time;
+                varying vec2 vUv;
+                float hash(vec2 p) {
+                    return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+                }
+                float noise(vec2 p) {
+                    vec2 i = floor(p);
+                    vec2 f = fract(p);
+                    float a = hash(i + vec2(0.0, 0.0));
+                    float b = hash(i + vec2(1.0, 0.0));
+                    float c = hash(i + vec2(0.0, 1.0));
+                    float d = hash(i + vec2(1.0, 1.0));
+                    vec2 u = f * f * (3.0 - 2.0 * f);
+                    return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+                }
+                void main() {
+                    vec2 uv = vUv * 1.5 - 0.75 + time * 0.01; // Adjusted scale for larger features
+                    float n1 = noise(uv);
+                    float n2 = noise(uv * 2.0 + time * 0.05);
+                    float n3 = noise(uv * 4.0 + time * 0.1);
+                    float n = (n1 + n2 + n3) / 3.0;
+                    vec3 color = vec3(0.05 + n * 0.1, 0.02 + n * 0.15, 0.1 + n * 0.2);
+                    gl_FragColor = vec4(color, 1.0);
+                }
+            `,
+            side: THREE.DoubleSide,
+            transparent: true,
+            depthWrite: false
+        });
+        const background = new THREE.Mesh(bgGeometry, bgMaterial);
+        background.position.z = -10;
+        scene.add(background);
+
+        // Starfield: Procedural points with twinkling and increased size
+        const starCount = 3000;
+        const starGeometry = new THREE.BufferGeometry();
+        const starPositions = new Float32Array(starCount * 3);
+        const starOffsets = new Float32Array(starCount);
+        for (let i = 0; i < starCount; i++) {
+            starPositions[i * 3] = Math.random() * 4000 - 2000;
+            starPositions[i * 3 + 1] = Math.random() * 4000 - 2000;
+            starPositions[i * 3 + 2] = -5;
+            starOffsets[i] = Math.random() * Math.PI * 2;
+        }
+        starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        starGeometry.setAttribute('offset', new THREE.BufferAttribute(starOffsets, 1));
+        const starMaterial = new THREE.ShaderMaterial({
+            uniforms: { time: { value: 0 } },
+            vertexShader: `
+                attribute float offset;
+                varying float vAlpha;
+                void main() {
+                    vAlpha = sin(time * 2.0 + offset) * 0.3 + 0.7;
+                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                    gl_PointSize = (sin(time + offset) * 1.0 + 2.0) * 2.0; // Increased size
+                    gl_Position = projectionMatrix * mvPosition;
+                }
+            `,
+            fragmentShader: `
+                varying float vAlpha;
+                void main() {
+                    gl_FragColor = vec4(1.0, 1.0, 1.0, vAlpha);
+                }
+            `,
+            transparent: true
+        });
+        const stars = new THREE.Points(starGeometry, starMaterial);
+        scene.add(stars);
+
+        // Game state
+        let score = 0;
+        let shield = 100;
+        let fireRate = 0.25;
+        let hasMissiles = false;
+        let hasShieldUpgrade = false;
+        const scoreEl = document.getElementById('score');
+        const healthEl = document.getElementById('health');
+        const upgradesEl = document.getElementById('upgrades');
+
+        // Animation loop
+        function animate(time) {
+            requestAnimationFrame(animate);
+
+            // Update materials with time
+            shipMaterial.uniforms.time.value = time / 1000;
+            bgMaterial.uniforms.time.value = time / 1000;
+            asteroids.forEach(a => a.material.uniforms.time.value = time / 1000);
+            powerups.forEach(p => p.material.uniforms.time.value = time / 1000);
+            bullets.forEach(b => b.material.uniforms.time.value = time / 1000);
+            starMaterial.uniforms.time.value = time / 1000;
+
+            // Aim ship with mouse
+            const mouseWorld = new THREE.Vector3(mouse.x * (width / 2), mouse.y * (height / 2), 0);
+            ship.rotation.z = Math.atan2(mouseWorld.y - ship.position.y, mouseWorld.x - ship.position.x) - Math.PI / 2;
+
+            // Thrust
+            const facingDir = new THREE.Vector2(-Math.sin(ship.rotation.z), Math.cos(ship.rotation.z));
+            if (keys['KeyW'] || keys['ArrowUp']) {
+                ship.velocity.add(facingDir.clone().multiplyScalar(0.2));
+                createThrust();
+            }
+            ship.velocity.multiplyScalar(0.98); // Light drag for control
+            ship.position.x += ship.velocity.x;
+            ship.position.y += ship.velocity.y;
+
+            // Camera and background follow
+            camera.position.x = ship.position.x;
+            camera.position.y = ship.position.y;
+            background.position.x = ship.position.x;
+            background.position.y = ship.position.y;
+            stars.position.x = ship.position.x * 0.2;
+            stars.position.y = ship.position.y * 0.2;
+
+            // Shoot
+            if (keys['Space'] && Date.now() / 1000 - shootTime > fireRate) {
+                shoot();
+                shootTime = Date.now() / 1000;
+            }
+
+            // Update bullets
+            bullets.forEach((b, index) => {
+                if (b.isMissile) {
+                    let nearest = null;
+                    let minDist = Infinity;
+                    asteroids.forEach(a => {
+                        const dist = Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y);
+                        if (dist < minDist) {
+                            minDist = dist;
+                            nearest = a;
+                        }
+                    });
+                    if (nearest && minDist < 300) {
+                        const dir = new THREE.Vector2(nearest.position.x - b.position.x, nearest.position.y - b.position.y).normalize();
+                        b.velocity.add(dir.multiplyScalar(0.1)).normalize().multiplyScalar(15);
+                    }
+                }
+                b.position.x += b.velocity.x;
+                b.position.y += b.velocity.y;
+                if (Date.now() - b.lastTrailTime > 50) {
+                    createBulletTrail(b);
+                    b.lastTrailTime = Date.now();
+                }
+                if (Math.hypot(b.position.x - ship.position.x, b.position.y - ship.position.y) > width * 1.5) {
+                    scene.remove(b);
+                    bullets.splice(index, 1);
+                }
+            });
+
+            // Update asteroids
+            asteroids.forEach((a, index) => {
+                a.position.x += a.velocity.x;
+                a.position.y += a.velocity.y;
+                a.rotation.z += a.angularVelocity;
+                if (Math.hypot(a.position.x - ship.position.x, a.position.y - ship.position.y) > Math.max(width, height) * 2) {
+                    scene.remove(a);
+                    asteroids.splice(index, 1);
+                }
+            });
+
+            // Generate new asteroids for open world
+            while (asteroids.length < 30) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.max(width, height) / 2 + 200 + Math.random() * 100;
+                const posx = ship.position.x + Math.cos(angle) * dist;
+                const posy = ship.position.y + Math.sin(angle) * dist;
+                createAsteroid(40 + Math.random() * 60, posx, posy);
+            }
+
+            // Collision: Ship - asteroid
+            asteroids.forEach((a, ai) => {
+                const dist = Math.hypot(a.position.x - ship.position.x, a.position.y - ship.position.y);
+                if (dist < a.size / 2 + 15) {
+                    shield -= hasShieldUpgrade ? 10 : 20;
+                    if (shield <= 0) {
+                        shield = 0;
+                        // Game over logic (placeholder)
+                    }
+                    createExplosion(ship.position.x, ship.position.y);
+                    destroyAsteroid(a, ai);
+                }
+            });
+
+            // Collision: Bullet - asteroid
+            bullets.forEach((b, bi) => {
+                asteroids.forEach((a, ai) => {
+                    const dist = Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y);
+                    if (dist < a.size / 2 + 5) {
+                        scene.remove(b);
+                        bullets.splice(bi, 1);
+                        destroyAsteroid(a, ai);
+                        score += 20;
+                        if (Math.random() < 0.3) {
+                            const types = ['shield', 'gun', 'missile'];
+                            const type = types[Math.floor(Math.random() * types.length)];
+                            createPowerup(a.position.x, a.position.y, type);
+                        }
+                    }
+                });
+            });
+
+            // Powerup collection
+            powerups.forEach((p, pi) => {
+                p.rotation.z += 0.05;
+                const dist = Math.hypot(p.position.x - ship.position.x, p.position.y - ship.position.y);
+                if (dist < 20) {
+                    playPowerup();
+                    if (p.type === 'shield') {
+                        shield = Math.min(100, shield + 50);
+                        hasShieldUpgrade = true;
+                    } else if (p.type === 'gun') {
+                        fireRate = 0.1;
+                    } else if (p.type === 'missile') {
+                        hasMissiles = true;
+                    }
+                    scene.remove(p);
+                    powerups.splice(pi, 1);
+                }
+            });
+
+            // Update particles
+            particlesList.forEach((p, i) => {
+                p.life--;
+                if (p.life <= 0) {
+                    scene.remove(p);
+                    particlesList.splice(i, 1);
+                    return;
+                }
+                p.material.opacity = p.life / p.initialLife;
+                for (let j = 0; j < p.particleCount; j++) {
+                    p.positions[j * 3] += p.velocities[j].x;
+                    p.positions[j * 3 + 1] += p.velocities[j].y;
+                }
+                p.geometry.attributes.position.needsUpdate = true;
+            });
+
+            // HUD update
+            scoreEl.textContent = `Score: ${score}`;
+            healthEl.textContent = `Shield: ${shield}`;
+            upgradesEl.textContent = `Upgrades: ${hasShieldUpgrade ? 'Shield ' : ''}${fireRate <= 0.1 ? 'Gun ' : ''}${hasMissiles ? 'Missiles' : ''}`;
+
+            composer.render();
+        }
+
+        function destroyAsteroid(a, ai) {
+            createExplosion(a.position.x, a.position.y);
+            scene.remove(a);
+            asteroids.splice(ai, 1);
+            if (a.size > 25) {
+                for (let i = 0; i < 3; i++) {
+                    createAsteroid(a.size / 1.5, a.position.x + Math.random() * 20 - 10, a.position.y + Math.random() * 20 - 10);
+                    asteroids[asteroids.length - 1].velocity.add(new THREE.Vector2(Math.random() * 6 - 3, Math.random() * 6 - 3));
+                }
+            }
+        }
+
+        animate(0);
+    </script>
+</body>
+</html>

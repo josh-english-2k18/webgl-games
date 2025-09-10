@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+<title>Asteroids Neo — Three.js</title>
+
+<!-- Import map so bare specifiers "three" and addons resolve in the browser -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+  }
+}
+</script>
+
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #000;
+    color: #eaf2ff;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol";
+    overflow: hidden;
+  }
+  #ui {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .hud {
+    position: absolute;
+    left: 12px; top: 10px;
+    width: 360px;
+    pointer-events: none;
+    font-weight: 600;
+    text-shadow: 0 0 8px rgba(0,255,255,0.25);
+  }
+  .hud .row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 6px 0;
+  }
+  .bar {
+    position: relative;
+    height: 10px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 10px;
+    overflow: hidden;
+    width: 220px;
+  }
+  .bar-fill {
+    position: absolute;
+    inset: 0;
+    width: 0%;
+    background: linear-gradient(90deg, rgba(0,255,220,0.9), rgba(0,180,255,0.9));
+    box-shadow: 0 0 12px rgba(0,255,220,0.6);
+    transition: width 0.12s linear;
+  }
+  .bar-fill.orange {
+    background: linear-gradient(90deg, rgba(255,200,0,0.9), rgba(255,120,0,0.9));
+    box-shadow: 0 0 12px rgba(255,160,0,0.6);
+  }
+  .bar-fill.pink {
+    background: linear-gradient(90deg, rgba(255,70,210,0.9), rgba(255,10,120,0.9));
+    box-shadow: 0 0 12px rgba(255,80,180,0.7);
+  }
+  .tiny { font-size: 12px; opacity: 0.8; }
+  .big { font-size: 18px; letter-spacing: 0.6px; }
+  .right { position: absolute; right: 12px; top: 10px; text-align: right; }
+  .center {
+    position: absolute; top: 50%; left: 50%; width: 92%;
+    transform: translate(-50%, -50%); text-align: center;
+  }
+  .title {
+    font-weight: 800; letter-spacing: 2px; font-size: 32px;
+    text-shadow: 0 0 18px rgba(0,255,255,0.35), 0 0 3px rgba(255,255,255,0.35);
+  }
+  .subtitle { opacity: 0.9; margin-top: 6px; }
+  .panel {
+    margin: 22px auto 0 auto; max-width: 760px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px; padding: 14px 18px; backdrop-filter: blur(4px);
+  }
+  .kbd {
+    display: inline-block; padding: 2px 6px; margin: 0 2px;
+    border: 1px solid rgba(255,255,255,0.2); border-bottom-width: 2px;
+    border-radius: 6px; background: rgba(255,255,255,0.05); font-weight: 700;
+  }
+  #overlay {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    pointer-events: auto;
+    background: radial-gradient(1000px 520px at 50% 15%, rgba(0,60,80,0.28), rgba(0,0,0,0.52) 45%, rgba(0,0,0,0.8));
+  }
+  #overlay.hidden { display: none; }
+  .footer { position: absolute; left: 12px; bottom: 10px; font-size: 12px; opacity: 0.6; }
+  a { color: #66f0ff; text-decoration: none }
+  canvas { display: block }
+</style>
+</head>
+<body>
+<div id="ui">
+  <div class="hud">
+    <div class="row big">Wave: <span id="wave">1</span></div>
+    <div class="row">
+      Shield <div class="bar"><div id="shieldBar" class="bar-fill"></div></div>
+      <span id="shieldPct" class="tiny"></span>
+    </div>
+    <div class="row">
+      Hull <div class="bar"><div id="hullBar" class="bar-fill orange"></div></div>
+      <span id="hullPct" class="tiny"></span>
+    </div>
+    <div class="row">
+      Weapon <span id="weaponName" class="tiny"></span>
+      <div class="bar" style="width: 140px;"><div id="weaponBar" class="bar-fill pink"></div></div>
+      <span id="weaponLvl" class="tiny"></span>
+    </div>
+  </div>
+  <div class="hud right">
+    <div class="big">Score: <span id="score">0</span></div>
+    <div class="tiny">High: <span id="highscore">0</span></div>
+    <div class="tiny">FPS: <span id="fps">0</span></div>
+  </div>
+  <div id="overlay">
+    <div class="center">
+      <div class="title">ASTEROIDS NEO</div>
+      <div class="subtitle">Neon space combat. Modernized.</div>
+      <div class="panel">
+        <div class="tiny">Controls</div>
+        <div>
+          Rotate: <span class="kbd">Left</span>/<span class="kbd">Right</span>
+          Thrust: <span class="kbd">Up</span>
+          Brake: <span class="kbd">Down</span>
+          Boost: <span class="kbd">Shift</span>
+          Fire: <span class="kbd">Space</span>
+        </div>
+        <div>
+          Weapons: <span class="kbd">1</span> Laser <span class="kbd">2</span> Spread <span class="kbd">3</span> Rail
+          Pause: <span class="kbd">P</span>
+        </div>
+        <div style="margin-top:10px;opacity:0.9">
+          Destroy asteroids, collect drops, upgrade your ship. Shield recharges over time. Wrap-around space.
+        </div>
+      </div>
+      <div class="subtitle" style="margin-top:12px; opacity:0.85">Press <span class="kbd">Enter</span> to start</div>
+    </div>
+  </div>
+  <div class="footer">© You. Built with Three.js</div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+////////////////////////////////////////////////////////////////////////////////
+// Utilities
+////////////////////////////////////////////////////////////////////////////////
+const TAU = Math.PI * 2;
+const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+const lerp = (a,b,t)=>a+(b-a)*t;
+const rand = (a=0,b=1)=>a+Math.random()*(b-a);
+const sign = v => v<0?-1:1;
+const wrap = (v,a,b)=>{ const w = b-a; v = (v-a) % w; if (v<0) v+=w; return v+a; };
+const V2 = (x=0,z=0)=>new THREE.Vector2(x,z);
+const V3 = (x=0,y=0,z=0)=>new THREE.Vector3(x,y,z);
+
+////////////////////////////////////////////////////////////////////////////////
+// Noise (moved out to avoid self-reference during GLSL initialization)
+////////////////////////////////////////////////////////////////////////////////
+const NOISE = `
+float hash11(float p){ p = fract(p*0.1031); p *= p + 33.33; p *= p + p; return fract(p); }
+float hash13(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.yzx + 19.19); return fract((p.x + p.y) * p.z); }
+float noise3(vec3 x){
+  vec3 i = floor(x);
+  vec3 f = fract(x);
+  f = f*f*(3.0-2.0*f);
+  float n =
+    mix(mix(mix(hash13(i+vec3(0,0,0)), hash13(i+vec3(1,0,0)), f.x),
+            mix(hash13(i+vec3(0,1,0)), hash13(i+vec3(1,1,0)), f.x), f.y),
+        mix(mix(hash13(i+vec3(0,0,1)), hash13(i+vec3(1,0,1)), f.x),
+            mix(hash13(i+vec3(0,1,1)), hash13(i+vec3(1,1,1)), f.x), f.y), f.z);
+  return n;
+}
+float fbm(vec3 p){
+  float a = 0.5;
+  float s = 0.0;
+  for(int i=0;i<5;i++){
+    s += a * noise3(p);
+    p *= 2.02;
+    a *= 0.5;
+  }
+  return s;
+}`.trim();
+
+////////////////////////////////////////////////////////////////////////////////
+// Shaders
+////////////////////////////////////////////////////////////////////////////////
+const GLSL = {
+  commonNoise: NOISE,
+
+  // Nebula background shader (large sphere)
+  nebulaVertex: `
+    varying vec3 vPos;
+    void main(){
+      vPos = position;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+    }`,
+  nebulaFragment: `
+    varying vec3 vPos;
+    uniform float uTime;
+    ${NOISE}
+    float stars(vec3 p){
+      float v = noise3(p*2.5);
+      v = smoothstep(0.94, 1.0, v);
+      return v;
+    }
+    void main(){
+      vec3 p = normalize(vPos);
+      float t = uTime*0.02;
+      float n1 = fbm(p*2.0 + t);
+      float n2 = fbm(p*4.5 - t*0.7 + 10.0);
+      float neb = smoothstep(0.25,0.9, n1*0.55 + n2*0.45);
+      vec3 ca = vec3(0.04, 0.09, 0.17);
+      vec3 cb = vec3(0.0, 0.4, 0.55);
+      vec3 cc = vec3(0.6, 0.1, 0.45);
+      vec3 col = mix(ca, cb, neb) + 0.4*neb*cc;
+      float st = stars(p*180.0 + t*15.0);
+      col += st * vec3(1.5,1.5,1.5);
+      col = pow(col, vec3(0.95));
+      gl_FragColor = vec4(col*0.7, 1.0);
+    }`,
+
+  // Asteroid shader
+  asteroidVertex: `
+    uniform float uTime;
+    uniform float uSeed;
+    uniform float uDispAmp;
+    varying vec3 vWorldPos;
+    varying vec3 vNormalW;
+    varying vec3 vPosL;
+    ${NOISE}
+    void main(){
+      vec3 pos = position;
+      float d = fbm(normalize(position)*1.8 + uSeed + uTime*0.15);
+      float d2 = fbm(position*0.7 + uSeed*2.0 - uTime*0.05);
+      float disp = (d*0.6 + d2*0.4 - 0.5) * uDispAmp;
+      pos += normal * disp;
+      vec4 wp = modelMatrix * vec4(pos,1.0);
+      vWorldPos = wp.xyz;
+      vNormalW = normalize(mat3(modelMatrix) * normal);
+      vPosL = pos;
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }`,
+  asteroidFragment: `
+    uniform vec3 uLightDir;
+    uniform vec3 uCamPos;
+    uniform vec3 uColorA;
+    uniform vec3 uColorB;
+    uniform float uMetalness;
+    uniform float uSmooth;
+    uniform float uTime;
+    uniform float uSeed;
+    varying vec3 vWorldPos;
+    varying vec3 vNormalW;
+    varying vec3 vPosL;
+    ${NOISE}
+    void main(){
+      vec3 N = normalize(vNormalW);
+      vec3 L = normalize(-uLightDir);
+      vec3 V = normalize(uCamPos - vWorldPos);
+      vec3 H = normalize(L+V);
+      float lambert = clamp(dot(N,L), 0.0, 1.0);
+
+      float f1 = fbm(vPosL*1.5 + uSeed*4.0);
+      float f2 = fbm(vWorldPos*0.15 - uSeed*3.0 + uTime*0.03);
+      float veins = smoothstep(0.65, 0.95, f1*0.7 + f2*0.3);
+
+      vec3 base = mix(uColorA, uColorB, f1);
+      base = mix(base, base*vec3(1.3, 1.15, 1.25), veins*0.55);
+
+      float spec = pow(clamp(dot(N,H),0.0,1.0), mix(12.0, 64.0, uMetalness));
+      float rim = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 2.2);
+
+      vec3 col = base * (0.2 + 0.9*lambert);
+      col += spec * mix(vec3(0.6,0.7,0.8), vec3(0.9,0.5,0.9), 0.3);
+      col += rim * vec3(0.2, 0.3, 0.55);
+
+      gl_FragColor = vec4(col, 1.0);
+    }`,
+
+  // Ship shader (stylized fresnel)
+  shipVertex: `
+    varying vec3 vWorldPos;
+    varying vec3 vNormalW;
+    void main(){
+      vec4 wp = modelMatrix * vec4(position,1.0);
+      vWorldPos = wp.xyz;
+      vNormalW = normalize(mat3(modelMatrix) * normal);
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }`,
+  shipFragment: `
+    uniform vec3 uCamPos;
+    uniform vec3 uBase;
+    uniform vec3 uAccent;
+    uniform float uTime;
+    varying vec3 vWorldPos;
+    varying vec3 vNormalW;
+    void main(){
+      vec3 V = normalize(uCamPos - vWorldPos);
+      float fres = pow(1.0 - clamp(dot(V, normalize(vNormalW)), 0.0, 1.0), 3.0);
+      float stripe = 0.5 + 0.5*sin(uTime*6.0 + vWorldPos.x*6.0);
+      vec3 col = mix(uBase, uAccent, stripe*0.5);
+      col += fres * (uAccent*1.3);
+      gl_FragColor = vec4(col, 1.0);
+    }`,
+
+  // Shield shader (rippling hologram)
+  shieldVertex: `
+    varying vec3 vWorldPos;
+    void main(){
+      vec4 wp = modelMatrix * vec4(position,1.0);
+      vWorldPos = wp.xyz;
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }`,
+  shieldFragment: `
+    uniform float uTime;
+    uniform float uPulse;
+    uniform vec3 uCamPos;
+    uniform vec3 uColor;
+    varying vec3 vWorldPos;
+    ${NOISE}
+    void main(){
+      float t = uTime;
+      vec3 dx = dFdx(vWorldPos);
+      vec3 dy = dFdy(vWorldPos);
+      vec3 N = normalize(cross(dx, dy));
+      vec3 V = normalize(uCamPos - vWorldPos);
+      float rim = pow(1.0 - abs(dot(V, N)), 2.0);
+      float swirl = fbm(vWorldPos*0.35 + t*0.8);
+      float ripple = 0.0;
+      if(uPulse > 0.001){
+        float r = fract(uPulse);
+        float dist = abs(sin(r*3.14159) * 0.8);
+        ripple = smoothstep(0.18, 0.0, abs(swirl - dist));
+      }
+      float a = clamp(0.08 + 0.85*rim + 0.6*swirl + ripple*1.2, 0.0, 1.0);
+      vec3 col = mix(vec3(0.0,0.25,0.35), uColor, 0.5 + 0.5*rim) + ripple*uColor*0.6;
+      gl_FragColor = vec4(col, a*0.55);
+    }`,
+
+  // Laser/rail beam shader
+  beamVertex: `
+    varying float vX;
+    void main(){
+      vX = position.y; // beam axis
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0);
+    }`,
+  beamFragment: `
+    uniform vec3 uColor;
+    uniform float uTime;
+    uniform float uIntensity;
+    varying float vX;
+    void main(){
+      float core = 1.0 - smoothstep(0.0, 0.5, abs(vX));
+      float flick = 0.75 + 0.25*sin(uTime*40.0 + vX*30.0);
+      vec3 col = uColor * (1.5*core*flick*uIntensity);
+      gl_FragColor = vec4(col, core*0.95);
+    }`,
+
+  // Simple additive particle shader
+  particleVertex: `
+    uniform float uSize;
+    uniform float uScale;
+    varying float vLife;
+    attribute float life;
+    void main(){
+      vLife = life;
+      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+      gl_PointSize = uSize * (1.0 + 1.5*(1.0 - vLife)) * (uScale / -mvPosition.z);
+      gl_Position = projectionMatrix * mvPosition;
+    }`,
+  particleFragment: `
+    uniform vec3 uColor;
+    varying float vLife;
+    void main(){
+      vec2 uv = gl_PointCoord * 2.0 - 1.0;
+      float d = dot(uv,uv);
+      float alpha = smoothstep(1.0, 0.0, d) * (vLife);
+      vec3 col = uColor * (0.6 + 0.4*vLife);
+      gl_FragColor = vec4(col, alpha);
+    }`,
+
+  // Vignette/color grade pass
+  postVertex: `
+    varying vec2 vUv;
+    void main(){
+      vUv = uv;
+      gl_Position = vec4(position, 1.0);
+    }`,
+  postFragment: `
+    uniform sampler2D tDiffuse;
+    uniform float uVignette;
+    uniform float uSaturation;
+    varying vec2 vUv;
+    vec3 sat(vec3 c, float s){
+      float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      return mix(vec3(l), c, s);
+    }
+    void main(){
+      vec2 uv = vUv;
+      vec3 col = texture2D(tDiffuse, uv).rgb;
+      float d = distance(uv, vec2(0.5));
+      float vig = smoothstep(0.9, uVignette, d);
+      col *= 1.0 - vig*0.3;
+      col = sat(col, uSaturation);
+      gl_FragColor = vec4(col, 1.0);
+    }`
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Renderer, Scene, Camera
+////////////////////////////////////////////////////////////////////////////////
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.1, 2000);
+camera.position.set(0, 27, 42);
+camera.lookAt(0, 0, 0);
+
+// Composer
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.15, 0.85, 0.0);
+composer.addPass(bloomPass);
+const vignettePass = new ShaderPass({
+  uniforms: { tDiffuse: { value: null }, uVignette: { value: 0.82 }, uSaturation: { value: 1.06 } },
+  vertexShader: GLSL.postVertex,
+  fragmentShader: GLSL.postFragment
+});
+composer.addPass(vignettePass);
+composer.addPass(new OutputPass());
+
+// Resize
+function onResize(){
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+  bloomPass.setSize(window.innerWidth, window.innerHeight);
+}
+addEventListener('resize', onResize);
+
+////////////////////////////////////////////////////////////////////////////////
+// Background
+////////////////////////////////////////////////////////////////////////////////
+const nebulaGeo = new THREE.SphereGeometry(1000, 64, 64);
+const nebulaMat = new THREE.ShaderMaterial({
+  uniforms: { uTime: { value: 0 } },
+  vertexShader: GLSL.nebulaVertex,
+  fragmentShader: GLSL.nebulaFragment,
+  side: THREE.BackSide,
+  depthWrite: false
+});
+const nebula = new THREE.Mesh(nebulaGeo, nebulaMat);
+scene.add(nebula);
+
+////////////////////////////////////////////////////////////////////////////////
+// Lighting
+////////////////////////////////////////////////////////////////////////////////
+const lightDir = new THREE.Vector3(0.8, 0.9, 0.3).normalize();
+
+////////////////////////////////////////////////////////////////////////////////
+// World parameters
+////////////////////////////////////////////////////////////////////////////////
+const WORLD = {
+  halfW: 120,
+  halfH: 75,
+  boundsY: 0
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Input
+////////////////////////////////////////////////////////////////////////////////
+const Keys = {};
+const KEY = {
+  LEFT: 'ArrowLeft', RIGHT: 'ArrowRight',
+  UP: 'ArrowUp', DOWN: 'ArrowDown', SHIFT: 'ShiftLeft',
+  SPACE: 'Space', ONE: 'Digit1', TWO: 'Digit2', THREE: 'Digit3',
+  P: 'KeyP', ENTER: 'Enter'
+};
+addEventListener('keydown', (e)=>{ Keys[e.code] = true; if (e.code === KEY.SPACE) e.preventDefault(); });
+addEventListener('keyup', (e)=>{ Keys[e.code] = false; });
+
+////////////////////////////////////////////////////////////////////////////////
+// Materials / Factories
+////////////////////////////////////////////////////////////////////////////////
+function createAsteroidMaterial(seed, hue=0.6){
+  const colorA = new THREE.Color().setHSL(hue, 0.25, 0.5);
+  const colorB = new THREE.Color().setHSL(hue-0.1, 0.35, 0.35);
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uSeed: { value: seed },
+      uDispAmp: { value: 0.55 },
+      uLightDir: { value: lightDir },
+      uCamPos: { value: camera.position },
+      uColorA: { value: colorA },
+      uColorB: { value: colorB },
+      uMetalness: { value: 0.35 },
+      uSmooth: { value: 0.5 }
+    },
+    vertexShader: GLSL.asteroidVertex,
+    fragmentShader: GLSL.asteroidFragment
+  });
+}
+
+function createShipMaterial(){
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uCamPos: { value: camera.position.clone() },
+      uBase:   { value: new THREE.Color(0x0ae3ff) },
+      uAccent: { value: new THREE.Color(0xff4ed7) },
+      uTime:   { value: 0 }
+    },
+    vertexShader: GLSL.shipVertex,
+    fragmentShader: GLSL.shipFragment
+  });
+}
+
+function createShieldMaterial(){
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uTime: { value: 0 },
+      uPulse: { value: 0 },
+      uCamPos: { value: camera.position },
+      uColor: { value: new THREE.Color(0x3affff) }
+    },
+    vertexShader: GLSL.shieldVertex,
+    fragmentShader: GLSL.shieldFragment,
+    extensions: { derivatives: true },
+    blending: THREE.AdditiveBlending,
+    transparent: true,
+    depthWrite: false,
+    side: THREE.DoubleSide
+  });
+}
+
+function createBeamMaterial(color=0x00f0ff){
+  return new THREE.ShaderMaterial({
+    uniforms: {
+      uColor: { value: new THREE.Color(color) },
+      uTime: { value: 0 },
+      uIntensity: { value: 1.0 }
+    },
+    vertexShader: GLSL.beamVertex,
+    fragmentShader: GLSL.beamFragment,
+    blending: THREE.AdditiveBlending,
+    transparent: true,
+    depthWrite: false
+  });
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Entities
+////////////////////////////////////////////////////////////////////////////////
+const ENT = { asteroids: [], bullets: [], particles: [], pickups: [] };
+
+class ParticleBurst {
+  constructor(count, color, pos, spread=1.5, speed=4, life=0.9){
+    const geo = new THREE.BufferGeometry();
+    const positions = new Float32Array(count*3);
+    const lifeAttr = new Float32Array(count);
+    for(let i=0;i<count;i++){
+      const dir = new THREE.Vector3(rand(-1,1), rand(0,1)*0.5, rand(-1,1)).normalize().multiplyScalar(rand(0.2,1.0));
+      positions[i*3+0] = pos.x + dir.x * spread;
+      positions[i*3+1] = pos.y + dir.y * spread * 0.2;
+      positions[i*3+2] = pos.z + dir.z * spread;
+      lifeAttr[i] = rand(0.65, 1.0);
+    }
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('life', new THREE.BufferAttribute(lifeAttr, 1));
+    this.material = new THREE.ShaderMaterial({
+      uniforms:{ uSize:{value: 28}, uScale:{value: window.devicePixelRatio}, uColor:{value:new THREE.Color(color)} },
+      vertexShader: GLSL.particleVertex,
+      fragmentShader: GLSL.particleFragment,
+      blending: THREE.AdditiveBlending,
+      transparent: true,
+      depthWrite: false
+    });
+    this.points = new THREE.Points(geo, this.material);
+    scene.add(this.points);
+
+    this.life = life;
+    this.maxLife = life;
+    this.vel = new THREE.Vector3((Math.random()-0.5)*0.2, 0, (Math.random()-0.5)*0.2).multiplyScalar(speed);
+    ENT.particles.push(this);
+  }
+  update(dt){
+    this.life -= dt;
+    if(this.life <= 0){
+      this.dispose();
+      return;
+    }
+    this.points.position.addScaledVector(this.vel, dt);
+    const a = this.points.geometry.getAttribute('life');
+    const t = this.life/this.maxLife;
+    for(let i=0;i<a.count;i++){
+      a.setX(i, t);
+    }
+    a.needsUpdate = true;
+  }
+  dispose(){
+    scene.remove(this.points);
+    this.points.geometry.dispose();
+    this.material.dispose();
+    const idx = ENT.particles.indexOf(this);
+    if(idx >= 0) ENT.particles.splice(idx,1);
+  }
+}
+
+class Pickup {
+  constructor(type, pos){
+    this.type = type; // 'shield','weapon','rapid','heal'
+    this.pos = pos.clone();
+    this.life = 12.0;
+    const geo = new THREE.IcosahedronGeometry(0.5, 0);
+    const color = {
+      shield: 0x44f7ff, weapon: 0xff4ed7, rapid: 0xffc54b, heal: 0x8cff4b
+    }[type] || 0xffffff;
+    const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.95, blending: THREE.AdditiveBlending });
+    this.mesh = new THREE.Mesh(geo, mat);
+    this.mesh.position.copy(this.pos);
+    this.vel = new THREE.Vector3(rand(-0.5,0.5), 0, rand(-0.5,0.5));
+    scene.add(this.mesh);
+    ENT.pickups.push(this);
+  }
+  update(dt){
+    this.life -= dt;
+    if (this.life <= 0) { this.dispose(); return; }
+    this.mesh.rotation.x += dt*1.6;
+    this.mesh.rotation.y += dt*1.2;
+    this.mesh.position.addScaledVector(this.vel, dt);
+    this.wrap();
+    this.mesh.material.opacity = 0.65 + 0.35*Math.sin((12.0 - this.life)*4.0);
+  }
+  wrap(){
+    const p = this.mesh.position;
+    p.x = wrap(p.x, -WORLD.halfW, WORLD.halfW);
+    p.z = wrap(p.z, -WORLD.halfH, WORLD.halfH);
+  }
+  dispose(){
+    scene.remove(this.mesh);
+    this.mesh.geometry.dispose();
+    this.mesh.material.dispose();
+    const i = ENT.pickups.indexOf(this);
+    if(i>=0) ENT.pickups.splice(i,1);
+  }
+}
+
+class Bullet {
+  constructor(pos, dir, speed, ttl, damage, color=0x00f0ff, radius=0.6, beam=false){
+    this.pos = pos.clone();
+    this.dir = dir.clone().normalize();
+    this.speed = speed;
+    this.ttl = ttl;
+    this.damage = damage;
+    this.radius = radius;
+    this.beam = beam;
+
+    const length = beam ? 5.5 : 2.2;
+    const r = beam ? 0.06 : 0.08;
+    const geo = new THREE.CylinderGeometry(r, r, length, 8, 1, true);
+    const mat = createBeamMaterial(color);
+    this.mesh = new THREE.Mesh(geo, mat);
+    const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0), this.dir);
+    this.mesh.quaternion.copy(q);
+    this.mesh.position.copy(this.pos);
+    scene.add(this.mesh);
+
+    ENT.bullets.push(this);
+  }
+  update(dt){
+    this.ttl -= dt;
+    if(this.ttl <= 0){ this.dispose(); return; }
+    this.pos.addScaledVector(this.dir, this.speed*dt);
+    this.pos.x = wrap(this.pos.x, -WORLD.halfW, WORLD.halfW);
+    this.pos.z = wrap(this.pos.z, -WORLD.halfH, WORLD.halfH);
+    this.mesh.position.copy(this.pos);
+    this.mesh.material.uniforms.uTime.value += dt;
+  }
+  dispose(){
+    scene.remove(this.mesh);
+    this.mesh.geometry.dispose();
+    this.mesh.material.dispose();
+    const i = ENT.bullets.indexOf(this);
+    if(i>=0) ENT.bullets.splice(i,1);
+  }
+}
+
+class Asteroid {
+  constructor(size=3, pos=V3(rand(-30,30), 0, rand(-20,20)), vel=V3(rand(-2,2),0,rand(-2,2))){
+    this.size = size;
+    this.hp = size * 24;
+    this.pos = pos.clone();
+    this.vel = vel.clone();
+    this.angVel = new THREE.Vector3(rand(-0.6,0.6), rand(-0.4,0.4), rand(-0.6,0.6));
+    const geo = new THREE.IcosahedronGeometry(size, 2);
+    this.mat = createAsteroidMaterial(Math.random()*100.0, rand(0.53, 0.65));
+    this.mesh = new THREE.Mesh(geo, this.mat);
+    this.mesh.position.copy(this.pos);
+    scene.add(this.mesh);
+    ENT.asteroids.push(this);
+  }
+  update(dt, time){
+    this.pos.addScaledVector(this.vel, dt);
+    this.pos.x = wrap(this.pos.x, -WORLD.halfW, WORLD.halfW);
+    this.pos.z = wrap(this.pos.z, -WORLD.halfH, WORLD.halfH);
+    this.mesh.position.copy(this.pos);
+    this.mesh.rotation.x += this.angVel.x*dt;
+    this.mesh.rotation.y += this.angVel.y*dt;
+    this.mesh.rotation.z += this.angVel.z*dt;
+    this.mat.uniforms.uTime.value = time;
+    this.mat.uniforms.uCamPos.value.copy(camera.position);
+  }
+  damage(d, worldPos){
+    this.hp -= d;
+    if (this.hp <= 0){
+      this.explode(worldPos || this.pos);
+      this.split();
+      this.dispose();
+      return true;
+    } else {
+      new ParticleBurst(42, 0xfff9d0, worldPos || this.pos, 0.8, 10, 0.4);
+    }
+    return false;
+  }
+  split(){
+    if(this.size > 1.2){
+      const count = 2 + (Math.random() < 0.35 ? 1 : 0);
+      for(let i=0;i<count;i++){
+        const dir = new THREE.Vector3(rand(-1,1),0,rand(-1,1)).normalize();
+        const pos = this.pos.clone().add(dir.clone().multiplyScalar(rand(0.1,0.6)));
+        const vel = this.vel.clone().add(dir.multiplyScalar(rand(1.5,3.2)));
+        new Asteroid(this.size*0.6, pos, vel);
+      }
+    } else {
+      const r = Math.random();
+      if(r < 0.25) new Pickup('shield', this.pos);
+      else if(r < 0.45) new Pickup('weapon', this.pos);
+      else if(r < 0.6) new Pickup('rapid', this.pos);
+      else if(r < 0.7) new Pickup('heal', this.pos);
+    }
+  }
+  explode(lp){
+    new ParticleBurst(120, 0xffc04b, lp, 1.8, 12, 1.2);
+    new ParticleBurst(80,  0xff48c8, lp, 1.4, 10, 0.9);
+  }
+  dispose(){
+    scene.remove(this.mesh);
+    this.mesh.geometry.dispose();
+    this.mat.dispose();
+    const i = ENT.asteroids.indexOf(this);
+    if(i>=0) ENT.asteroids.splice(i, 1);
+  }
+}
+
+class Player {
+  constructor(){
+    this.pos = new THREE.Vector3(0,0,0);
+    this.vel = new THREE.Vector3(0,0,0);
+    this.yaw = Math.PI;
+    this.turnSpeed = 3.2;
+    this.accel = 18;
+    this.drag = 0.98;
+    this.maxSpeed = 26.0;
+
+    this.shieldMax = 100;
+    this.shield = 80;
+    this.shieldRegen = 8;
+    this.hullMax = 100;
+    this.hull = 100;
+    this.invuln = 0;
+
+    this.weapon = 'laser';
+    this.weaponLevel = 1;
+    this.rate = 9.0;
+    this.cooldown = 0.0;
+
+    this.group = new THREE.Group();
+    scene.add(this.group);
+
+    const bodyMat = createShipMaterial();
+    const body = new THREE.Mesh(new THREE.ConeGeometry(0.8, 2.2, 8, 1, false), bodyMat);
+    body.rotation.x = Math.PI/2;
+    body.position.set(0, 0.2, 0);
+    this.group.add(body);
+
+    const wingMat = new THREE.MeshBasicMaterial({ color: 0x0ae3ff });
+    const wingGeo = new THREE.BoxGeometry(1.6, 0.08, 0.7);
+    const w1 = new THREE.Mesh(wingGeo, wingMat); w1.position.set(0, 0.1, -0.2); this.group.add(w1);
+    const w2 = new THREE.Mesh(wingGeo, new THREE.MeshBasicMaterial({ color: 0xff4ed7 }));
+    w2.position.set(0, -0.15, -0.2); w2.scale.set(0.8, 1, 1); this.group.add(w2);
+
+    const engMat = new THREE.MeshBasicMaterial({ color: 0x00f6ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending });
+    const engine = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.9, 12, 1), engMat);
+    engine.rotation.x = -Math.PI/2; engine.position.set(0, 0, 1.2);
+    this.engine = engine; this.group.add(engine);
+
+    const shield = new THREE.Mesh(new THREE.SphereGeometry(1.3, 32, 32), createShieldMaterial());
+    this.shieldMesh = shield; this.group.add(shield);
+
+    this.shieldPulse = 0;
+    this.radius = 1.0;
+  }
+
+  setWeapon(name){
+    this.weapon = name;
+    this.weaponLevel = Math.max(1, this.weaponLevel);
+    if(name === 'laser') this.rate = 9 + (this.weaponLevel-1)*1.2;
+    if(name === 'spread') this.rate = 6 + (this.weaponLevel-1)*0.8;
+    if(name === 'rail') this.rate = 2.6 + (this.weaponLevel-1)*0.3;
+    updateUIWeapon();
+  }
+
+  update(dt){
+    if (Keys[KEY.LEFT]) this.yaw += this.turnSpeed*dt;
+    if (Keys[KEY.RIGHT]) this.yaw -= this.turnSpeed*dt;
+
+    const forward = new THREE.Vector3(Math.sin(this.yaw), 0, Math.cos(this.yaw));
+
+    if (Keys[KEY.UP]) {
+      const boost = Keys[KEY.SHIFT] ? 1.5 : 1.0;
+      this.vel.addScaledVector(forward, this.accel*boost*dt);
+      this.engine.material.opacity = 0.6 + Math.random()*0.4;
+      this.engine.scale.setScalar(1.0 + 0.6*Math.random());
+    } else {
+      this.engine.material.opacity = 0.25 + 0.2*Math.sin(perf.time*6.0);
+      this.engine.scale.set(1,1,1);
+    }
+
+    if (Keys[KEY.DOWN]) this.vel.multiplyScalar(0.95);
+
+    const spdXZ = Math.hypot(this.vel.x, this.vel.z);
+    if (spdXZ > this.maxSpeed) this.vel.multiplyScalar(this.maxSpeed / (spdXZ+1e-6));
+    this.vel.multiplyScalar(this.drag);
+
+    this.pos.addScaledVector(this.vel, dt);
+    this.pos.x = wrap(this.pos.x, -WORLD.halfW, WORLD.halfW);
+    this.pos.z = wrap(this.pos.z, -WORLD.halfH, WORLD.halfH);
+
+    this.group.position.copy(this.pos);
+    this.group.rotation.y = this.yaw + Math.PI;
+
+    this.cooldown -= dt;
+    if (Keys[KEY.SPACE] && this.cooldown <= 0) this.fire(forward);
+
+    const sh = this.shieldMesh.material;
+    sh.uniforms.uTime.value = perf.time;
+    sh.uniforms.uCamPos.value.copy(camera.position);
+    sh.uniforms.uPulse.value = this.shieldPulse;
+
+    if (this.shield < this.shieldMax) this.shield = clamp(this.shield + this.shieldRegen*dt, 0, this.shieldMax);
+    else this.shieldPulse = Math.max(0.0, this.shieldPulse- dt*0.7);
+
+    if (this.invuln > 0) {
+      this.invuln -= dt;
+      const blink = Math.sin(perf.time*25.0) > 0.0 ? 0.4 : 1.0;
+      this.group.visible = blink > 0.5;
+    } else {
+      this.group.visible = true;
+    }
+
+    this.updateUIBars();
+  }
+
+  updateUIBars(){
+    const shPct = Math.round(100*this.shield/this.shieldMax);
+    const huPct = Math.round(100*this.hull/this.hullMax);
+    document.getElementById('shieldBar').style.width = shPct+"%";
+    document.getElementById('shieldPct').textContent = shPct+"%";
+    document.getElementById('hullBar').style.width = huPct+"%";
+    document.getElementById('hullPct').textContent = huPct+"%";
+    const reload = clamp(1.0 - clamp(this.cooldown, 0, 1)/1.0, 0, 1);
+    document.getElementById('weaponBar').style.width = Math.round(reload*100)+"%";
+  }
+
+  fire(forward){
+    const baseDir = forward.clone().normalize();
+    const pos = this.pos.clone().add(baseDir.clone().multiplyScalar(1.6));
+
+    if (this.weapon === 'laser'){
+      const nShots = this.weaponLevel >= 4 ? 2 : 1;
+      const spread = (this.weaponLevel >= 3) ? 0.07 : 0.04;
+      for(let i=0;i<nShots;i++){
+        const off = (i===0?0:(i%2===0?1:-1)) * spread;
+        const dir = baseDir.clone().applyAxisAngle(new THREE.Vector3(0,1,0), off);
+        new Bullet(pos, dir, 42, 1.5, 16+4*this.weaponLevel, 0x00f6ff, 0.6, false);
+      }
+      this.cooldown = 1.0 / this.rate;
+    }
+    else if (this.weapon === 'spread'){
+      const pellets = 3 + Math.min(3, this.weaponLevel);
+      const cone = 0.25 + 0.04*this.weaponLevel;
+      for(let i=0;i<pellets;i++){
+        const ang = (i / (pellets-1) - 0.5) * cone;
+        const dir = baseDir.clone().applyAxisAngle(new THREE.Vector3(0,1,0), ang + rand(-0.05,0.05));
+        new Bullet(pos, dir, 36, 0.8, 10, 0xffc04b, 0.6, false);
+      }
+      this.cooldown = 1.0 / this.rate;
+    }
+    else if (this.weapon === 'rail'){
+      const damage = 55 + this.weaponLevel*12;
+      new Bullet(pos, baseDir, 80, 0.35, damage, 0xff48c8, 0.8, true);
+      this.cooldown = 1.0 / this.rate + 0.05;
+    }
+  }
+
+  takeDamage(d, hitPos){
+    if (this.invuln > 0) return;
+    let remaining = d;
+    if (this.shield > 0) {
+      const absorb = Math.min(this.shield, remaining);
+      this.shield -= absorb;
+      remaining -= absorb;
+      this.shieldPulse = 1.0;
+      new ParticleBurst(40, 0x66ffff, hitPos || this.pos, 0.8, 6, 0.5);
+    }
+    if (remaining > 0) {
+      this.hull -= remaining;
+      new ParticleBurst(60, 0xff5544, hitPos || this.pos, 1.0, 8, 0.6);
+    }
+    if (this.hull <= 0) {
+      gameOver();
+    } else {
+      this.invuln = 1.0;
+    }
+  }
+
+  healHull(qty){ this.hull = clamp(this.hull+qty, 0, this.hullMax); }
+  chargeShield(qty){ this.shield = clamp(this.shield+qty, 0, this.shieldMax); this.shieldPulse = 1.0; }
+
+  collectPickup(pickup){
+    if (pickup.type === 'shield') this.chargeShield(30);
+    if (pickup.type === 'heal') this.healHull(25);
+    if (pickup.type === 'rapid') this.rate += 1.5;
+    if (pickup.type === 'weapon') this.weaponLevel = Math.min(8, this.weaponLevel + 1);
+    pickup.dispose();
+    updateUIWeapon();
+    new ParticleBurst(32, 0xffffff, this.pos, 0.6, 4, 0.4);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Game Management
+////////////////////////////////////////////////////////////////////////////////
+//const perf = { last: performance.now(), time: 0, dt: 0, fpsAcc: 0, fpsCount: 0, fps: 0 };
+let player = null;
+let running = false;
+let paused = false;
+let wave = 1;
+let score = 0;
+let highscore = parseInt(localStorage.getItem('neoAsteroidsHighscore')||'0', 10) || 0;
+document.getElementById('highscore').textContent = highscore;
+
+function updateUIWeapon(){
+  const name = player ? player.weapon : 'laser';
+  const lvl = player ? player.weaponLevel : 1;
+  document.getElementById('weaponName').textContent = name.toUpperCase();
+  document.getElementById('weaponLvl').textContent = "Lv " + lvl;
+}
+
+function resetGame(){
+  ENT.asteroids.slice().forEach(a=>a.dispose());
+  ENT.bullets.slice().forEach(b=>b.dispose());
+  ENT.particles.slice().forEach(p=>p.dispose());
+  ENT.pickups.slice().forEach(p=>p.dispose());
+
+  wave = 1;
+  score = 0; updateScore();
+  document.getElementById('wave').textContent = wave;
+
+  if (!player) player = new Player();
+  player.pos.set(0,0,0);
+  player.vel.set(0,0,0);
+  player.yaw = Math.PI;
+  player.shield = 80; player.hull = 100; player.invuln = 1.2;
+  player.setWeapon('laser');
+  updateUIWeapon();
+
+  spawnWave();
+}
+
+function spawnWave(){
+  const base = 5 + wave*2;
+  for(let i=0;i<base;i++){
+    const angle = Math.random()*TAU;
+    const dist = rand(20, Math.min(WORLD.halfW, WORLD.halfH)-4);
+    const pos = new THREE.Vector3(Math.cos(angle)*dist, 0, Math.sin(angle)*dist);
+    const dir = new THREE.Vector3(Math.cos(angle+Math.PI+rand(-0.8,0.8)), 0, Math.sin(angle+Math.PI+rand(-0.8,0.8)));
+    const vel = dir.normalize().multiplyScalar(rand(2, 3.8)+wave*0.1);
+    const size = rand(1.4, 3.5) * (rand()<0.5 ? 1.0 : 1.4);
+    new Asteroid(size, pos, vel);
+  }
+}
+
+function nextWave(){
+  wave += 1;
+  document.getElementById('wave').textContent = wave;
+  player.chargeShield(25);
+  spawnWave();
+}
+
+function updateScore(inc=0){
+  score += inc;
+  document.getElementById('score').textContent = score;
+  if(score > highscore){
+    highscore = score;
+    localStorage.setItem('neoAsteroidsHighscore', String(highscore));
+    document.getElementById('highscore').textContent = highscore;
+  }
+}
+
+function gameOver(){
+  running = false;
+  showOverlay("ASTEROIDS NEO", "Game Over. Score: "+score, true);
+}
+
+function showOverlay(title, message){
+  const overlay = document.getElementById('overlay');
+  overlay.classList.remove('hidden');
+  overlay.querySelector('.title').textContent = title;
+  overlay.querySelector('.subtitle').textContent = message || 'Neon space combat. Modernized.';
+}
+function hideOverlay(){ document.getElementById('overlay').classList.add('hidden'); }
+
+////////////////////////////////////////////////////////////////////////////////
+// Collisions and World
+////////////////////////////////////////////////////////////////////////////////
+function distanceXZ(a, b){ return Math.hypot(a.x - b.x, a.z - b.z); }
+
+function checkCollisions(){
+  // Bullet vs Asteroid
+  for (let i=ENT.bullets.length-1; i>=0; i--){
+    const b = ENT.bullets[i];
+    for (let j=ENT.asteroids.length-1; j>=0; j--){
+      const a = ENT.asteroids[j];
+      const d = distanceXZ(b.pos, a.pos);
+      if (d < a.size + b.radius){
+        const killed = a.damage(b.damage, b.pos);
+        if (killed) updateScore(Math.round(50 + a.size*25));
+        b.dispose();
+        break;
+      }
+    }
+  }
+  // Player vs Asteroid
+  if (player && player.invuln <= 0){
+    for (let j=ENT.asteroids.length-1; j>=0; j--){
+      const a = ENT.asteroids[j];
+      const d = distanceXZ(player.pos, a.pos);
+      if (d < a.size + player.radius){
+        const dir = player.pos.clone().sub(a.pos).normalize();
+        const hitPos = player.pos.clone().add(dir.multiplyScalar(0.2));
+        player.takeDamage(Math.round(18 + a.size*8), hitPos);
+        player.vel.add(dir.multiplyScalar(8));
+        break;
+      }
+    }
+  }
+  // Player vs Pickups
+  for (let i=ENT.pickups.length-1; i>=0; i--){
+    const p = ENT.pickups[i];
+    const d = distanceXZ(player.pos, p.mesh.position);
+    if (d < 2.0) player.collectPickup(p);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// UI and Input Handling
+////////////////////////////////////////////////////////////////////////////////
+addEventListener('keydown', e=>{
+  if (e.code === KEY.P && running) paused = !paused;
+  if (e.code === KEY.ENTER && !running){
+    hideOverlay();
+    resetGame();
+    running = true;
+    paused = false;
+  }
+  if (!player) return;
+  if (e.code === KEY.ONE) player.setWeapon('laser');
+  else if (e.code === KEY.TWO) player.setWeapon('spread');
+  else if (e.code === KEY.THREE) player.setWeapon('rail');
+});
+
+////////////////////////////////////////////////////////////////////////////////
+// Main Loop
+////////////////////////////////////////////////////////////////////////////////
+const perf = { last: performance.now(), time: 0, fpsAcc: 0, fpsCount: 0 };
+function update(dt, t){
+  // Animate background always
+  nebulaMat.uniforms.uTime.value = t;
+
+  if (!running || paused) return;
+
+  player.update(dt);
+  for (let i=0;i<ENT.asteroids.length;i++) ENT.asteroids[i].update(dt, t);
+  for (let i=ENT.bullets.length-1;i>=0;i--) ENT.bullets[i].update(dt);
+  for (let i=ENT.particles.length-1;i>=0;i--) ENT.particles[i].update(dt);
+  for (let i=ENT.pickups.length-1;i>=0;i--) ENT.pickups[i].update(dt);
+
+  checkCollisions();
+  if (ENT.asteroids.length === 0) nextWave();
+}
+
+function loop(){
+  const now = performance.now();
+  const dt = Math.min(0.033, (now - perf.last)/1000);
+  perf.last = now;
+  perf.time += dt;
+
+  perf.fpsAcc += dt; perf.fpsCount++;
+  if (perf.fpsAcc >= 0.5){
+    const fps = Math.round(perf.fpsCount / perf.fpsAcc);
+    document.getElementById('fps').textContent = fps;
+    perf.fpsAcc = 0; perf.fpsCount = 0;
+  }
+
+  update(dt, perf.time);
+  composer.render();
+}
+renderer.setAnimationLoop(loop);
+
+////////////////////////////////////////////////////////////////////////////////
+// Initial Overlay
+////////////////////////////////////////////////////////////////////////////////
+showOverlay("ASTEROIDS NEO", "Neon space combat. Modernized.");
+document.getElementById('wave').textContent = 1;
+document.getElementById('score').textContent = 0;
+</script>
+</body>
+</html>

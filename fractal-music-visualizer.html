@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive 3D Fractal Music Visualizer</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000000;
+            color: #fff;
+            font-family: 'Inter', sans-serif;
+        }
+        canvas#visualizer-canvas {
+            display: block;
+            cursor: move;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 14px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        #setup-dialog {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            z-index: 100;
+        }
+        #setup-dialog h1 { font-weight: 300; font-size: 2.5em; margin-bottom: 10px; }
+        #setup-dialog p { color: rgba(255, 255, 255, 0.7); margin-bottom: 30px; max-width: 400px; text-align: center; }
+        #file-input-wrapper { position: relative; margin-bottom: 20px; }
+        #file-input { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+        .styled-button {
+            padding: 12px 30px; border: 1px solid #fff; color: #fff; background-color: transparent;
+            border-radius: 5px; font-size: 1em; cursor: pointer; transition: background-color 0.3s, color 0.3s;
+        }
+        .styled-button:hover { background-color: #fff; color: #000; }
+        #start-button { display: none; }
+        #file-name { color: rgba(255, 255, 255, 0.6); margin-top: 15px; height: 20px; }
+        #audio-display {
+            position: absolute; bottom: 20px; left: 50%;
+            transform: translateX(-50%); width: 90%; max-width: 1200px;
+            background: rgba(0, 0, 0, 0.6); border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1); z-index: 20;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: center; padding: 15px; box-sizing: border-box;
+        }
+        #waveform-container { position: relative; width: 100%; height: 60px; background-color: rgba(0,0,0,0.3); border-radius: 5px; }
+        .waveform-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        #playback-marker { stroke: #ff4d4d; stroke-width: 2; }
+        #controls-container { display: flex; width: 100%; justify-content: space-between; align-items: center; margin-top: 10px; }
+        #playback-controls button { background: none; border: none; cursor: pointer; padding: 5px; display: flex; align-items: center; justify-content: center;}
+        #playback-controls button svg { width: 24px; height: 24px; fill: #fff; transition: fill 0.2s; }
+        #playback-controls button:hover svg { fill: #aaa; }
+        #track-info { flex-grow: 1; text-align: center; color: rgba(255, 255, 255, 0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin: 0 15px; }
+        #volume-control { display: flex; align-items: center; }
+        #volume-control svg { width: 20px; height: 20px; fill: #fff; margin-right: 10px; }
+        #volume-slider { -webkit-appearance: none; appearance: none; width: 100px; height: 4px; background: rgba(255,255,255,0.3); border-radius: 2px; outline: none; transition: opacity .2s; cursor: pointer; }
+        #volume-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; background: #fff; cursor: pointer; border-radius: 50%; }
+        #volume-slider::-moz-range-thumb { width: 14px; height: 14px; background: #fff; cursor: pointer; border-radius: 50%; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400&display=swap');
+    </style>
+</head>
+<body>
+    <div id="info">Click and drag to rotate</div>
+    <div id="setup-dialog">
+        <h1>Fractal Music Visualizer</h1>
+        <p>Upload one or more MP3 files to begin. The visuals will react in real-time to your music playlist.</p>
+        <div id="file-input-wrapper">
+             <button class="styled-button">Select MP3(s)</button>
+             <input type="file" id="file-input" accept=".mp3" multiple>
+        </div>
+        <div id="file-name">No files selected.</div>
+        <button id="start-button" class="styled-button">Start</button>
+    </div>
+    
+    <div id="audio-display" style="display: none;">
+        <div id="waveform-container">
+            <canvas class="waveform-canvas" id="waveform-bg-canvas"></canvas>
+            <svg class="waveform-canvas" id="waveform-progress-svg">
+                <line id="playback-marker" y1="0" y2="100%"></line>
+            </svg>
+        </div>
+        <div id="controls-container">
+            <div id="playback-controls">
+                <button id="prev-button" title="Previous Track"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"></path></svg></button>
+                <button id="play-pause-button" title="Play/Pause"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg></button>
+                <button id="next-button" title="Next Track"><svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"></path></svg></button>
+            </div>
+            <div id="track-info"></div>
+            <div id="volume-control">
+                <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path></svg>
+                <input type="range" id="volume-slider" min="0" max="1" step="0.01" value="1">
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // --- GLOBALS ---
+        let scene, camera, renderer, particleSystem, audioContext, analyser, audioSource, gainNode;
+        let frequencyData, timeDomainData, particleState;
+        const particleCount = 400000;
+        let isMouseDown = false, animationStarted = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let rotationTargetX = 0, rotationTargetY = 0;
+        let playlist = [], currentTrackIndex = 0, audio = new Audio();
+        let params = { a: 5, b: 3, c: 2, d: 1, scale: 12 };
+        let audioInfluence = { bass: 0, mid: 0, treble: 0, volume: 0 };
+
+        // --- UI ELEMENTS ---
+        const ui = {
+            waveformBgCanvas: document.getElementById('waveform-bg-canvas'),
+            playbackMarker: document.getElementById('playback-marker'),
+            playPauseBtn: document.getElementById('play-pause-button'),
+            playIcon: '<path d="M8 5v14l11-7z"></path>',
+            pauseIcon: '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"></path>',
+            prevBtn: document.getElementById('prev-button'),
+            nextBtn: document.getElementById('next-button'),
+            trackInfo: document.getElementById('track-info'),
+            volumeSlider: document.getElementById('volume-slider'),
+            fileInput: document.getElementById('file-input'),
+            startButton: document.getElementById('start-button'),
+            setupDialog: document.getElementById('setup-dialog'),
+            fileNameDisplay: document.getElementById('file-name'),
+            audioDisplay: document.getElementById('audio-display'),
+        };
+        const waveformBgCtx = ui.waveformBgCanvas.getContext('2d');
+        
+        // --- INITIALIZATION ---
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 25;
+            renderer = new THREE.WebGLRenderer({ antialias: true, canvas: document.createElement('canvas') });
+            renderer.domElement.id = 'visualizer-canvas';
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.body.appendChild(renderer.domElement);
+
+            const geometry = new THREE.BufferGeometry();
+            particleState = new Float32Array(particleCount * 2);
+            for (let i = 0; i < particleCount; i++) {
+                particleState[i * 2] = Math.random() * 2 * Math.PI;
+                particleState[i * 2 + 1] = Math.random() * 2 * Math.PI;
+            }
+            geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(particleCount * 3), 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(particleCount * 3), 3));
+            
+            const circleTexture = createCircleTexture();
+            const material = new THREE.PointsMaterial({
+                size: 0.08, vertexColors: true, blending: THREE.AdditiveBlending,
+                transparent: true, depthWrite: false, map: circleTexture, alphaTest: 0.5
+            });
+
+            particleSystem = new THREE.Points(geometry, material);
+            scene.add(particleSystem);
+            addEventListeners();
+        }
+
+        function createCircleTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32; canvas.height = 32;
+            const context = canvas.getContext('2d');
+            context.beginPath();
+            context.arc(16, 16, 16, 0, 2 * Math.PI);
+            context.fillStyle = '#FFFFFF';
+            context.fill();
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        // --- AUDIO PROCESSING & PLAYBACK ---
+        function setupAudio() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            gainNode = audioContext.createGain();
+            analyser.fftSize = 512;
+            audioSource = audioContext.createMediaElementSource(audio);
+            audioSource.connect(gainNode).connect(analyser).connect(audioContext.destination);
+            frequencyData = new Uint8Array(analyser.frequencyBinCount);
+            timeDomainData = new Uint8Array(analyser.frequencyBinCount);
+        }
+
+        async function playTrack(index) {
+            if (!playlist[index]) return;
+            currentTrackIndex = index;
+            const track = playlist[index];
+            ui.trackInfo.textContent = `Loading: ${track.name}`;
+
+            if (!track.audioBuffer) {
+                const response = await fetch(track.url);
+                const arrayBuffer = await response.arrayBuffer();
+                track.audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+            }
+            
+            drawFullWaveform(track.audioBuffer);
+            audio.src = track.url;
+            await audio.play().catch(e => console.error("Audio play failed:", e));
+            ui.playPauseBtn.innerHTML = ui.pauseIcon;
+            ui.trackInfo.textContent = `${track.name}`;
+        }
+
+        // --- WAVEFORM DRAWING ---
+        function drawFullWaveform(buffer) {
+            const data = buffer.getChannelData(0);
+            const w = ui.waveformBgCanvas.width, h = ui.waveformBgCanvas.height;
+            waveformBgCtx.clearRect(0, 0, w, h);
+            waveformBgCtx.lineWidth = 1;
+            waveformBgCtx.strokeStyle = 'rgba(150, 200, 255, 0.5)';
+            waveformBgCtx.beginPath();
+            
+            const step = Math.ceil(data.length / w);
+            const amp = h / 2;
+            for (let i = 0; i < w; i++) {
+                let min = 1.0, max = -1.0;
+                for (let j = 0; j < step; j++) {
+                    const datum = data[(i * step) + j];
+                    if (datum < min) min = datum;
+                    if (datum > max) max = datum;
+                }
+                waveformBgCtx.moveTo(i, (1 + min) * amp);
+                waveformBgCtx.lineTo(i, (1 + max) * amp);
+            }
+            waveformBgCtx.stroke();
+        }
+        
+        function updatePlaybackMarker() {
+            if (audio.duration) {
+                const progress = audio.currentTime / audio.duration;
+                ui.playbackMarker.setAttribute('x1', `${progress * 100}%`);
+                ui.playbackMarker.setAttribute('x2', `${progress * 100}%`);
+            }
+        }
+
+        // --- ANIMATION LOOP & VISUALS ---
+        function animate(time) {
+            if (!animationStarted) return;
+            requestAnimationFrame(animate);
+            updateAudioData();
+            updatePlaybackMarker();
+            updateFractalParams();
+            updateParticles(time);
+            updateRotation();
+            renderer.render(scene, camera);
+        }
+        
+        function updateAudioData() {
+            if (!analyser) return;
+            analyser.getByteFrequencyData(frequencyData);
+            let bassSum=0, midSum=0, trebleSum=0, volSum=0;
+            const l=analyser.frequencyBinCount, bE=Math.floor(l*0.1), mE=Math.floor(l*0.4);
+            for(let i=0;i<l;i++){const v=frequencyData[i]/255;if(i<bE)bassSum+=v;else if(i<mE)midSum+=v;else trebleSum+=v; volSum+=v;}
+            audioInfluence={bass:bassSum/bE,mid:midSum/(mE-bE),treble:trebleSum/(l-mE),volume:volSum/l};
+        }
+        
+        function updateFractalParams(){
+             params.a = 5 + audioInfluence.bass * 3;
+             params.b = 3 + audioInfluence.mid * 4;
+             params.c = 2 + audioInfluence.treble * 2;
+             params.d = 1 + audioInfluence.volume * 3;
+        }
+
+        function updateParticles(time) {
+            const p = particleSystem.geometry.attributes.position.array, c = particleSystem.geometry.attributes.color.array;
+            const easing = 0.05;
+            particleSystem.material.size = 0.04 + audioInfluence.volume * 0.12;
+            for (let i=0; i<particleCount; i++){
+                const i2=i*2,i3=i*3;
+                // Increased speed
+                particleState[i2]+=0.003; 
+                particleState[i2+1]+=0.0015;
+                const u=particleState[i2],v=particleState[i2+1];
+                let r=Math.sin(params.a*u)+Math.cos(params.b*v);
+                let x=r*Math.cos(u)*Math.sin(v), y=r*Math.sin(u)*Math.sin(v), z=r*Math.cos(v)+params.c*Math.sin(params.d*u);
+                const tX=x*params.scale, tY=y*params.scale, tZ=z*params.scale;
+                p[i3]+=(tX-p[i3])*easing; p[i3+1]+=(tY-p[i3+1])*easing; p[i3+2]+=(tZ-p[i3+2])*easing;
+                const color=new THREE.Color();
+                // Slowly cycle hue over time
+                const baseHue = (time * 0.00005) % 1;
+                const particleHue = (u / (Math.PI * 4)) % 1;
+                const finalHue = (baseHue + particleHue + (audioInfluence.treble * 0.1)) % 1;
+                color.setHSL(finalHue, 0.8+(audioInfluence.mid*0.2), 0.5+(audioInfluence.bass*0.3));
+                c[i3]=color.r; c[i3+1]=color.g; c[i3+2]=color.b;
+            }
+            particleSystem.geometry.attributes.position.needsUpdate = true;
+            particleSystem.geometry.attributes.color.needsUpdate = true;
+        }
+        
+        function updateRotation() {
+            // This part handles the smooth rotation towards the mouse-dragged target
+            particleSystem.rotation.y += (rotationTargetY - particleSystem.rotation.y) * 0.05;
+            particleSystem.rotation.x += (rotationTargetX - particleSystem.rotation.x) * 0.05;
+            
+            // This part adds the continuous, gentle rotation when not interacting
+            if (!isMouseDown) {
+                particleSystem.rotation.x += 0.001; // Increased rotation on X axis
+                particleSystem.rotation.y += 0.002;  // Increased rotation on Y axis
+                particleSystem.rotation.z += 0.0006; // Increased rotation on Z axis
+            }
+        }
+
+        // --- EVENT HANDLERS ---
+        function addEventListeners() {
+            ui.fileInput.addEventListener('change', (e) => {
+                playlist = Array.from(e.target.files).map(file => ({ name: file.name, url: URL.createObjectURL(file), audioBuffer: null }));
+                if (playlist.length) {
+                    ui.fileNameDisplay.textContent = `${playlist.length} track(s) selected.`;
+                    ui.startButton.style.display = 'inline-block';
+                }
+            });
+
+            ui.startButton.addEventListener('click', () => {
+                if (playlist.length > 0) {
+                    ui.setupDialog.style.display = 'none';
+                    ui.audioDisplay.style.display = 'flex';
+                    if (!audioContext) setupAudio();
+                    playTrack(0);
+                    animationStarted = true;
+                    animate(0); // Start animation with time = 0
+                }
+            });
+
+            audio.addEventListener('ended', () => playTrack((currentTrackIndex + 1) % playlist.length));
+            
+            ui.playPauseBtn.addEventListener('click', () => {
+                if (audio.paused) { audio.play(); ui.playPauseBtn.innerHTML = ui.pauseIcon; } 
+                else { audio.pause(); ui.playPauseBtn.innerHTML = ui.playIcon; }
+            });
+            ui.nextBtn.addEventListener('click', () => playTrack((currentTrackIndex + 1) % playlist.length));
+            ui.prevBtn.addEventListener('click', () => playTrack((currentTrackIndex - 1 + playlist.length) % playlist.length));
+            ui.volumeSlider.addEventListener('input', (e) => { if(gainNode) gainNode.gain.value = e.target.value; });
+
+            renderer.domElement.addEventListener('mousedown', (e)=>{isMouseDown=true; previousMousePosition.x=e.clientX; previousMousePosition.y=e.clientY;});
+            renderer.domElement.addEventListener('mousemove', (e)=>{if(!isMouseDown)return; const dx=e.clientX-previousMousePosition.x, dy=e.clientY-previousMousePosition.y; rotationTargetY+=dx*0.005; rotationTargetX+=dy*0.005; previousMousePosition.x=e.clientX; previousMousePosition.y=e.clientY;});
+            window.addEventListener('mouseup', ()=>{isMouseDown=false;});
+            window.addEventListener('resize', ()=>{if(!camera)return; camera.aspect=window.innerWidth/window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight);});
+        }
+        
+        init();
+    </script>
+</body>
+</html>
