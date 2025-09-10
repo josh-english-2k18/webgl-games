@@ -10,3 +10,6 @@ A simple repository of WebGL games, prototypes and experiments.
 - [Matrix Audio Visualizer](https://josh-english-2k18.github.io/webgl-games/matrix-audio-visualizer.html)
 - [3D Ball Physics Simulation](https://josh-english-2k18.github.io/webgl-games/ball-physics-simulation.html)
 - [Starfox 3D Space Fighter Simulator](https://josh-english-2k18.github.io/webgl-games/starfox.html)
+- [Fractal Music Visualizer](https://josh-english-2k18.github.io/webgl-games/fractal-music-visualizer.html)
+- [Asteroids (Grok 4)](https://josh-english-2k18.github.io/webgl-games/grok-4-asteroids.html)
+- [Asteroids (GPT-5)](https://josh-english-2k18.github.io/webgl-games/gpt-5-asteroids.html)
