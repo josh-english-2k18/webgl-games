@@ -13,3 +13,7 @@ A simple repository of WebGL games, prototypes and experiments.
 - [Fractal Music Visualizer](https://josh-english-2k18.github.io/webgl-games/fractal-music-visualizer.html)
 - [Asteroids (Grok 4)](https://josh-english-2k18.github.io/webgl-games/grok-4-asteroids.html)
 - [Asteroids (GPT-5)](https://josh-english-2k18.github.io/webgl-games/gpt-5-asteroids.html)
+- [Holograph Particle Morphing](https://josh-english-2k18.github.io/webgl-games/holograph-particle-morphing.html)
+- [Prismalith Engine](https://josh-english-2k18.github.io/webgl-games/holograph-particle-morphing-v2.html)
+- [Causal Field](https://josh-english-2k18.github.io/webgl-games/causal-field.html)
+- [Signal City](https://josh-english-2k18.github.io/webgl-games/signal-city.html)

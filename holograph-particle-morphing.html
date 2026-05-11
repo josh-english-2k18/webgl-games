@@ -1,0 +1,1011 @@
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&display=swap');
+    
+    :root {
+        --primary-color: #00ffff;
+        --primary-light: #88ffff;
+        --primary-dark: #002233;
+        --primary-shadow-1: rgba(0, 255, 255, 0.4);
+        --primary-shadow-2: rgba(0, 255, 255, 0.6);
+        --secondary-color: #ff00c1;
+    }
+
+    * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+    }
+
+    body {
+        overflow: hidden;
+        background: #000;
+        font-family: 'Orbitron', monospace;
+        color: var(--primary-color);
+    }
+
+    #container {
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg,
+            #030007 0%,
+            #110022 25%,
+            #080014 50%,
+            #1a000a 75%,
+            #020008 100%
+        );
+    }
+
+    .grid-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        opacity: 0.04;
+        background-image: 
+            linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+        background-size: 50px 50px;
+        animation: gridShift 20s linear infinite;
+    }
+
+    @keyframes gridShift {
+        0% { transform: translate(0, 0); }
+        100% { transform: translate(50px, 50px); }
+    }
+
+    .scan-line {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 3px;
+        background: repeating-linear-gradient(90deg, 
+            var(--primary-color), 
+            var(--primary-color) 15px, 
+            transparent 15px, 
+            transparent 30px,
+            var(--secondary-color) 30px,
+            var(--secondary-color) 35px,
+            transparent 35px,
+            transparent 50px
+        );
+        box-shadow: 
+            0 0 8px var(--primary-color),
+            0 0 16px var(--primary-shadow-2),
+            0 0 32px var(--secondary-color);
+        animation: scanMove 4s cubic-bezier(0.645, 0.045, 0.355, 1.000) infinite;
+        z-index: 999;
+        opacity: 0.7;
+    }
+
+    @keyframes scanMove {
+        0% { top: -5%; opacity: 0; }
+        10% { opacity: 0.7; }
+        90% { opacity: 0.7; }
+        100% { top: 105%; opacity: 0; }
+    }
+
+    .tech-pattern {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        opacity: 0.02;
+        background-image: 
+            radial-gradient(circle at 25% 25%, var(--primary-shadow-1) 0%, transparent 50%),
+            radial-gradient(circle at 75% 75%, var(--primary-shadow-1) 0%, transparent 50%);
+        animation: techPulse 8s ease-in-out infinite;
+    }
+
+    @keyframes techPulse {
+        0%, 100% { opacity: 0.02; transform: scale(1); }
+        50% { opacity: 0.06; transform: scale(1.1); }
+    }
+
+    .circuit-lines {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        opacity: 0.08;
+        background-image: 
+            linear-gradient(45deg, transparent 40%, var(--primary-shadow-1) 41%, var(--primary-shadow-1) 42%, transparent 43%),
+            linear-gradient(-45deg, transparent 40%, var(--primary-shadow-1) 41%, var(--primary-shadow-1) 42%, transparent 43%);
+        background-size: 200px 200px;
+        animation: circuitFlow 15s linear infinite;
+    }
+
+    @keyframes circuitFlow {
+        0% { background-position: 0px 0px, 0px 0px; }
+        100% { background-position: 200px 200px, -200px 200px; }
+    }
+
+    #control-panel {
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 20px;
+        z-index: 100;
+        width: 100%;
+        padding: 0 20px;
+    }
+
+    .control-section {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        background: rgba(0, 0, 0, 0.7);
+        padding: 15px 25px;
+        border: 1px solid var(--primary-shadow-1);
+        border-radius: 20px;
+        backdrop-filter: blur(30px);
+        position: relative;
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        overflow: hidden;
+        box-shadow: inset 0 0 20px var(--primary-shadow-1);
+    }
+
+    .control-section::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
+        animation: controlSweep 4s linear infinite;
+    }
+
+    .control-section::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        right: -100%;
+        width: 100%;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
+        animation: controlSweep 4s linear infinite reverse;
+    }
+
+    @keyframes controlSweep {
+        0% { left: -100%; }
+        100% { left: 100%; }
+    }
+
+    .cyber-switch {
+        position: relative;
+        width: 60px;
+        height: 30px;
+        background: var(--primary-dark);
+        border: 1px solid var(--primary-color);
+        cursor: pointer;
+        transition: all 0.3s ease;
+        overflow: hidden;
+        border-radius: 15px;
+    }
+
+    .cyber-switch::before {
+        content: '';
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 26px;
+        height: 26px;
+        background: var(--primary-color);
+        transition: all 0.3s ease;
+        box-shadow: 0 0 10px var(--primary-color);
+        border-radius: 50%;
+    }
+
+    .cyber-switch.active::before {
+        transform: translateX(30px);
+        background: var(--primary-light);
+        box-shadow: 0 0 15px var(--primary-light);
+    }
+
+    .cyber-switch.active {
+        background: var(--primary-dark);
+        box-shadow: inset 0 0 10px var(--primary-color);
+    }
+
+    .switch-label {
+        color: var(--primary-color);
+        font-weight: 500;
+        user-select: none;
+        cursor: pointer;
+        text-shadow: 0 0 5px var(--primary-shadow-1);
+        transition: all 0.3s ease;
+    }
+
+    .switch-label:hover {
+        color: var(--primary-light);
+        text-shadow: 0 0 10px var(--primary-shadow-1);
+    }
+
+    #execute-btn, #controls-toggle {
+        background: rgba(0, 0, 0, 0.7);
+        border: 2px solid var(--primary-shadow-1);
+        color: var(--primary-color);
+        font-family: 'Orbitron', monospace;
+        font-size: 14px;
+        font-weight: 600;
+        padding: 15px 30px;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+        backdrop-filter: blur(30px);
+        border-radius: 30px;
+        box-shadow: inset 0 0 20px var(--primary-shadow-1);
+    }
+
+    #execute-btn:hover, #controls-toggle:hover {
+        background: var(--primary-shadow-1);
+        box-shadow: 
+            0 0 20px var(--primary-shadow-2),
+            inset 0 0 20px var(--primary-shadow-1);
+        transform: scale(1.05);
+    }
+
+    .cyber-icon {
+        width: 16px;
+        height: 16px;
+        stroke: var(--primary-color);
+        stroke-width: 2;
+        fill: none;
+        filter: drop-shadow(0 0 5px var(--primary-color));
+        transition: all 0.3s ease;
+    }
+
+    #execute-btn:hover .cyber-icon, #controls-toggle:hover .cyber-icon {
+        filter: drop-shadow(0 0 10px var(--primary-color));
+        transform: scale(1.1);
+    }
+    
+    #controls-toggle {
+        display: none;
+    }
+
+    .performance-bars {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        z-index: 100;
+    }
+
+    .perf-bar {
+        width: 120px;
+        height: 4px;
+        background: rgba(0, 0, 0, 0.8);
+        border: 1px solid var(--primary-color);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .perf-bar::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        height: 100%;
+        background: linear-gradient(90deg, #ff0088, var(--primary-color), #0088ff);
+        transition: width 0.3s ease;
+        animation: perfPulse 2s ease-in-out infinite;
+    }
+
+    @keyframes perfPulse {
+        0%, 100% { opacity: 0.8; }
+        50% { opacity: 1; }
+    }
+
+    .perf-bar.cpu::before { width: 75%; }
+    .perf-bar.gpu::before { width: 90%; }
+    .perf-bar.memory::before { width: 60%; }
+
+    .perf-label {
+        font-size: 10px;
+        color: var(--primary-color);
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 2px;
+    }
+
+    @media (max-width: 850px) {
+        #control-panel {
+            flex-direction: column;
+            gap: 15px;
+            bottom: 20px;
+        }
+    }
+
+    @media (max-width: 768px) {
+        #controls-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 24px;
+            font-size: 12px;
+        }
+        
+        .control-section {
+            display: none;
+        }
+        
+        #control-panel.expanded .control-section {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 15px 10px;
+            align-items: center;
+            padding: 15px 20px;
+            font-size: 11px;
+            width: auto;
+            max-width: 300px;
+        }
+
+        .performance-bars {
+            top: 10px;
+            right: 10px;
+        }
+
+        .perf-bar {
+            width: 80px;
+            height: 3px;
+        }
+    }
+
+    @media (max-width: 480px) {
+        #execute-btn {
+            padding: 12px 24px;
+            font-size: 12px;
+        }
+
+        .performance-bars {
+            display: none;
+        }
+    }
+</style>
+
+<script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.174.0/examples/jsm/"
+        }
+    }
+</script>
+
+<div id="container"></div>
+<div class="grid-overlay"></div>
+<div class="tech-pattern"></div>
+<div class="circuit-lines"></div>
+<div class="scan-line"></div>
+
+<div class="performance-bars">
+    <div class="perf-label">CPU LOAD</div>
+    <div class="perf-bar cpu"></div>
+    <div class="perf-label">GPU LOAD</div>
+    <div class="perf-bar gpu"></div>
+    <div class="perf-label">MEMORY</div>
+    <div class="perf-bar memory"></div>
+</div>
+
+<div id="control-panel">
+    <button id="controls-toggle">
+        <svg class="cyber-icon" viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line>
+            <line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line>
+            <line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line>
+            <line x1="17" y1="16" x2="23" y2="16"></line>
+        </svg>
+        CONTROLS
+    </button>
+    <div class="control-section">
+        <div class="cyber-switch active" id="rotation-switch"></div>
+        <span class="switch-label">AUTO_ROTATE</span>
+        <div class="cyber-switch active" id="flow-switch"></div>
+        <span class="switch-label">PARTICLE FX</span>
+        <div class="cyber-switch active" id="trails-switch"></div>
+        <span class="switch-label">TRAILS</span>
+    </div>
+    <button id="execute-btn">
+        <svg class="cyber-icon" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+        MORPH SEQUENCE
+    </button>
+</div>
+
+<script type="module">
+    import * as THREE from 'three';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+    import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { TeapotGeometry } from 'three/addons/geometries/TeapotGeometry.js';
+
+    let scene, camera, renderer, dataNodes, trailSystem, backgroundNodes;
+    let composer, controls;
+    let time = 0;
+    let currentVisualization = 0;
+    let isTransforming = false;
+    let transformProgress = 0;
+    
+    let autoRotate = true;
+    let dataFlow = true;
+    let showTrails = true;
+    
+    const nodeCount = 24000;
+    const trailCount = 8000;
+    const transformSpeed = 0.02;
+
+    let networkPointCache = null;
+    let teapotPointCache = null;
+    let butterflyPointCache = null;
+
+    function createCenteredPoints(count, generatorFunc) {
+        const tempPositions = new Float32Array(count * 3);
+        for(let i = 0; i < count; i++) {
+            const pos = generatorFunc(i, count);
+            tempPositions[i * 3] = pos.x;
+            tempPositions[i * 3 + 1] = pos.y;
+            tempPositions[i * 3 + 2] = pos.z;
+        }
+
+        const tempGeom = new THREE.BufferGeometry();
+        tempGeom.setAttribute('position', new THREE.BufferAttribute(tempPositions, 3));
+        tempGeom.computeBoundingBox();
+        
+        const center = new THREE.Vector3();
+        tempGeom.boundingBox.getCenter(center);
+        tempGeom.translate(-center.x, -center.y, -center.z);
+        
+        return tempGeom.attributes.position.array;
+    }
+
+    function generateHolographicNetwork(i, count) {
+        if (!networkPointCache) {
+            networkPointCache = createCenteredPoints(count, (i, count) => {
+                const layerCount = 8;
+                const layerIndex = Math.floor(i / (count / layerCount));
+                const nodeInLayer = i % Math.floor(count / layerCount);
+                const nodeInLayerT = nodeInLayer / Math.floor(count / layerCount);
+                const layerHeight = (layerIndex - layerCount / 2) * 15;
+                const layerRadius = 30 + Math.sin(layerIndex * 0.8) * 20;
+                const angle = nodeInLayerT * Math.PI * 2;
+                const yOffset = Math.sin(angle * (4 + layerIndex % 3)) * 4; 
+                return new THREE.Vector3(Math.cos(angle) * layerRadius, layerHeight + yOffset, Math.sin(angle) * layerRadius);
+            });
+        }
+        const randomIndex = Math.floor(Math.random() * count);
+        return new THREE.Vector3(
+            networkPointCache[randomIndex * 3],
+            networkPointCache[randomIndex * 3 + 1],
+            networkPointCache[randomIndex * 3 + 2]
+        );
+    }
+
+    function generateTeapot(i, count) {
+        if (!teapotPointCache) {
+            const teapotGeom = new TeapotGeometry(30, 10);
+            teapotGeom.computeBoundingBox();
+            const center = new THREE.Vector3();
+            teapotGeom.boundingBox.getCenter(center);
+            teapotGeom.translate(-center.x, -center.y, -center.z);
+            teapotPointCache = teapotGeom.attributes.position;
+        }
+        const randomIndex = Math.floor(Math.random() * teapotPointCache.count);
+        return new THREE.Vector3(
+            teapotPointCache.getX(randomIndex),
+            teapotPointCache.getY(randomIndex),
+            teapotPointCache.getZ(randomIndex)
+        );
+    }
+
+    function generateButterfly(i, count) {
+         if (!butterflyPointCache) {
+            butterflyPointCache = createCenteredPoints(count, (i, count) => {
+                const t = (i / count) * Math.PI * 4;
+                const scale = 30;
+                const r = Math.exp(Math.sin(t)) - 2 * Math.cos(4 * t) + Math.pow(Math.sin((2 * t - Math.PI) / 24), 5);
+                const x = Math.sin(t) * r * scale * 0.7;
+                const y = Math.cos(t) * r * scale * 0.7;
+                const z = (Math.sin(i * 0.5) * 0.5) * 10;
+                return new THREE.Vector3(x, y, z);
+            });
+        }
+        const randomIndex = Math.floor(Math.random() * count);
+        return new THREE.Vector3(
+            butterflyPointCache[randomIndex * 3],
+            butterflyPointCache[randomIndex * 3 + 1],
+            butterflyPointCache[randomIndex * 3 + 2]
+        );
+    }
+    
+    const visualizations = [
+        generateHolographicNetwork,
+        generateTeapot,
+        generateButterfly
+    ];
+    
+    const colorSchemes = [
+        [
+            new THREE.Color(0x00ffff), new THREE.Color(0x00aaff), new THREE.Color(0x44ddff),
+            new THREE.Color(0x66ccff), new THREE.Color(0x88aaff), new THREE.Color(0x22aaff),
+            new THREE.Color(0x00ccff), new THREE.Color(0x44aadd)
+        ],
+        [
+            new THREE.Color(0xff00c1), new THREE.Color(0xdd00aa), new THREE.Color(0xbb0099),
+            new THREE.Color(0xff44dd), new THREE.Color(0xff66ee), new THREE.Color(0xff88ff),
+            new THREE.Color(0xff22cc), new THREE.Color(0xff00aa)
+        ],
+        [
+            new THREE.Color(0x00ff88), new THREE.Color(0x44ffaa), new THREE.Color(0x00dd77), 
+            new THREE.Color(0x66ffcc), new THREE.Color(0x88ffdd), new THREE.Color(0x22ff99), 
+            new THREE.Color(0x00ffaa), new THREE.Color(0x99ffcc)
+        ]
+    ];
+
+    const uiThemes = [
+        { primary: '#00ffff', light: '#88ffff', dark: '#002233', shadow1: 'rgba(0, 255, 255, 0.4)', shadow2: 'rgba(0, 255, 255, 0.6)', secondary: '#ff00c1' },
+        { primary: '#ff00c1', light: '#ff99ee', dark: '#220011', shadow1: 'rgba(255, 0, 193, 0.3)', shadow2: 'rgba(255, 0, 193, 0.6)', secondary: '#00ffff' },
+        { primary: '#00ff88', light: '#88ffaa', dark: '#002211', shadow1: 'rgba(0, 255, 136, 0.3)', shadow2: 'rgba(0, 255, 136, 0.6)', secondary: '#ff00c1' }
+    ];
+    
+    function updateThemeColor(vizIndex) {
+        const theme = uiThemes[vizIndex];
+        const root = document.documentElement;
+        root.style.setProperty('--primary-color', theme.primary);
+        root.style.setProperty('--primary-light', theme.light);
+        root.style.setProperty('--primary-dark', theme.dark);
+        root.style.setProperty('--primary-shadow-1', theme.shadow1);
+        root.style.setProperty('--primary-shadow-2', theme.shadow2);
+        root.style.setProperty('--secondary-color', theme.secondary);
+    }
+
+    function createTrailSystem() {
+        const trailGeometry = new THREE.BufferGeometry();
+        const trailPositions = new Float32Array(trailCount * 3);
+        const trailColors = new Float32Array(trailCount * 3);
+        const trailSizes = new Float32Array(trailCount);
+        const trailOpacities = new Float32Array(trailCount);
+        
+        for (let i = 0; i < trailCount; i++) {
+            trailPositions[i * 3] = (Math.random() - 0.5) * 100;
+            trailPositions[i * 3 + 1] = (Math.random() - 0.5) * 100;
+            trailPositions[i * 3 + 2] = (Math.random() - 0.5) * 100;
+            
+            const colorScheme = colorSchemes[currentVisualization];
+            const color = colorScheme[Math.floor(Math.random() * colorScheme.length)];
+            trailColors[i * 3] = color.r;
+            trailColors[i * 3 + 1] = color.g;
+            trailColors[i * 3 + 2] = color.b;
+            
+            trailSizes[i] = Math.random() * 1.5 + 0.5;
+            trailOpacities[i] = Math.random() * 0.5 + 0.2;
+        }
+        
+        trailGeometry.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
+        trailGeometry.setAttribute('color', new THREE.BufferAttribute(trailColors, 3));
+        trailGeometry.setAttribute('size', new THREE.BufferAttribute(trailSizes, 1));
+        trailGeometry.setAttribute('opacity', new THREE.BufferAttribute(trailOpacities, 1));
+        
+        const trailTexture = createTrailTexture();
+        const trailMaterial = new THREE.PointsMaterial({
+            size: 2.0, map: trailTexture, vertexColors: true,
+            transparent: true, blending: THREE.AdditiveBlending,
+            depthWrite: false, opacity: 0.6
+        });
+        
+        trailSystem = new THREE.Points(trailGeometry, trailMaterial);
+        scene.add(trailSystem);
+    }
+    
+    function createTrailTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 32; canvas.height = 32;
+        const context = canvas.getContext('2d');
+        const gradient = context.createRadialGradient(16, 16, 0, 16, 16, 16);
+        gradient.addColorStop(0, 'rgba(255, 255, 255, 0.8)');
+        gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.4)');
+        gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        context.fillStyle = gradient;
+        context.fillRect(0, 0, 32, 32);
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+        return texture;
+    }
+    
+    function createBackgroundParticles() {
+        const bgGeometry = new THREE.BufferGeometry();
+        const bgCount = 2000;
+        const bgPositions = new Float32Array(bgCount * 3);
+        const bgColors = new Float32Array(bgCount * 3);
+        const bgSizes = new Float32Array(bgCount);
+        
+        for (let i = 0; i < bgCount; i++) {
+            const radius = 200 + Math.random() * 300;
+            const phi = Math.random() * Math.PI * 2;
+            const theta = Math.random() * Math.PI;
+            bgPositions[i * 3] = radius * Math.sin(theta) * Math.cos(phi);
+            bgPositions[i * 3 + 1] = radius * Math.sin(theta) * Math.sin(phi);
+            bgPositions[i * 3 + 2] = radius * Math.cos(theta);
+            const intensity = Math.random() * 0.3 + 0.1;
+            bgColors[i * 3] = intensity * 0.5;
+            bgColors[i * 3 + 1] = intensity * 0.2;
+            bgColors[i * 3 + 2] = intensity * 0.5;
+            bgSizes[i] = Math.random() * 2 + 0.5;
+        }
+        
+        bgGeometry.setAttribute('position', new THREE.BufferAttribute(bgPositions, 3));
+        bgGeometry.setAttribute('color', new THREE.BufferAttribute(bgColors, 3));
+        bgGeometry.setAttribute('size', new THREE.BufferAttribute(bgSizes, 1));
+        
+        const bgMaterial = new THREE.PointsMaterial({
+            size: 1.0, vertexColors: true, transparent: true,
+            opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false
+        });
+        
+        backgroundNodes = new THREE.Points(bgGeometry, bgMaterial);
+        scene.add(backgroundNodes);
+    }
+    
+    function initializeSystem() {
+        scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x080014, 0.0006);
+        
+        camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+        camera.position.set(0, 0, 120);
+        
+        renderer = new THREE.WebGLRenderer({ 
+            antialias: true, alpha: true, powerPreference: "high-performance" 
+        });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.1;
+        document.getElementById('container').appendChild(renderer.domElement);
+        
+        setupCameraControls();
+        setupPostProcessing();
+        createDataVisualization();
+        createTrailSystem();
+        createBackgroundParticles();
+        setupEventHandlers();
+        updateThemeColor(currentVisualization);
+        
+        executeMainLoop();
+    }
+    
+    function setupCameraControls() {
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.08;
+        controls.rotateSpeed = 0.5;
+        controls.zoomSpeed = 0.8;
+        controls.minDistance = 40;
+        controls.maxDistance = 300;
+        controls.enablePan = false;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.3; 
+    }
+    
+    function setupPostProcessing() {
+        composer = new EffectComposer(renderer);
+        composer.addPass(new RenderPass(scene, camera));
+        const bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            0.35,
+            0.5, 
+            0.85
+        );
+        composer.addPass(bloomPass);
+        composer.addPass(new OutputPass());
+    }
+    
+    function createDataVisualization() {
+        const geometry = new THREE.BufferGeometry();
+        const positions = new Float32Array(nodeCount * 3);
+        const colors = new Float32Array(nodeCount * 3);
+        const sizes = new Float32Array(nodeCount);
+        
+        const initialVisualization = visualizations[currentVisualization];
+        for (let i = 0; i < nodeCount; i++) {
+            const pos = initialVisualization(i, nodeCount);
+            positions[i * 3] = pos.x;
+            positions[i * 3 + 1] = pos.y;
+            positions[i * 3 + 2] = pos.z;
+            assignParticleProperties(i, colors, sizes, currentVisualization);
+        }
+        
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+        geometry.userData.currentColors = new Float32Array(colors);
+        
+        const texture = createEnhancedParticleTexture();
+        const material = new THREE.PointsMaterial({
+            size: 3.5, map: texture, vertexColors: true,
+            transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
+        });
+        
+        dataNodes = new THREE.Points(geometry, material);
+        scene.add(dataNodes);
+    }
+
+    function assignParticleProperties(i, colors, sizes, vizIndex) {
+        const colorScheme = colorSchemes[vizIndex];
+        let color;
+        let brightness = 1.0;
+
+        if (vizIndex === 0) {
+            const layerIndex = Math.floor(i / (nodeCount / 8));
+            color = colorScheme[layerIndex % colorScheme.length];
+            brightness = 0.8 + Math.random() * 0.5;
+            sizes[i] = 0.8 + Math.random() * 2.0;
+        } else if (vizIndex === 1) {
+            color = colorScheme[i % colorScheme.length];
+            brightness = 0.7 + Math.random() * 0.6;
+            sizes[i] = 1.0 + Math.random() * 1.5;
+        } else {
+            color = colorScheme[i % colorScheme.length];
+            brightness = 1.0 + Math.random() * 0.5;
+            sizes[i] = 1.2 + Math.random() * 2.2;
+        }
+        
+        colors[i * 3] = color.r * brightness;
+        colors[i * 3 + 1] = color.g * brightness;
+        colors[i * 3 + 2] = color.b * brightness;
+    }
+    
+    function createEnhancedParticleTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 128; canvas.height = 128;
+        const context = canvas.getContext('2d');
+        const centerX = 64, centerY = 64;
+        const outerGradient = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, 64);
+        outerGradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+        outerGradient.addColorStop(0.2, 'rgba(255, 255, 255, 0.6)');
+        outerGradient.addColorStop(0.5, 'rgba(255, 128, 200, 0.3)');
+        outerGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        context.fillStyle = outerGradient;
+        context.fillRect(0, 0, 128, 128);
+        const coreGradient = context.createRadialGradient(centerX, centerY, 0, centerX, centerY, 12);
+        coreGradient.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+        coreGradient.addColorStop(1, 'rgba(255, 128, 200, 0.2)');
+        context.fillStyle = coreGradient;
+        context.beginPath();
+        context.arc(centerX, centerY, 12, 0, Math.PI * 2);
+        context.fill();
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+        return texture;
+    }
+    
+    function setupEventHandlers() {
+        window.addEventListener('resize', onSystemResize);
+        
+        document.getElementById('rotation-switch').addEventListener('click', () => {
+            autoRotate = !autoRotate;
+            controls.autoRotate = autoRotate;
+            document.getElementById('rotation-switch').classList.toggle('active', autoRotate);
+        });
+        
+        document.getElementById('flow-switch').addEventListener('click', () => {
+            dataFlow = !dataFlow;
+            document.getElementById('flow-switch').classList.toggle('active', dataFlow);
+        });
+        
+        document.getElementById('trails-switch').addEventListener('click', () => {
+            showTrails = !showTrails;
+            document.getElementById('trails-switch').classList.toggle('active', showTrails);
+            if (trailSystem) trailSystem.visible = showTrails;
+        });
+        
+        const executeBtn = document.getElementById('execute-btn');
+        executeBtn.addEventListener('click', executeTransformation);
+        executeBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            executeTransformation();
+        });
+
+        const controlsToggle = document.getElementById('controls-toggle');
+        const controlPanel = document.getElementById('control-panel');
+        controlsToggle.addEventListener('click', () => {
+            controlPanel.classList.toggle('expanded');
+        });
+    }
+    
+    function executeTransformation() {
+        if (isTransforming) return;
+        const nextVisualization = (currentVisualization + 1) % visualizations.length;
+        transformToVisualization(nextVisualization);
+    }
+    
+    function transformToVisualization(newVisualization) {
+        isTransforming = true;
+        transformProgress = 0;
+        
+        updateThemeColor(newVisualization);
+
+        const positions = dataNodes.geometry.attributes.position.array;
+        const colors = dataNodes.geometry.attributes.color.array;
+        const sizes = dataNodes.geometry.attributes.size.array;
+        
+        const currentPositions = new Float32Array(positions);
+        const currentColors = new Float32Array(dataNodes.geometry.userData.currentColors);
+        const currentSizes = new Float32Array(sizes);
+        
+        const visualizationFunction = visualizations[newVisualization];
+        const newPositions = new Float32Array(positions.length);
+        const newColors = new Float32Array(colors.length);
+        const newSizes = new Float32Array(sizes.length);
+        
+        for (let i = 0; i < nodeCount; i++) {
+            const pos = visualizationFunction(i, nodeCount);
+            newPositions[i * 3] = pos.x;
+            newPositions[i * 3 + 1] = pos.y;
+            newPositions[i * 3 + 2] = pos.z;
+            assignParticleProperties(i, newColors, newSizes, newVisualization);
+        }
+        
+        dataNodes.userData.fromPositions = currentPositions;
+        dataNodes.userData.toPositions = newPositions;
+        dataNodes.userData.fromColors = currentColors;
+        dataNodes.userData.toColors = newColors;
+        dataNodes.userData.fromSizes = currentSizes;
+        dataNodes.userData.toSizes = newSizes;
+        dataNodes.userData.targetVisualization = newVisualization;
+        
+        if (trailSystem) {
+            const trailColors = trailSystem.geometry.attributes.color.array;
+            const newColorScheme = colorSchemes[newVisualization];
+            for (let i = 0; i < trailCount; i++) {
+                const color = newColorScheme[Math.floor(Math.random() * newColorScheme.length)];
+                trailColors[i * 3] = color.r;
+                trailColors[i * 3 + 1] = color.g;
+                trailColors[i * 3 + 2] = color.b;
+            }
+            trailSystem.geometry.attributes.color.needsUpdate = true;
+        }
+    }
+    
+    function animateTrailSystem() {
+        if (!trailSystem || !showTrails) return;
+        const positions = trailSystem.geometry.attributes.position.array;
+        const opacities = trailSystem.geometry.attributes.opacity.array;
+        for (let i = 0; i < trailCount; i++) {
+            const ix = i * 3, iy = ix + 1, iz = ix + 2;
+            switch(dataNodes.userData.targetVisualization ?? currentVisualization) {
+                case 0:
+                    const distance = Math.sqrt(positions[ix] * positions[ix] + positions[iz] * positions[iz]);
+                    if (distance > 0.1) {
+                        const expansion = 1 + Math.sin(time * 3 + i * 0.05) * 0.005;
+                        positions[ix] *= expansion;
+                        positions[iz] *= expansion;
+                    }
+                    positions[iy] += Math.sin(time * 2.5 + i * 0.03) * 0.2;
+                    break;
+                case 1:
+                    const orbitSpeed = 0.005 + (i % 5) * 0.003;
+                    const x = positions[ix], z = positions[iz];
+                    positions[ix] = x * Math.cos(orbitSpeed) - z * Math.sin(orbitSpeed);
+                    positions[iz] = x * Math.sin(orbitSpeed) + z * Math.cos(orbitSpeed);
+                    positions[iy] += (Math.random() - 0.5) * 0.2;
+                    if(positions[iy] > 50 || positions[iy] < -50) positions[iy] *= -1;
+                    break;
+                case 2:
+                    positions[ix] += (Math.random() - 0.5) * 0.3;
+                    positions[iy] += (Math.random() - 0.5) * 0.3;
+                    positions[iz] += (Math.random() - 0.5) * 0.1;
+                    break;
+            }
+            opacities[i] = 0.3 + Math.sin(time * 3 + i * 0.1) * 0.3;
+        }
+        trailSystem.geometry.attributes.position.needsUpdate = true;
+        trailSystem.geometry.attributes.opacity.needsUpdate = true;
+    }
+    
+    function animateDataFlow() {
+        if (!dataNodes || isTransforming || !dataFlow) return;
+        const positions = dataNodes.geometry.attributes.position.array;
+        switch(currentVisualization) {
+            case 0:
+                const layerCount = 8;
+                for (let i = 0; i < nodeCount; i++) {
+                    const layerIndex = Math.floor(i / (nodeCount / layerCount));
+                    const ix = i * 3, iz = i * 3 + 2;
+                    const x = positions[ix], z = positions[iz];
+                    const rotationSpeed = 0.005 + (layerIndex % 3) * 0.003;
+                    positions[ix] = x * Math.cos(rotationSpeed) - z * Math.sin(rotationSpeed);
+                    positions[iz] = x * Math.sin(rotationSpeed) + z * Math.cos(rotationSpeed);
+                }
+                dataNodes.geometry.attributes.position.needsUpdate = true;
+                break;
+            case 1:
+                for (let i = 0; i < nodeCount; i++) {
+                    const ix = i * 3, iy = i * 3 + 1, iz = i * 3 + 2;
+                    positions[ix] += Math.sin(time * 3 + i) * 0.04;
+                    positions[iy] += Math.cos(time * 2 + i) * 0.04;
+                    positions[iz] += Math.sin(time * 4 + i) * 0.04;
+                }
+                dataNodes.geometry.attributes.position.needsUpdate = true;
+                break;
+            case 2:
+                for (let i = 0; i < nodeCount; i++) {
+                    const iz = i * 3 + 2;
+                    positions[iz] += Math.sin(time * 6 + positions[i*3]) * 0.35;
+                }
+                dataNodes.geometry.attributes.position.needsUpdate = true;
+                break;
+        }
+    }
+    
+    function onSystemResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        composer.setSize(window.innerWidth, window.innerHeight);
+    }
+    
+    function executeMainLoop() {
+        requestAnimationFrame(executeMainLoop);
+        time += 0.01;
+        
+        controls.update();
+        
+        if (isTransforming) {
+            transformProgress += transformSpeed;
+            if (transformProgress >= 1.0) {
+                transformProgress = 1.0;
+                isTransforming = false;
+                currentVisualization = dataNodes.userData.targetVisualization;
+                dataNodes.geometry.attributes.position.array.set(dataNodes.userData.toPositions);
+                dataNodes.geometry.attributes.color.array.set(dataNodes.userData.toColors);
+                dataNodes.geometry.attributes.size.array.set(dataNodes.userData.toSizes);
+                dataNodes.geometry.userData.currentColors = new Float32Array(dataNodes.userData.toColors);
+            } else {
+                const t = transformProgress;
+                const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+                const positions = dataNodes.geometry.attributes.position.array;
+                const colors = dataNodes.geometry.attributes.color.array;
+                const sizes = dataNodes.geometry.attributes.size.array;
+                for (let i = 0; i < positions.length; i++) {
+                    positions[i] = dataNodes.userData.fromPositions[i] * (1 - ease) + dataNodes.userData.toPositions[i] * ease;
+                    colors[i] = dataNodes.userData.fromColors[i] * (1 - ease) + dataNodes.userData.toColors[i] * ease;
+                }
+                for (let i = 0; i < sizes.length; i++) {
+                    sizes[i] = dataNodes.userData.fromSizes[i] * (1 - ease) + dataNodes.userData.toSizes[i] * ease;
+                }
+            }
+            dataNodes.geometry.attributes.position.needsUpdate = true;
+            dataNodes.geometry.attributes.color.needsUpdate = true;
+            dataNodes.geometry.attributes.size.needsUpdate = true;
+        } else {
+            animateDataFlow();
+        }
+        
+        animateTrailSystem();
+        composer.render();
+    }
+
+    window.onload = initializeSystem;
+</script>

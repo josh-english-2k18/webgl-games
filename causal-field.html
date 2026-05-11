@@ -1,0 +1,1496 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Causal Field</title>
+    <style>
+        :root {
+            --bg: #040506;
+            --ink: #f6f2e8;
+            --muted: rgba(246, 242, 232, 0.62);
+            --line: rgba(246, 242, 232, 0.16);
+            --panel: rgba(7, 9, 10, 0.76);
+            --blue: #75ddff;
+            --green: #82ffbd;
+            --amber: #ffd166;
+            --red: #ff5f7d;
+            --violet: #b8a5ff;
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            letter-spacing: 0;
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        #stage {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 16% 18%, rgba(117, 221, 255, 0.1), transparent 30%),
+                radial-gradient(circle at 86% 76%, rgba(255, 95, 125, 0.08), transparent 32%),
+                linear-gradient(180deg, #08090a 0%, #020303 100%);
+        }
+
+        #stage canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .grid,
+        .vignette {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .grid {
+            opacity: 0.16;
+            background-image:
+                linear-gradient(rgba(246, 242, 232, 0.08) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(246, 242, 232, 0.08) 1px, transparent 1px);
+            background-size: 46px 46px;
+            mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 82%, transparent 100%);
+        }
+
+        .vignette {
+            background:
+                linear-gradient(to right, rgba(0, 0, 0, 0.58), transparent 18%, transparent 82%, rgba(0, 0, 0, 0.58)),
+                linear-gradient(to bottom, rgba(0, 0, 0, 0.56), transparent 22%, transparent 74%, rgba(0, 0, 0, 0.68));
+        }
+
+        .hud {
+            position: fixed;
+            top: 18px;
+            left: 18px;
+            z-index: 20;
+            max-width: 430px;
+            pointer-events: none;
+        }
+
+        .eyebrow {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .mark {
+            width: 28px;
+            height: 28px;
+            position: relative;
+            border: 1px solid rgba(117, 221, 255, 0.76);
+            border-radius: 50%;
+            box-shadow: 0 0 24px rgba(117, 221, 255, 0.18), inset 0 0 16px rgba(117, 221, 255, 0.12);
+        }
+
+        .mark::before,
+        .mark::after {
+            content: "";
+            position: absolute;
+            inset: 6px;
+            border: 1px solid rgba(255, 209, 102, 0.75);
+            transform: rotate(45deg);
+        }
+
+        .mark::after {
+            inset: 11px;
+            border-color: var(--red);
+            border-radius: 50%;
+            transform: none;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 34px;
+            line-height: 0.98;
+            text-transform: uppercase;
+        }
+
+        .subline {
+            max-width: 360px;
+            margin: 12px 0 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .readout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 750;
+            text-transform: uppercase;
+        }
+
+        .readout strong {
+            color: var(--ink);
+        }
+
+        .inspector {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            z-index: 20;
+            width: 306px;
+            padding: 14px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.44);
+        }
+
+        .inspector h2 {
+            margin: 0 0 8px;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        .inspector p {
+            min-height: 68px;
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .meter {
+            display: grid;
+            grid-template-columns: 78px 1fr 42px;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .track {
+            height: 5px;
+            overflow: hidden;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .fill {
+            display: block;
+            width: 0%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--green), var(--amber), var(--red));
+            transition: width 140ms ease;
+        }
+
+        .module-label {
+            position: fixed;
+            z-index: 10;
+            pointer-events: none;
+            min-width: 88px;
+            padding: 7px 9px;
+            border: 1px solid rgba(246, 242, 232, 0.15);
+            border-radius: 6px;
+            background: rgba(5, 6, 7, 0.68);
+            color: var(--ink);
+            font-size: 11px;
+            font-weight: 800;
+            text-align: center;
+            text-transform: uppercase;
+            white-space: nowrap;
+            transform: translate(-50%, -50%);
+            backdrop-filter: blur(16px);
+            box-shadow: 0 10px 26px rgba(0, 0, 0, 0.34);
+        }
+
+        .module-label span {
+            display: block;
+            margin-top: 2px;
+            color: var(--muted);
+            font-size: 9px;
+        }
+
+        .controls {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            left: 18px;
+            z-index: 30;
+            display: grid;
+            grid-template-columns: minmax(430px, 1fr) auto minmax(300px, 410px);
+            gap: 12px;
+            max-width: 1240px;
+            margin: 0 auto;
+            padding: 12px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 18px 56px rgba(0, 0, 0, 0.45);
+        }
+
+        .scenario-list {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 6px;
+        }
+
+        .scenario,
+        .icon-btn,
+        .toggle-btn {
+            min-height: 42px;
+            border: 1px solid rgba(246, 242, 232, 0.14);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.045);
+            color: var(--muted);
+            cursor: pointer;
+            transition: border-color 160ms ease, background 160ms ease, color 160ms ease;
+        }
+
+        .scenario {
+            overflow: hidden;
+            padding: 9px 10px;
+            text-align: left;
+        }
+
+        .scenario strong,
+        .scenario span {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .scenario strong {
+            color: var(--ink);
+            font-size: 12px;
+            line-height: 1.15;
+            text-transform: uppercase;
+        }
+
+        .scenario span {
+            margin-top: 3px;
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .scenario:hover,
+        .icon-btn:hover,
+        .toggle-btn:hover {
+            color: var(--ink);
+            border-color: rgba(117, 221, 255, 0.6);
+            background: rgba(117, 221, 255, 0.1);
+        }
+
+        .scenario.active,
+        .toggle-btn.active {
+            border-color: rgba(117, 221, 255, 0.7);
+            background: linear-gradient(180deg, rgba(117, 221, 255, 0.17), rgba(255, 255, 255, 0.045));
+            box-shadow: inset 0 0 22px rgba(117, 221, 255, 0.1);
+        }
+
+        .toolbar {
+            display: grid;
+            grid-template-columns: repeat(4, 42px);
+            gap: 6px;
+        }
+
+        .icon-btn,
+        .toggle-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+
+        .icon-btn svg,
+        .toggle-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .sliders {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .slider {
+            display: grid;
+            gap: 7px;
+            min-width: 0;
+        }
+
+        .slider label {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 20px;
+            margin: 0;
+            accent-color: var(--blue);
+            cursor: pointer;
+        }
+
+        #fallback {
+            position: fixed;
+            inset: 18px;
+            z-index: 100;
+            display: none;
+            place-items: center;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: rgba(7, 9, 10, 0.94);
+            color: var(--ink);
+            text-align: center;
+        }
+
+        #fallback.visible {
+            display: grid;
+        }
+
+        @media (max-width: 980px) {
+            .controls {
+                grid-template-columns: 1fr;
+                max-width: 700px;
+            }
+
+            .toolbar {
+                grid-template-columns: repeat(4, minmax(42px, 1fr));
+            }
+        }
+
+        @media (max-width: 720px) {
+            .hud {
+                top: 12px;
+                left: 12px;
+                max-width: 310px;
+            }
+
+            h1 {
+                font-size: 24px;
+            }
+
+            .subline,
+            .inspector {
+                display: none;
+            }
+
+            .controls {
+                right: 10px;
+                bottom: 10px;
+                left: 10px;
+                padding: 10px;
+            }
+
+            .scenario-list,
+            .sliders {
+                grid-template-columns: 1fr;
+            }
+
+            .scenario-list {
+                max-height: 148px;
+                overflow: auto;
+            }
+
+            .module-label {
+                font-size: 9px;
+                min-width: 70px;
+                padding: 5px 7px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main id="stage" aria-label="Interactive 3D neural causal field"></main>
+    <div class="grid"></div>
+    <div class="vignette"></div>
+
+    <section class="hud" aria-live="polite">
+        <div class="eyebrow">
+            <span class="mark" aria-hidden="true"></span>
+            <span>Experiment 02</span>
+        </div>
+        <h1>Causal Field</h1>
+        <p class="subline">A living 3D abstraction of a frontier model: attention, memory, routing, safety, tools, and decoding in continuous causal motion.</p>
+        <div class="readout">
+            <span>Mode <strong id="scenario-name">Prompt Storm</strong></span>
+            <span>Active <strong id="signal-count">0</strong></span>
+        </div>
+    </section>
+
+    <aside class="inspector" aria-label="Selected subsystem details">
+        <h2 id="selected-title">Model Field</h2>
+        <p id="selected-copy">Click a subsystem to inject activation. Signals branch through attention highways, feedback loops, memory paths, and decoder pressure instead of stopping at a single edge.</p>
+        <div class="meter">
+            <span>Coherence</span>
+            <span class="track"><span class="fill" id="coherence-fill"></span></span>
+            <span id="coherence-value">--</span>
+        </div>
+        <div class="meter">
+            <span>Entropy</span>
+            <span class="track"><span class="fill" id="entropy-fill"></span></span>
+            <span id="entropy-value">--</span>
+        </div>
+        <div class="meter">
+            <span>Output</span>
+            <span class="track"><span class="fill" id="output-fill"></span></span>
+            <span id="output-value">--</span>
+        </div>
+    </aside>
+
+    <nav class="controls" aria-label="Causal Field controls">
+        <div class="scenario-list" role="tablist" aria-label="Model activity modes">
+            <button class="scenario active" type="button" data-scenario="0" role="tab" aria-selected="true">
+                <strong>Prompt</strong>
+                <span>Storm</span>
+            </button>
+            <button class="scenario" type="button" data-scenario="1" role="tab" aria-selected="false">
+                <strong>Memory</strong>
+                <span>Recall</span>
+            </button>
+            <button class="scenario" type="button" data-scenario="2" role="tab" aria-selected="false">
+                <strong>Tool</strong>
+                <span>Loop</span>
+            </button>
+            <button class="scenario" type="button" data-scenario="3" role="tab" aria-selected="false">
+                <strong>Safety</strong>
+                <span>Debate</span>
+            </button>
+        </div>
+
+        <div class="toolbar">
+            <button class="icon-btn" id="inject-btn" type="button" aria-label="Inject prompt activation" title="Inject prompt activation">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path><path d="M5 6v12"></path></svg>
+            </button>
+            <button class="icon-btn" id="surge-btn" type="button" aria-label="Start activation surge" title="Start activation surge">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h4l2-7 4 14 2-7h4"></path></svg>
+            </button>
+            <button class="icon-btn" id="reset-btn" type="button" aria-label="Reset field" title="Reset field">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 4v6h6"></path></svg>
+            </button>
+            <button class="toggle-btn active" id="labels-btn" type="button" aria-label="Toggle labels" title="Toggle labels" aria-pressed="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"></path><path d="M4 12h10"></path><path d="M4 17h13"></path></svg>
+            </button>
+        </div>
+
+        <div class="sliders">
+            <div class="slider">
+                <label for="load-slider">
+                    <span>Inference Load</span>
+                    <span id="load-value">58</span>
+                </label>
+                <input id="load-slider" type="range" min="20" max="100" value="58">
+            </div>
+            <div class="slider">
+                <label for="noise-slider">
+                    <span>Temperature</span>
+                    <span id="noise-value">34</span>
+                </label>
+                <input id="noise-slider" type="range" min="0" max="80" value="34">
+            </div>
+        </div>
+    </nav>
+
+    <div id="fallback">
+        <p>This browser could not start the 3D field.</p>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.174.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+        const stage = document.getElementById('stage');
+        const fallback = document.getElementById('fallback');
+        const compact = window.matchMedia('(max-width: 720px)').matches;
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const TAU = Math.PI * 2;
+
+        const ui = {
+            scenarioName: document.getElementById('scenario-name'),
+            signalCount: document.getElementById('signal-count'),
+            selectedTitle: document.getElementById('selected-title'),
+            selectedCopy: document.getElementById('selected-copy'),
+            coherenceFill: document.getElementById('coherence-fill'),
+            coherenceValue: document.getElementById('coherence-value'),
+            entropyFill: document.getElementById('entropy-fill'),
+            entropyValue: document.getElementById('entropy-value'),
+            outputFill: document.getElementById('output-fill'),
+            outputValue: document.getElementById('output-value'),
+            load: document.getElementById('load-slider'),
+            loadValue: document.getElementById('load-value'),
+            noise: document.getElementById('noise-slider'),
+            noiseValue: document.getElementById('noise-value'),
+            scenarios: Array.from(document.querySelectorAll('[data-scenario]')),
+            inject: document.getElementById('inject-btn'),
+            surge: document.getElementById('surge-btn'),
+            reset: document.getElementById('reset-btn'),
+            labels: document.getElementById('labels-btn')
+        };
+
+        const moduleSpecs = [
+            { id: 'prompt', label: 'Prompt Intake', kind: 'tokens', count: 210, center: [-92, 10, 0], spread: [14, 34, 30], color: 0x75ddff, copy: 'Token pressure enters the field here. A strong injection creates branching activation rather than a single path.' },
+            { id: 'embed', label: 'Embedding Lattice', kind: 'encoding', count: 310, center: [-60, -16, 8], spread: [18, 40, 34], color: 0x82ffbd, copy: 'Raw symbols become dense geometry: meaning, position, and local context collapse into vectors.' },
+            { id: 'attnA', label: 'Attention Bank A', kind: 'attention', count: 360, center: [-22, 24, -28], spread: [26, 42, 24], color: 0xffd166, copy: 'Attention heads route relevant features through parallel highways. Activity here fans out quickly.' },
+            { id: 'attnB', label: 'Attention Bank B', kind: 'attention', count: 360, center: [-18, -26, 28], spread: [26, 42, 24], color: 0xffa85c, copy: 'A second attention bank creates cross-current pressure and competing salience patterns.' },
+            { id: 'memory', label: 'Working Memory', kind: 'memory', count: 300, center: [20, 34, 4], spread: [24, 28, 38], color: 0xb8a5ff, copy: 'Temporary state persists here. Loops through memory make the field feel alive instead of one-shot.' },
+            { id: 'router', label: 'Routing Gate', kind: 'routing', count: 230, center: [18, -4, -2], spread: [16, 28, 28], color: 0xf6f2e8, copy: 'The bottleneck. Signals compete for paths into tools, policy, planning, and decoding.' },
+            { id: 'tool', label: 'Tool Cortex', kind: 'tools', count: 230, center: [48, -42, -28], spread: [22, 26, 24], color: 0x75ddff, copy: 'External-action simulation. In tool mode, this subsystem pulls traffic into recurrent request-response loops.' },
+            { id: 'safety', label: 'Safety Critic', kind: 'critic', count: 260, center: [50, 36, -24], spread: [22, 30, 26], color: 0xff5f7d, copy: 'Constraint pressure enters here. It can dampen, redirect, or intensify downstream behavior.' },
+            { id: 'plan', label: 'Latent Plan', kind: 'planning', count: 340, center: [62, 4, 28], spread: [26, 38, 30], color: 0xb8a5ff, copy: 'Intermediate structure forms here: goals, steps, hypotheses, and hidden organization.' },
+            { id: 'decoder', label: 'Decoder Field', kind: 'output', count: 320, center: [102, -10, 4], spread: [18, 44, 34], color: 0x82ffbd, copy: 'Output pressure becomes visible here. Strong decoder coherence means the system has converged.' },
+            { id: 'eval', label: 'Evaluator Loop', kind: 'feedback', count: 240, center: [74, 48, 30], spread: [20, 26, 24], color: 0xffd166, copy: 'The field looks back at itself. Evaluator loops turn output into new constraints.' }
+        ];
+
+        const pathways = [
+            ['prompt', 'embed', 0.96, 190], ['embed', 'attnA', 0.88, 170], ['embed', 'attnB', 0.88, 170],
+            ['attnA', 'router', 0.74, 140], ['attnB', 'router', 0.74, 140], ['attnA', 'memory', 0.62, 110],
+            ['attnB', 'plan', 0.62, 110], ['memory', 'attnA', 0.46, 90], ['memory', 'plan', 0.74, 130],
+            ['router', 'tool', 0.7, 96], ['tool', 'router', 0.52, 86], ['router', 'safety', 0.78, 120],
+            ['safety', 'router', -0.52, 100], ['router', 'plan', 0.82, 150], ['safety', 'plan', -0.38, 82],
+            ['plan', 'decoder', 0.9, 180], ['decoder', 'eval', 0.58, 105], ['eval', 'memory', 0.54, 96],
+            ['eval', 'safety', 0.44, 86], ['decoder', 'prompt', 0.18, 54], ['plan', 'attnA', 0.34, 70],
+            ['plan', 'attnB', 0.34, 70]
+        ];
+
+        const scenarios = [
+            { name: 'Prompt Storm', emphasis: ['prompt', 'embed', 'attnA', 'attnB'], load: 0.58, noise: 0.34, copy: 'A prompt floods the intake and competes for salience across attention banks.' },
+            { name: 'Memory Recall', emphasis: ['memory', 'attnA', 'plan', 'eval'], load: 0.54, noise: 0.22, copy: 'Working memory and evaluator loops pull old context back into the active field.' },
+            { name: 'Tool Loop', emphasis: ['router', 'tool', 'memory', 'decoder'], load: 0.68, noise: 0.28, copy: 'Routing pressure repeatedly asks whether external action is worth invoking.' },
+            { name: 'Safety Debate', emphasis: ['safety', 'router', 'plan', 'eval'], load: 0.62, noise: 0.18, copy: 'The critic subsystem constrains the latent plan while the evaluator keeps pressure in the loop.' }
+        ];
+
+        const state = {
+            selectedModule: null,
+            scenario: 0,
+            load: Number(ui.load.value) / 100,
+            noise: Number(ui.noise.value) / 100,
+            labels: true,
+            pulseBudget: compact ? 420 : 920,
+            autoRotate: !reducedMotion,
+            lastSurge: performance.now()
+        };
+
+        let scene;
+        let camera;
+        let renderer;
+        let controls;
+        let composer;
+        let bloomPass;
+        let clock;
+        let neuronMesh;
+        let neuronGeometry;
+        let neuronEnergy;
+        let linkMesh;
+        let pathwayMeshes = [];
+        let pulseMesh;
+        let pulseGeometry;
+        let pulsePositions;
+        let pulseColors;
+        let pulseAlpha;
+        let moduleMeshes = [];
+        let moduleLabels = [];
+        let nodes = [];
+        let edges = [];
+        let pulses = [];
+        let moduleMap = new Map();
+        let moduleNodes = new Map();
+        let outgoingEdges = new Map();
+        let raycaster = new THREE.Raycaster();
+        let pointer = new THREE.Vector2();
+
+        init();
+
+        function init() {
+            try {
+                scene = new THREE.Scene();
+                scene.fog = new THREE.FogExp2(0x050607, 0.0045);
+
+                camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 1200);
+                camera.position.set(0, compact ? 76 : 58, compact ? 230 : 190);
+
+                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.outputColorSpace = THREE.SRGBColorSpace;
+                renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                renderer.toneMappingExposure = 0.86;
+                stage.appendChild(renderer.domElement);
+
+                controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.065;
+                controls.enablePan = false;
+                controls.minDistance = 90;
+                controls.maxDistance = 320;
+                controls.autoRotate = state.autoRotate;
+                controls.autoRotateSpeed = 0.28;
+
+                composer = new EffectComposer(renderer);
+                composer.addPass(new RenderPass(scene, camera));
+                bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.34, 0.38, 0.56);
+                composer.addPass(bloomPass);
+                composer.addPass(new OutputPass());
+
+                buildModelField();
+                createNeurons();
+                createLinks();
+                createPathwayGlow();
+                createPulses();
+                createModuleShells();
+                createDepthGrid();
+                createLabels();
+                bindEvents();
+                applyScenario(0);
+
+                clock = new THREE.Clock();
+                renderer.setAnimationLoop(animate);
+                window.__causalFieldReady = true;
+            } catch (error) {
+                console.error(error);
+                fallback.classList.add('visible');
+            }
+        }
+
+        function buildModelField() {
+            moduleMap = new Map();
+            moduleNodes = new Map();
+            outgoingEdges = new Map();
+            nodes = [];
+            edges = [];
+
+            moduleSpecs.forEach((spec, moduleIndex) => {
+                const module = {
+                    ...spec,
+                    index: moduleIndex,
+                    center: new THREE.Vector3(...spec.center),
+                    spread: new THREE.Vector3(...spec.spread),
+                    color: new THREE.Color(spec.color),
+                    energy: 0,
+                    pressure: 0,
+                    targetEnergy: 0
+                };
+                moduleMap.set(module.id, module);
+                moduleNodes.set(module.id, []);
+                outgoingEdges.set(module.id, []);
+            });
+
+            moduleSpecs.forEach((spec) => {
+                const module = moduleMap.get(spec.id);
+                const count = Math.max(48, Math.floor(spec.count * (compact ? 0.54 : 1)));
+
+                for (let i = 0; i < count; i += 1) {
+                    const local = randomEllipsoid(i, module.index, module.spread);
+                    const position = module.center.clone().add(local);
+                    const node = {
+                        module,
+                        position,
+                        base: position.clone(),
+                        phase: hash(i, module.index + 19) * TAU,
+                        size: 1.05 + Math.pow(hash(i, module.index + 41), 2.1) * 2.5,
+                        energy: 0
+                    };
+                    moduleNodes.get(module.id).push(nodes.length);
+                    nodes.push(node);
+                }
+            });
+
+            pathways.forEach(([fromId, toId, weight, fanout], pathIndex) => {
+                const fromNodes = moduleNodes.get(fromId);
+                const toNodes = moduleNodes.get(toId);
+                const count = Math.floor(fanout * (compact ? 0.55 : 1));
+
+                for (let i = 0; i < count; i += 1) {
+                    const fromIndex = fromNodes[Math.floor(hash(i, pathIndex + 101) * fromNodes.length)];
+                    const toIndex = toNodes[Math.floor(hash(i, pathIndex + 151) * toNodes.length)];
+                    const edge = {
+                        fromIndex,
+                        toIndex,
+                        fromId,
+                        toId,
+                        weight,
+                        pathway: pathIndex,
+                        energy: 0
+                    };
+                    outgoingEdges.get(fromId).push(edges.length);
+                    edges.push(edge);
+                }
+            });
+        }
+
+        function createNeurons() {
+            const positions = new Float32Array(nodes.length * 3);
+            const colors = new Float32Array(nodes.length * 3);
+            const sizes = new Float32Array(nodes.length);
+            neuronEnergy = new Float32Array(nodes.length);
+
+            nodes.forEach((node, index) => {
+                const offset = index * 3;
+                positions[offset] = node.position.x;
+                positions[offset + 1] = node.position.y;
+                positions[offset + 2] = node.position.z;
+                colors[offset] = node.module.color.r;
+                colors[offset + 1] = node.module.color.g;
+                colors[offset + 2] = node.module.color.b;
+                sizes[index] = node.size;
+            });
+
+            neuronGeometry = new THREE.BufferGeometry();
+            neuronGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            neuronGeometry.setAttribute('aColor', new THREE.BufferAttribute(colors, 3));
+            neuronGeometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+            neuronGeometry.setAttribute('aEnergy', new THREE.BufferAttribute(neuronEnergy, 1).setUsage(THREE.DynamicDrawUsage));
+            neuronGeometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 180);
+
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    uTime: { value: 0 },
+                    uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) }
+                },
+                vertexShader: `
+                    attribute vec3 aColor;
+                    attribute float aSize;
+                    attribute float aEnergy;
+
+                    uniform float uTime;
+                    uniform float uPixelRatio;
+
+                    varying vec3 vColor;
+                    varying float vEnergy;
+
+                    void main() {
+                        vec3 p = position;
+                        float wave = sin(uTime * 0.9 + position.x * 0.05 + position.y * 0.035 + position.z * 0.04);
+                        p += normalize(position + vec3(0.01, 0.02, 0.03)) * wave * (0.3 + aEnergy * 2.4);
+                        vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
+                        gl_Position = projectionMatrix * mvPosition;
+                        float perspective = clamp(390.0 / max(80.0, -mvPosition.z), 0.7, 5.0);
+                        gl_PointSize = aSize * perspective * uPixelRatio * (0.7 + aEnergy * 1.7);
+                        vColor = aColor * (0.42 + aEnergy * 1.3);
+                        vEnergy = aEnergy;
+                    }
+                `,
+                fragmentShader: `
+                    precision highp float;
+
+                    varying vec3 vColor;
+                    varying float vEnergy;
+
+                    void main() {
+                        vec2 uv = gl_PointCoord - 0.5;
+                        float d = length(uv);
+                        float core = smoothstep(0.28, 0.02, d);
+                        float halo = smoothstep(0.50, 0.12, d) * 0.24;
+                        float alpha = (core + halo) * (0.22 + vEnergy * 0.58);
+
+                        if (alpha < 0.012) discard;
+
+                        gl_FragColor = vec4(vColor * (0.62 + core * 0.8), alpha);
+                    }
+                `,
+                transparent: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            });
+
+            neuronMesh = new THREE.Points(neuronGeometry, material);
+            scene.add(neuronMesh);
+        }
+
+        function createLinks() {
+            const positions = new Float32Array(edges.length * 2 * 3);
+            const colors = new Float32Array(edges.length * 2 * 3);
+
+            edges.forEach((edge, index) => {
+                const from = nodes[edge.fromIndex].position;
+                const to = nodes[edge.toIndex].position;
+                const color = edge.weight < 0 ? new THREE.Color(0xff5f7d) : nodes[edge.fromIndex].module.color;
+                const offset = index * 6;
+                positions[offset] = from.x;
+                positions[offset + 1] = from.y;
+                positions[offset + 2] = from.z;
+                positions[offset + 3] = to.x;
+                positions[offset + 4] = to.y;
+                positions[offset + 5] = to.z;
+                for (let j = 0; j < 2; j += 1) {
+                    const colorOffset = (index * 2 + j) * 3;
+                    colors[colorOffset] = color.r * 0.58;
+                    colors[colorOffset + 1] = color.g * 0.58;
+                    colors[colorOffset + 2] = color.b * 0.58;
+                }
+            });
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const material = new THREE.LineBasicMaterial({
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.14,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            linkMesh = new THREE.LineSegments(geometry, material);
+            scene.add(linkMesh);
+        }
+
+        function createPathwayGlow() {
+            pathwayMeshes = pathways.map(([fromId, toId, weight, fanout], index) => {
+                const fromModule = moduleMap.get(fromId);
+                const toModule = moduleMap.get(toId);
+                const curve = createPathwayCurve(fromModule.center, toModule.center, weight, index);
+                const color = weight < 0
+                    ? new THREE.Color(0xff5f7d)
+                    : fromModule.color.clone().lerp(toModule.color, 0.42);
+                const radius = 0.18 + Math.min(0.72, fanout / 260) * 0.46;
+
+                const haloGeometry = new THREE.TubeGeometry(curve, 88, radius * 2.9, 10, false);
+                const coreGeometry = new THREE.TubeGeometry(curve, 88, radius * 0.66, 8, false);
+                const haloMaterial = new THREE.MeshBasicMaterial({
+                    color,
+                    transparent: true,
+                    opacity: 0.035,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                const coreMaterial = new THREE.MeshBasicMaterial({
+                    color,
+                    transparent: true,
+                    opacity: 0.12,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+
+                const halo = new THREE.Mesh(haloGeometry, haloMaterial);
+                const core = new THREE.Mesh(coreGeometry, coreMaterial);
+                halo.renderOrder = 1;
+                core.renderOrder = 2;
+                scene.add(halo);
+                scene.add(core);
+
+                return {
+                    fromId,
+                    toId,
+                    weight,
+                    fanout,
+                    color,
+                    halo,
+                    core,
+                    energy: 0,
+                    phase: hash(index, 811) * TAU
+                };
+            });
+        }
+
+        function createPathwayCurve(from, to, weight, index) {
+            const start = from.clone();
+            const end = to.clone();
+            const delta = end.clone().sub(start);
+            const distance = delta.length();
+            const direction = delta.clone().normalize();
+            const side = new THREE.Vector3(direction.z, 0.35 + hash(index, 823) * 0.9, -direction.x).normalize();
+            const sign = weight < 0 ? -1 : 1;
+            const lift = 10 + Math.sin(index * 1.37) * 12 + (weight < 0 ? 18 : 0);
+            const bend = Math.min(38, 12 + distance * 0.13) * sign;
+            const mid = start.clone().lerp(end, 0.5).addScaledVector(side, bend);
+            mid.y += lift;
+
+            return new THREE.CatmullRomCurve3([
+                start,
+                start.clone().lerp(mid, 0.42),
+                mid,
+                mid.clone().lerp(end, 0.58),
+                end
+            ]);
+        }
+
+        function createPulses() {
+            pulsePositions = new Float32Array(state.pulseBudget * 3);
+            pulseColors = new Float32Array(state.pulseBudget * 3);
+            pulseAlpha = new Float32Array(state.pulseBudget);
+            const pulseSizes = new Float32Array(state.pulseBudget);
+
+            for (let i = 0; i < state.pulseBudget; i += 1) {
+                pulsePositions[i * 3 + 1] = -999;
+                pulseSizes[i] = 2.6 + hash(i, 303) * 3.6;
+                pulses.push(makePulse(i, i < state.pulseBudget * 0.62));
+            }
+
+            pulseGeometry = new THREE.BufferGeometry();
+            pulseGeometry.setAttribute('position', new THREE.BufferAttribute(pulsePositions, 3).setUsage(THREE.DynamicDrawUsage));
+            pulseGeometry.setAttribute('aColor', new THREE.BufferAttribute(pulseColors, 3).setUsage(THREE.DynamicDrawUsage));
+            pulseGeometry.setAttribute('aAlpha', new THREE.BufferAttribute(pulseAlpha, 1).setUsage(THREE.DynamicDrawUsage));
+            pulseGeometry.setAttribute('aSize', new THREE.BufferAttribute(pulseSizes, 1));
+
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) }
+                },
+                vertexShader: `
+                    attribute vec3 aColor;
+                    attribute float aAlpha;
+                    attribute float aSize;
+                    uniform float uPixelRatio;
+                    varying vec3 vColor;
+                    varying float vAlpha;
+
+                    void main() {
+                        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                        gl_Position = projectionMatrix * mvPosition;
+                        float perspective = clamp(430.0 / max(80.0, -mvPosition.z), 0.8, 5.4);
+                        gl_PointSize = aSize * perspective * uPixelRatio;
+                        vColor = aColor;
+                        vAlpha = aAlpha;
+                    }
+                `,
+                fragmentShader: `
+                    precision highp float;
+
+                    varying vec3 vColor;
+                    varying float vAlpha;
+
+                    void main() {
+                        vec2 uv = gl_PointCoord - 0.5;
+                        float d = length(uv);
+                        float core = smoothstep(0.32, 0.02, d);
+                        float halo = smoothstep(0.5, 0.12, d) * 0.38;
+                        float alpha = (core + halo) * vAlpha;
+                        if (alpha < 0.01) discard;
+                        gl_FragColor = vec4(vColor * (0.8 + core * 0.9), alpha);
+                    }
+                `,
+                transparent: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            });
+
+            pulseMesh = new THREE.Points(pulseGeometry, material);
+            scene.add(pulseMesh);
+        }
+
+        function createModuleShells() {
+            moduleMeshes = [];
+            moduleSpecs.forEach((spec) => {
+                const module = moduleMap.get(spec.id);
+                const radius = Math.max(module.spread.x, module.spread.y, module.spread.z) * 1.12;
+                const geometry = new THREE.SphereGeometry(radius, 24, 14);
+                const material = new THREE.MeshBasicMaterial({
+                    color: module.color,
+                    transparent: true,
+                    opacity: 0.065,
+                    wireframe: true,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.copy(module.center);
+                mesh.userData.moduleId = module.id;
+                scene.add(mesh);
+                moduleMeshes.push(mesh);
+            });
+        }
+
+        function createDepthGrid() {
+            const group = new THREE.Group();
+            const material = new THREE.LineBasicMaterial({
+                color: 0xf6f2e8,
+                transparent: true,
+                opacity: 0.08,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            [-54, 0, 54].forEach((z) => {
+                const geometry = new THREE.BufferGeometry();
+                const positions = [];
+                for (let x = -130; x <= 130; x += 20) {
+                    positions.push(x, -70, z, x, 70, z);
+                }
+                for (let y = -70; y <= 70; y += 20) {
+                    positions.push(-130, y, z, 130, y, z);
+                }
+                geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+                group.add(new THREE.LineSegments(geometry, material));
+            });
+
+            scene.add(group);
+        }
+
+        function createLabels() {
+            moduleLabels.forEach((label) => label.remove());
+            moduleLabels = moduleSpecs.map((spec) => {
+                const label = document.createElement('div');
+                label.className = 'module-label';
+                label.innerHTML = `${spec.label}<span>${spec.kind}</span>`;
+                document.body.appendChild(label);
+                return label;
+            });
+        }
+
+        function bindEvents() {
+            window.addEventListener('resize', onResize);
+            renderer.domElement.addEventListener('pointerdown', onPointerDown);
+
+            ui.scenarios.forEach((button) => {
+                button.addEventListener('click', () => applyScenario(Number(button.dataset.scenario)));
+            });
+
+            ui.inject.addEventListener('click', () => {
+                injectModule(state.selectedModule || 'prompt', 1.4, 42);
+            });
+
+            ui.surge.addEventListener('click', () => {
+                scenarios[state.scenario].emphasis.forEach((id, index) => {
+                    window.setTimeout(() => injectModule(id, 1.12, 34), index * 130);
+                });
+            });
+
+            ui.reset.addEventListener('click', () => resetField());
+
+            ui.labels.addEventListener('click', () => {
+                state.labels = !state.labels;
+                ui.labels.classList.toggle('active', state.labels);
+                ui.labels.setAttribute('aria-pressed', String(state.labels));
+                moduleLabels.forEach((label) => {
+                    label.style.display = state.labels ? 'block' : 'none';
+                });
+            });
+
+            ui.load.addEventListener('input', () => {
+                state.load = Number(ui.load.value) / 100;
+                ui.loadValue.textContent = ui.load.value;
+            });
+
+            ui.noise.addEventListener('input', () => {
+                state.noise = Number(ui.noise.value) / 100;
+                ui.noiseValue.textContent = ui.noise.value;
+            });
+
+            window.addEventListener('keydown', (event) => {
+                if (event.target instanceof HTMLInputElement) return;
+                if (event.key >= '1' && event.key <= String(scenarios.length)) {
+                    applyScenario(Number(event.key) - 1);
+                } else if (event.key === ' ') {
+                    event.preventDefault();
+                    injectModule(state.selectedModule || 'prompt', 1.4, 42);
+                } else if (event.key.toLowerCase() === 'r') {
+                    resetField();
+                }
+            });
+        }
+
+        function applyScenario(index) {
+            const scenario = scenarios[index];
+            state.scenario = index;
+            state.load = scenario.load;
+            state.noise = scenario.noise;
+            ui.load.value = Math.round(state.load * 100);
+            ui.noise.value = Math.round(state.noise * 100);
+            ui.loadValue.textContent = ui.load.value;
+            ui.noiseValue.textContent = ui.noise.value;
+            ui.scenarioName.textContent = scenario.name;
+            ui.selectedTitle.textContent = scenario.name;
+            ui.selectedCopy.textContent = scenario.copy;
+
+            ui.scenarios.forEach((button, buttonIndex) => {
+                const active = buttonIndex === index;
+                button.classList.toggle('active', active);
+                button.setAttribute('aria-selected', String(active));
+            });
+
+            resetField(false);
+            scenario.emphasis.forEach((id, emphasisIndex) => {
+                window.setTimeout(() => injectModule(id, 1.0, 26), emphasisIndex * 120);
+            });
+        }
+
+        function resetField(clearSelection = true) {
+            moduleMap.forEach((module) => {
+                module.energy = 0;
+                module.targetEnergy = 0;
+                module.pressure = 0;
+            });
+            nodes.forEach((node) => {
+                node.energy = 0;
+            });
+            edges.forEach((edge) => {
+                edge.energy = 0;
+            });
+            pulses.forEach((pulse, index) => {
+                pulses[index] = makePulse(index, index < state.pulseBudget * 0.45);
+            });
+            if (clearSelection) {
+                state.selectedModule = null;
+                ui.selectedTitle.textContent = 'Model Field';
+                ui.selectedCopy.textContent = 'Click a subsystem to inject activation. Signals branch through attention highways, feedback loops, memory paths, and decoder pressure instead of stopping at a single edge.';
+            }
+        }
+
+        function onPointerDown(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            pointer.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
+            raycaster.setFromCamera(pointer, camera);
+            const hits = raycaster.intersectObjects(moduleMeshes, false);
+            if (!hits.length) return;
+
+            const moduleId = hits[0].object.userData.moduleId;
+            selectModule(moduleId);
+            injectModule(moduleId, 1.35, 46);
+        }
+
+        function selectModule(moduleId) {
+            const module = moduleMap.get(moduleId);
+            if (!module) return;
+            state.selectedModule = moduleId;
+            ui.selectedTitle.textContent = module.label;
+            ui.selectedCopy.textContent = module.copy;
+        }
+
+        function injectModule(moduleId, strength, count) {
+            const module = moduleMap.get(moduleId);
+            if (!module) return;
+
+            module.energy = Math.min(2.4, module.energy + strength);
+            module.pressure = Math.min(1, module.pressure + strength * 0.28);
+
+            const candidates = outgoingEdges.get(moduleId) || [];
+            for (let i = 0; i < count; i += 1) {
+                const edgeIndex = candidates[Math.floor(hash(i + performance.now(), module.index + 503) * candidates.length)];
+                activatePulse(edgeIndex, strength * (0.62 + hash(i, module.index + 521) * 0.5));
+            }
+        }
+
+        function makePulse(index, active) {
+            const scenario = scenarios[state.scenario] || scenarios[0];
+            const fromId = scenario.emphasis[index % scenario.emphasis.length];
+            const candidates = outgoingEdges.get(fromId) || [];
+            const edgeIndex = candidates[Math.floor(hash(index, 607) * candidates.length)] ?? Math.floor(hash(index, 613) * edges.length);
+            return {
+                active,
+                edgeIndex,
+                progress: hash(index, 619),
+                speed: 0.24 + hash(index, 631) * 0.58,
+                strength: active ? 0.35 + hash(index, 641) * 0.55 : 0,
+                branch: hash(index, 653)
+            };
+        }
+
+        function activatePulse(edgeIndex, strength) {
+            let pulse = pulses.find((candidate) => !candidate.active || candidate.strength < 0.08);
+            if (!pulse) {
+                pulse = pulses[Math.floor(hash(performance.now(), 701) * pulses.length)];
+            }
+            pulse.active = true;
+            pulse.edgeIndex = edgeIndex;
+            pulse.progress = 0;
+            pulse.speed = 0.38 + Math.random() * 0.52;
+            pulse.strength = Math.min(1.6, strength);
+            pulse.branch = Math.random();
+        }
+
+        function animate() {
+            const elapsed = clock.getElapsedTime();
+            const dt = Math.min(0.034, clock.getDelta());
+
+            updateModules(dt);
+            updateNodes(elapsed);
+            updatePulses(dt);
+            updatePathwayGlow(elapsed, dt);
+            updateModuleShells(elapsed);
+            updateLabels();
+            updateMetrics();
+
+            neuronMesh.material.uniforms.uTime.value = elapsed;
+            controls.update();
+            composer.render();
+        }
+
+        function updateModules(dt) {
+            const scenario = scenarios[state.scenario];
+            moduleMap.forEach((module) => {
+                const emphasized = scenario.emphasis.includes(module.id) ? 0.18 : 0;
+                const baseline = 0.08 + state.load * 0.16 + emphasized;
+                module.targetEnergy = Math.max(module.targetEnergy * 0.94, baseline);
+                module.energy += (module.targetEnergy - module.energy) * Math.min(1, dt * 3.6);
+                module.energy *= Math.pow(0.985, dt * 60);
+                module.pressure *= Math.pow(0.975, dt * 60);
+            });
+        }
+
+        function updateNodes(elapsed) {
+            const positions = neuronGeometry.attributes.position.array;
+
+            nodes.forEach((node, index) => {
+                const offset = index * 3;
+                const moduleEnergy = node.module.energy;
+                const localWave = Math.sin(elapsed * (0.6 + state.noise) + node.phase + node.base.length() * 0.025);
+                const drift = localWave * (0.25 + moduleEnergy * 2.8);
+                const direction = node.base.clone().sub(node.module.center).normalize();
+                node.position.copy(node.base).addScaledVector(direction, drift);
+                node.energy += (moduleEnergy - node.energy) * 0.08;
+                neuronEnergy[index] = Math.min(1.8, node.energy + Math.max(0, localWave) * state.noise * 0.18);
+                positions[offset] = node.position.x;
+                positions[offset + 1] = node.position.y;
+                positions[offset + 2] = node.position.z;
+            });
+
+            neuronGeometry.attributes.position.needsUpdate = true;
+            neuronGeometry.attributes.aEnergy.needsUpdate = true;
+        }
+
+        function updatePulses(dt) {
+            let activeCount = 0;
+            const scenario = scenarios[state.scenario];
+            const targetActive = Math.floor(state.pulseBudget * (0.38 + state.load * 0.42));
+
+            pulses.forEach((pulse, index) => {
+                if (!pulse.active) {
+                    hidePulse(index);
+                    return;
+                }
+
+                const edge = edges[pulse.edgeIndex];
+                const fromNode = nodes[edge.fromIndex];
+                const toNode = nodes[edge.toIndex];
+                const speed = pulse.speed * (0.48 + state.load * 1.18);
+                pulse.progress += dt * speed;
+                edge.energy = Math.max(edge.energy, pulse.strength * (1 - pulse.progress * 0.35));
+                if (pathwayMeshes[edge.pathway]) {
+                    pathwayMeshes[edge.pathway].energy = Math.max(pathwayMeshes[edge.pathway].energy, pulse.strength * (1 - pulse.progress * 0.22));
+                }
+
+                if (pulse.progress >= 1) {
+                    const toModule = moduleMap.get(edge.toId);
+                    const delivered = pulse.strength * Math.abs(edge.weight) * (edge.weight < 0 ? 0.42 : 0.76);
+                    toModule.energy = Math.min(2.2, toModule.energy + delivered);
+                    toModule.pressure = Math.min(1, toModule.pressure + delivered * 0.18);
+
+                    const downstream = outgoingEdges.get(edge.toId) || [];
+                    const branchChance = 0.44 + state.load * 0.32 + state.noise * 0.18;
+                    if (downstream.length && pulse.strength > 0.08 && Math.random() < branchChance) {
+                        const nextIndex = downstream[Math.floor(Math.random() * downstream.length)];
+                        pulse.edgeIndex = nextIndex;
+                        pulse.progress = 0;
+                        pulse.strength *= 0.72 + Math.random() * 0.16;
+                        pulse.speed = 0.32 + Math.random() * 0.6;
+                    } else {
+                        pulse.active = false;
+                        hidePulse(index);
+                        return;
+                    }
+                }
+
+                const p = interpolateEdge(edge, pulse.progress);
+                const color = edge.weight < 0 ? new THREE.Color(0xff5f7d) : fromNode.module.color.clone().lerp(toNode.module.color, pulse.progress);
+                const offset = index * 3;
+                pulsePositions[offset] = p.x;
+                pulsePositions[offset + 1] = p.y;
+                pulsePositions[offset + 2] = p.z;
+                pulseColors[offset] = color.r;
+                pulseColors[offset + 1] = color.g;
+                pulseColors[offset + 2] = color.b;
+                pulseAlpha[index] = Math.min(1, 0.18 + pulse.strength * 0.55);
+                pulse.strength *= Math.pow(0.993, dt * 60);
+                activeCount += 1;
+            });
+
+            while (activeCount < targetActive) {
+                const sourceId = scenario.emphasis[Math.floor(Math.random() * scenario.emphasis.length)];
+                const candidates = outgoingEdges.get(sourceId) || [];
+                const edgeIndex = candidates[Math.floor(Math.random() * candidates.length)];
+                activatePulse(edgeIndex, 0.28 + Math.random() * 0.36);
+                activeCount += 1;
+            }
+
+            edges.forEach((edge) => {
+                edge.energy *= Math.pow(0.94, dt * 60);
+            });
+
+            pulseGeometry.attributes.position.needsUpdate = true;
+            pulseGeometry.attributes.aColor.needsUpdate = true;
+            pulseGeometry.attributes.aAlpha.needsUpdate = true;
+            ui.signalCount.textContent = String(activeCount);
+        }
+
+        function updatePathwayGlow(elapsed, dt) {
+            pathwayMeshes.forEach((pathway) => {
+                const fromEnergy = moduleMap.get(pathway.fromId).energy;
+                const toEnergy = moduleMap.get(pathway.toId).energy;
+                const pressure = Math.min(1.8, pathway.energy + (fromEnergy + toEnergy) * 0.12);
+                const shimmer = 0.5 + Math.sin(elapsed * 2.2 + pathway.phase) * 0.5;
+                const inhibitionBoost = pathway.weight < 0 ? 0.035 : 0;
+                pathway.halo.material.opacity = 0.028 + state.load * 0.028 + pressure * 0.085 + shimmer * 0.012 + inhibitionBoost;
+                pathway.core.material.opacity = 0.07 + state.load * 0.045 + pressure * 0.16 + shimmer * 0.018 + inhibitionBoost;
+                pathway.energy *= Math.pow(0.91, dt * 60);
+            });
+        }
+
+        function updateModuleShells(elapsed) {
+            moduleMeshes.forEach((mesh) => {
+                const module = moduleMap.get(mesh.userData.moduleId);
+                mesh.rotation.x += 0.0015 + module.energy * 0.0008;
+                mesh.rotation.y += 0.001 + module.pressure * 0.0012;
+                mesh.material.opacity = 0.035 + Math.min(0.14, module.energy * 0.06);
+                mesh.scale.setScalar(1 + module.energy * 0.045 + Math.sin(elapsed + module.index) * 0.006);
+            });
+
+            linkMesh.material.opacity = 0.08 + state.load * 0.09;
+            bloomPass.strength = 0.22 + state.load * 0.32;
+        }
+
+        function updateLabels() {
+            if (!state.labels) return;
+
+            moduleSpecs.forEach((spec, index) => {
+                const module = moduleMap.get(spec.id);
+                const label = moduleLabels[index];
+                const projected = module.center.clone().project(camera);
+                const visible = projected.z < 1;
+                label.style.display = visible ? 'block' : 'none';
+                if (!visible) return;
+                const x = (projected.x * 0.5 + 0.5) * window.innerWidth;
+                const y = (-projected.y * 0.5 + 0.5) * window.innerHeight;
+                label.style.left = `${x}px`;
+                label.style.top = `${y}px`;
+                label.style.borderColor = `rgba(${Math.round(module.color.r * 255)}, ${Math.round(module.color.g * 255)}, ${Math.round(module.color.b * 255)}, ${0.18 + module.energy * 0.22})`;
+                label.style.opacity = String(Math.min(1, 0.46 + module.energy * 0.42));
+            });
+        }
+
+        function updateMetrics() {
+            const energies = [...moduleMap.values()].map((module) => module.energy);
+            const avg = energies.reduce((sum, value) => sum + value, 0) / energies.length;
+            const max = Math.max(...energies);
+            const router = moduleMap.get('router').pressure;
+            const decoder = moduleMap.get('decoder').energy;
+            const safety = moduleMap.get('safety').pressure;
+            const entropy = clamp(state.noise * 0.62 + max * 0.16 + router * 0.22);
+            const output = clamp(decoder * 0.42 + moduleMap.get('plan').energy * 0.24 + avg * 0.18);
+            const coherence = clamp(0.74 + output * 0.28 - entropy * 0.36 - safety * 0.12);
+
+            setMeter(ui.entropyFill, ui.entropyValue, entropy);
+            setMeter(ui.outputFill, ui.outputValue, output);
+            setMeter(ui.coherenceFill, ui.coherenceValue, coherence);
+        }
+
+        function setMeter(fill, value, amount) {
+            const percent = Math.round(clamp(amount) * 100);
+            fill.style.width = `${percent}%`;
+            value.textContent = `${percent}%`;
+        }
+
+        function interpolateEdge(edge, t) {
+            const from = nodes[edge.fromIndex].position;
+            const to = nodes[edge.toIndex].position;
+            const middle = from.clone().lerp(to, 0.5);
+            const bend = from.clone().cross(to).normalize().multiplyScalar(edge.weight * 7);
+            middle.add(bend);
+            const inv = 1 - t;
+            return new THREE.Vector3(
+                inv * inv * from.x + 2 * inv * t * middle.x + t * t * to.x,
+                inv * inv * from.y + 2 * inv * t * middle.y + t * t * to.y,
+                inv * inv * from.z + 2 * inv * t * middle.z + t * t * to.z
+            );
+        }
+
+        function hidePulse(index) {
+            const offset = index * 3;
+            pulsePositions[offset] = 0;
+            pulsePositions[offset + 1] = -999;
+            pulsePositions[offset + 2] = 0;
+            pulseAlpha[index] = 0;
+        }
+
+        function onResize() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            camera.aspect = width / height;
+            camera.position.z = width < 720 ? 230 : 190;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            composer.setSize(width, height);
+            bloomPass.setSize(width, height);
+            neuronMesh.material.uniforms.uPixelRatio.value = Math.min(window.devicePixelRatio, 2);
+            pulseMesh.material.uniforms.uPixelRatio.value = Math.min(window.devicePixelRatio, 2);
+        }
+
+        function randomEllipsoid(index, salt, spread) {
+            const u = hash(index, salt + 17);
+            const v = hash(index, salt + 23);
+            const w = Math.pow(hash(index, salt + 29), 0.42);
+            const theta = u * TAU;
+            const phi = Math.acos(2 * v - 1);
+            return new THREE.Vector3(
+                Math.sin(phi) * Math.cos(theta) * spread.x * w,
+                Math.cos(phi) * spread.y * w,
+                Math.sin(phi) * Math.sin(theta) * spread.z * w
+            );
+        }
+
+        function clamp(value) {
+            return Math.max(0, Math.min(1, value));
+        }
+
+        function hash(index, salt) {
+            const value = Math.sin(index * 127.1 + salt * 311.7) * 43758.5453123;
+            return value - Math.floor(value);
+        }
+    </script>
+</body>
+</html>

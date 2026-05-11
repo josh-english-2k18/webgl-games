@@ -1,0 +1,1267 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Prismalith Engine</title>
+    <style>
+        :root {
+            --bg: #030305;
+            --panel: rgba(5, 7, 12, 0.74);
+            --panel-strong: rgba(10, 12, 18, 0.9);
+            --line: rgba(224, 246, 255, 0.18);
+            --line-hot: rgba(90, 241, 255, 0.72);
+            --ink: #eef8ff;
+            --muted: rgba(238, 248, 255, 0.62);
+            --accent: #5af1ff;
+            --accent-2: #ff5277;
+            --accent-3: #ffd166;
+            --shadow: rgba(90, 241, 255, 0.2);
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            letter-spacing: 0;
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        #stage {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background:
+                linear-gradient(115deg, rgba(255, 82, 119, 0.08), transparent 32%),
+                linear-gradient(245deg, rgba(255, 209, 102, 0.06), transparent 30%),
+                linear-gradient(180deg, #06070b 0%, #020203 100%);
+        }
+
+        #stage canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .backplane,
+        .scan,
+        .edge-vignette {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .backplane {
+            opacity: 0.18;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.055) 1px, transparent 1px);
+            background-size: 56px 56px;
+            mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 78%, transparent 100%);
+            animation: driftGrid 24s linear infinite;
+        }
+
+        .scan {
+            opacity: 0.08;
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent 0,
+                transparent 9px,
+                rgba(255, 255, 255, 0.4) 10px
+            );
+            mix-blend-mode: screen;
+        }
+
+        .edge-vignette {
+            background:
+                linear-gradient(to right, rgba(0, 0, 0, 0.58), transparent 18%, transparent 82%, rgba(0, 0, 0, 0.58)),
+                linear-gradient(to bottom, rgba(0, 0, 0, 0.54), transparent 22%, transparent 72%, rgba(0, 0, 0, 0.62));
+        }
+
+        @keyframes driftGrid {
+            from { transform: translate3d(0, 0, 0); }
+            to { transform: translate3d(56px, 56px, 0); }
+        }
+
+        .hud {
+            position: fixed;
+            top: 18px;
+            left: 18px;
+            z-index: 20;
+            pointer-events: none;
+            min-width: 280px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .brand-mark {
+            width: 28px;
+            height: 28px;
+            border: 1px solid var(--line-hot);
+            border-radius: 50%;
+            position: relative;
+            box-shadow: 0 0 22px var(--shadow), inset 0 0 16px rgba(90, 241, 255, 0.12);
+        }
+
+        .brand-mark::before,
+        .brand-mark::after {
+            content: "";
+            position: absolute;
+            inset: 6px;
+            border: 1px solid rgba(255, 209, 102, 0.72);
+            transform: rotate(45deg);
+        }
+
+        .brand-mark::after {
+            inset: 11px;
+            border-color: var(--accent-2);
+            border-radius: 50%;
+            transform: none;
+        }
+
+        #shape-name {
+            margin: 0;
+            color: var(--ink);
+            font-size: 28px;
+            line-height: 1.02;
+            font-weight: 800;
+            text-transform: uppercase;
+            text-shadow: 0 0 28px rgba(90, 241, 255, 0.24);
+        }
+
+        .status-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 650;
+            text-transform: uppercase;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 18px var(--accent);
+        }
+
+        .telemetry {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            z-index: 20;
+            width: 218px;
+            padding: 14px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(22px);
+            box-shadow: 0 16px 42px rgba(0, 0, 0, 0.34);
+        }
+
+        .metric {
+            display: grid;
+            grid-template-columns: 64px 1fr 42px;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 10px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .metric:last-child {
+            margin-bottom: 0;
+        }
+
+        .track {
+            height: 5px;
+            overflow: hidden;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.09);
+        }
+
+        .fill {
+            width: 0%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--accent-2), var(--accent), var(--accent-3));
+            box-shadow: 0 0 18px var(--shadow);
+            transition: width 160ms ease;
+        }
+
+        .controls {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            left: 18px;
+            z-index: 30;
+            display: grid;
+            grid-template-columns: minmax(420px, 1fr) auto minmax(260px, 360px);
+            gap: 12px;
+            align-items: center;
+            max-width: 1220px;
+            margin: 0 auto;
+            padding: 12px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 18px 56px rgba(0, 0, 0, 0.42);
+        }
+
+        .shape-switcher {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 6px;
+            min-width: 0;
+        }
+
+        .shape-btn,
+        .icon-btn,
+        .toggle-btn {
+            min-height: 42px;
+            border: 1px solid rgba(238, 248, 255, 0.14);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.045);
+            color: var(--muted);
+            cursor: pointer;
+            transition: border-color 160ms ease, background 160ms ease, color 160ms ease, transform 160ms ease;
+        }
+
+        .shape-btn {
+            overflow: hidden;
+            padding: 9px 10px;
+            text-align: left;
+        }
+
+        .shape-btn strong,
+        .shape-btn span {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .shape-btn strong {
+            color: var(--ink);
+            font-size: 12px;
+            line-height: 1.15;
+            text-transform: uppercase;
+        }
+
+        .shape-btn span {
+            margin-top: 3px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .shape-btn:hover,
+        .icon-btn:hover,
+        .toggle-btn:hover {
+            color: var(--ink);
+            border-color: rgba(90, 241, 255, 0.58);
+            background: rgba(90, 241, 255, 0.1);
+        }
+
+        .shape-btn.active,
+        .toggle-btn.active {
+            border-color: var(--line-hot);
+            background: linear-gradient(180deg, rgba(90, 241, 255, 0.18), rgba(255, 255, 255, 0.045));
+            box-shadow: inset 0 0 22px rgba(90, 241, 255, 0.12), 0 0 24px rgba(90, 241, 255, 0.08);
+        }
+
+        .transport {
+            display: grid;
+            grid-template-columns: repeat(4, 42px);
+            gap: 6px;
+        }
+
+        .icon-btn,
+        .toggle-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+
+        .icon-btn svg,
+        .toggle-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+
+        .sliders {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .slider {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 7px;
+            min-width: 0;
+        }
+
+        .slider label {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 750;
+            text-transform: uppercase;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 20px;
+            margin: 0;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        #fallback {
+            position: fixed;
+            inset: 18px;
+            z-index: 100;
+            display: none;
+            place-items: center;
+            padding: 24px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel-strong);
+            color: var(--ink);
+            text-align: center;
+        }
+
+        #fallback.visible {
+            display: grid;
+        }
+
+        @media (max-width: 980px) {
+            .controls {
+                grid-template-columns: 1fr;
+                max-width: 680px;
+            }
+
+            .transport {
+                grid-template-columns: repeat(4, minmax(42px, 1fr));
+            }
+        }
+
+        @media (max-width: 720px) {
+            .hud {
+                top: 12px;
+                left: 12px;
+                min-width: 0;
+                max-width: calc(100vw - 24px);
+            }
+
+            #shape-name {
+                max-width: 280px;
+                font-size: 21px;
+            }
+
+            .brand {
+                margin-bottom: 8px;
+            }
+
+            .telemetry {
+                display: none;
+            }
+
+            .controls {
+                right: 10px;
+                bottom: 10px;
+                left: 10px;
+                padding: 10px;
+            }
+
+            .shape-switcher {
+                grid-template-columns: 1fr;
+                max-height: 154px;
+                overflow: auto;
+            }
+
+            .shape-btn {
+                min-height: 38px;
+                padding: 8px;
+            }
+
+            .sliders {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .backplane {
+                animation: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main id="stage" aria-label="Interactive Prismalith particle scene"></main>
+    <div class="backplane"></div>
+    <div class="scan"></div>
+    <div class="edge-vignette"></div>
+
+    <section class="hud" aria-live="polite">
+        <div class="brand">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <span>Prismalith Engine</span>
+        </div>
+        <h1 id="shape-name">Helix Engine</h1>
+        <div class="status-row">
+            <span class="status-dot"></span>
+            <span id="phase-value">Stable</span>
+            <span id="particle-value">46000 particles</span>
+        </div>
+    </section>
+
+    <aside class="telemetry" aria-label="Scene telemetry">
+        <div class="metric">
+            <span>FPS</span>
+            <span class="track"><span class="fill" id="fps-fill"></span></span>
+            <span id="fps-value">--</span>
+        </div>
+        <div class="metric">
+            <span>Energy</span>
+            <span class="track"><span class="fill" id="energy-fill"></span></span>
+            <span id="energy-value">38%</span>
+        </div>
+        <div class="metric">
+            <span>Links</span>
+            <span class="track"><span class="fill" id="links-fill"></span></span>
+            <span id="links-value">On</span>
+        </div>
+    </aside>
+
+    <nav class="controls" aria-label="Prismalith controls">
+        <div class="shape-switcher" role="tablist" aria-label="Particle forms">
+            <button class="shape-btn active" type="button" data-shape="0" role="tab" aria-selected="true">
+                <strong>Helix</strong>
+                <span>Engine</span>
+            </button>
+            <button class="shape-btn" type="button" data-shape="1" role="tab" aria-selected="false">
+                <strong>Orbital</strong>
+                <span>Bloom</span>
+            </button>
+            <button class="shape-btn" type="button" data-shape="2" role="tab" aria-selected="false">
+                <strong>Crown</strong>
+                <span>Reactor</span>
+            </button>
+            <button class="shape-btn" type="button" data-shape="3" role="tab" aria-selected="false">
+                <strong>Lattice</strong>
+                <span>City</span>
+            </button>
+            <button class="shape-btn" type="button" data-shape="4" role="tab" aria-selected="false">
+                <strong>Wave</strong>
+                <span>Cathedral</span>
+            </button>
+        </div>
+
+        <div class="transport">
+            <button class="icon-btn" id="previous-shape" type="button" aria-label="Previous form" title="Previous form">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 5 8 12l11 7V5Z"></path><path d="M5 5v14"></path></svg>
+            </button>
+            <button class="icon-btn" id="next-shape" type="button" aria-label="Next form" title="Next form">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 5 11 7-11 7V5Z"></path><path d="M19 5v14"></path></svg>
+            </button>
+            <button class="toggle-btn active" id="auto-toggle" type="button" aria-label="Toggle automatic morphing" title="Automatic morphing" aria-pressed="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v6h6"></path><path d="M20 20v-6h-6"></path><path d="M5.5 15a7 7 0 0 0 11.8 2.5L20 14"></path><path d="M18.5 9A7 7 0 0 0 6.7 6.5L4 10"></path></svg>
+            </button>
+            <button class="toggle-btn active" id="links-toggle" type="button" aria-label="Toggle constellation links" title="Constellation links" aria-pressed="true">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="2"></circle><circle cx="12" cy="5" r="2"></circle><circle cx="19" cy="16" r="2"></circle><path d="m6.7 10.6 3.6-4"></path><path d="m13.8 6.3 3.7 7.9"></path><path d="M7 12.5 17 16"></path></svg>
+            </button>
+        </div>
+
+        <div class="sliders">
+            <div class="slider">
+                <label for="energy-slider">
+                    <span>Energy</span>
+                    <span id="energy-label">38</span>
+                </label>
+                <input id="energy-slider" type="range" min="10" max="85" value="38">
+            </div>
+            <div class="slider">
+                <label for="bloom-slider">
+                    <span>Bloom</span>
+                    <span id="bloom-label">18</span>
+                </label>
+                <input id="bloom-slider" type="range" min="0" max="60" value="18">
+            </div>
+        </div>
+    </nav>
+
+    <div id="fallback">
+        <p>This browser could not start the WebGL scene.</p>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.174.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+        const stage = document.getElementById('stage');
+        const fallback = document.getElementById('fallback');
+        const compactQuery = window.matchMedia('(max-width: 720px)');
+        const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+        const isCompact = compactQuery.matches;
+        const particleCount = isCompact ? 24000 : 46000;
+        const linkCount = isCompact ? 680 : 1500;
+        const TAU = Math.PI * 2;
+        const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+
+        const ui = {
+            shapeName: document.getElementById('shape-name'),
+            phase: document.getElementById('phase-value'),
+            particleValue: document.getElementById('particle-value'),
+            fpsFill: document.getElementById('fps-fill'),
+            fpsValue: document.getElementById('fps-value'),
+            energyFill: document.getElementById('energy-fill'),
+            energyValue: document.getElementById('energy-value'),
+            linksFill: document.getElementById('links-fill'),
+            linksValue: document.getElementById('links-value'),
+            energySlider: document.getElementById('energy-slider'),
+            bloomSlider: document.getElementById('bloom-slider'),
+            energyLabel: document.getElementById('energy-label'),
+            bloomLabel: document.getElementById('bloom-label'),
+            shapeButtons: Array.from(document.querySelectorAll('[data-shape]')),
+            previous: document.getElementById('previous-shape'),
+            next: document.getElementById('next-shape'),
+            auto: document.getElementById('auto-toggle'),
+            links: document.getElementById('links-toggle')
+        };
+
+        const state = {
+            currentShape: 0,
+            targetShape: 0,
+            morphStart: 0,
+            morphDuration: 1750,
+            morphing: false,
+            autoMorph: !reducedMotionQuery.matches,
+            showLinks: true,
+            energy: Number(ui.energySlider.value) / 100,
+            bloom: Number(ui.bloomSlider.value) / 100,
+            lastAutoMorph: performance.now(),
+            fps: 0,
+            frameCounter: 0,
+            frameWindowStart: performance.now()
+        };
+
+        if (!state.autoMorph) {
+            ui.auto.classList.remove('active');
+            ui.auto.setAttribute('aria-pressed', 'false');
+        }
+
+        const shapes = [
+            {
+                name: 'Helix Engine',
+                code: 'Engine',
+                palette: [0x5af1ff, 0xff5277, 0xeef8ff],
+                generator: helixEngine
+            },
+            {
+                name: 'Orbital Bloom',
+                code: 'Bloom',
+                palette: [0xffd166, 0x67ffb8, 0xff7a59],
+                generator: orbitalBloom
+            },
+            {
+                name: 'Crown Reactor',
+                code: 'Reactor',
+                palette: [0xb996ff, 0x5af1ff, 0xff5277],
+                generator: crownReactor
+            },
+            {
+                name: 'Lattice City',
+                code: 'City',
+                palette: [0xf4f1bb, 0x66d9e8, 0xff8fab],
+                generator: latticeCity
+            },
+            {
+                name: 'Wave Cathedral',
+                code: 'Cathedral',
+                palette: [0x7cffcb, 0xffd166, 0xa78bfa],
+                generator: waveCathedral
+            }
+        ];
+
+        let scene;
+        let camera;
+        let renderer;
+        let controls;
+        let composer;
+        let bloomPass;
+        let particleMesh;
+        let particleMaterial;
+        let particleGeometry;
+        let linkMesh;
+        let linkGeometry;
+        let linkIndices;
+        let fieldGroup;
+        let stars;
+        let clock;
+        let shapeBuffers;
+
+        init();
+
+        function init() {
+            try {
+                scene = new THREE.Scene();
+                scene.fog = new THREE.FogExp2(0x030305, 0.006);
+
+                camera = new THREE.PerspectiveCamera(64, window.innerWidth / window.innerHeight, 0.1, 1200);
+                camera.position.set(0, 24, isCompact ? 172 : 144);
+
+                renderer = new THREE.WebGLRenderer({
+                    antialias: true,
+                    alpha: true,
+                    powerPreference: 'high-performance'
+                });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.outputColorSpace = THREE.SRGBColorSpace;
+                renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                renderer.toneMappingExposure = 0.82;
+                stage.appendChild(renderer.domElement);
+
+                controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.065;
+                controls.enablePan = false;
+                controls.minDistance = 70;
+                controls.maxDistance = 270;
+                controls.autoRotate = !reducedMotionQuery.matches;
+                controls.autoRotateSpeed = 0.35;
+                controls.target.set(0, 0, 0);
+
+                composer = new EffectComposer(renderer);
+                composer.addPass(new RenderPass(scene, camera));
+                bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), state.bloom * 0.55, 0.34, 0.58);
+                composer.addPass(bloomPass);
+                composer.addPass(new OutputPass());
+
+                shapeBuffers = shapes.map((shape, index) => buildShapeBuffer(shape, index));
+                createParticles();
+                createLinks();
+                createFieldRings();
+                createStars();
+                bindEvents();
+                updateUi();
+
+                clock = new THREE.Clock();
+                renderer.setAnimationLoop(animate);
+                window.__holographV2Ready = true;
+            } catch (error) {
+                console.error(error);
+                fallback.classList.add('visible');
+            }
+        }
+
+        function buildShapeBuffer(shape, shapeIndex) {
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+            const color = new THREE.Color();
+            const nextColor = new THREE.Color();
+
+            for (let i = 0; i < particleCount; i += 1) {
+                const point = shape.generator(i, particleCount);
+                const offset = i * 3;
+                positions[offset] = point.x;
+                positions[offset + 1] = point.y;
+                positions[offset + 2] = point.z;
+
+                const baseIndex = Math.floor(hash(i, shapeIndex + 13) * shape.palette.length);
+                const nextIndex = (baseIndex + 1 + Math.floor(hash(i, shapeIndex + 31) * (shape.palette.length - 1))) % shape.palette.length;
+                const mix = hash(i, shapeIndex + 47) * 0.65;
+                const lift = 0.54 + hash(i, shapeIndex + 79) * 0.3;
+                color.setHex(shape.palette[baseIndex]);
+                nextColor.setHex(shape.palette[nextIndex]);
+                color.lerp(nextColor, mix);
+                colors[offset] = color.r * lift;
+                colors[offset + 1] = color.g * lift;
+                colors[offset + 2] = color.b * lift;
+            }
+
+            return { positions, colors };
+        }
+
+        function createParticles() {
+            const initial = shapeBuffers[0];
+            const seeds = new Float32Array(particleCount);
+            const sizes = new Float32Array(particleCount);
+
+            for (let i = 0; i < particleCount; i += 1) {
+                seeds[i] = hash(i, 91);
+                sizes[i] = 0.75 + Math.pow(hash(i, 113), 2.2) * 2.2;
+            }
+
+            particleGeometry = new THREE.BufferGeometry();
+            particleGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(initial.positions), 3));
+            particleGeometry.setAttribute('fromPosition', new THREE.BufferAttribute(new Float32Array(initial.positions), 3));
+            particleGeometry.setAttribute('toPosition', new THREE.BufferAttribute(new Float32Array(initial.positions), 3));
+            particleGeometry.setAttribute('fromColor', new THREE.BufferAttribute(new Float32Array(initial.colors), 3));
+            particleGeometry.setAttribute('toColor', new THREE.BufferAttribute(new Float32Array(initial.colors), 3));
+            particleGeometry.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
+            particleGeometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+            particleGeometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 140);
+
+            particleMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    uTime: { value: 0 },
+                    uMorph: { value: 1 },
+                    uEnergy: { value: state.energy },
+                    uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
+                    uFlow: { value: reducedMotionQuery.matches ? 0 : 1 }
+                },
+                vertexShader: `
+                    attribute vec3 fromPosition;
+                    attribute vec3 toPosition;
+                    attribute vec3 fromColor;
+                    attribute vec3 toColor;
+                    attribute float aSeed;
+                    attribute float aSize;
+
+                    uniform float uTime;
+                    uniform float uMorph;
+                    uniform float uEnergy;
+                    uniform float uPixelRatio;
+                    uniform float uFlow;
+
+                    varying vec3 vColor;
+                    varying float vAlpha;
+                    varying float vSpark;
+
+                    float easeInOutCubic(float x) {
+                        return x < 0.5 ? 4.0 * x * x * x : 1.0 - pow(-2.0 * x + 2.0, 3.0) * 0.5;
+                    }
+
+                    mat2 rotate2d(float angle) {
+                        float s = sin(angle);
+                        float c = cos(angle);
+                        return mat2(c, -s, s, c);
+                    }
+
+                    void main() {
+                        float eased = easeInOutCubic(clamp(uMorph, 0.0, 1.0));
+                        vec3 p = mix(fromPosition, toPosition, eased);
+                        float radial = length(p.xz);
+                        float wave = sin(uTime * (0.62 + aSeed * 1.3) + radial * 0.12 + aSeed * 6.2831853);
+                        float breath = cos(uTime * 0.48 + p.y * 0.075 + aSeed * 9.0);
+                        float spin = (0.0015 + aSeed * 0.0025) * uTime * uFlow * (0.4 + uEnergy);
+                        p.xz = rotate2d(spin * radial) * p.xz;
+                        p += normalize(p + vec3(0.001, 0.003, 0.002)) * wave * uFlow * uEnergy * (0.95 + aSeed * 1.25);
+                        p.y += breath * uFlow * uEnergy * 0.78;
+
+                        vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
+                        gl_Position = projectionMatrix * mvPosition;
+
+                        float perspective = clamp(420.0 / max(88.0, -mvPosition.z), 0.75, 5.2);
+                        gl_PointSize = aSize * perspective * uPixelRatio * (0.82 + uEnergy * 0.55 + wave * 0.045);
+
+                        vColor = mix(fromColor, toColor, eased) * (0.54 + wave * 0.08 + uEnergy * 0.16);
+                        vAlpha = clamp(0.2 + uEnergy * 0.26 + wave * 0.06, 0.08, 0.56);
+                        vSpark = aSeed;
+                    }
+                `,
+                fragmentShader: `
+                    precision highp float;
+
+                    varying vec3 vColor;
+                    varying float vAlpha;
+                    varying float vSpark;
+
+                    void main() {
+                        vec2 uv = gl_PointCoord - 0.5;
+                        float d = length(uv);
+                        float core = smoothstep(0.27, 0.018, d);
+                        float halo = smoothstep(0.48, 0.12, d) * 0.16;
+                        float ring = smoothstep(0.48, 0.41, d) * smoothstep(0.2, 0.4, d) * 0.12;
+                        float spark = pow(max(0.0, 1.0 - d * 2.1), 6.0) * (0.16 + vSpark * 0.18);
+                        float alpha = (core + halo + ring) * vAlpha;
+
+                        if (alpha < 0.01) {
+                            discard;
+                        }
+
+                        vec3 color = vColor * (0.62 + core * 0.88 + ring * 0.24 + spark);
+                        gl_FragColor = vec4(color, alpha);
+                    }
+                `,
+                transparent: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            });
+
+            particleMesh = new THREE.Points(particleGeometry, particleMaterial);
+            scene.add(particleMesh);
+        }
+
+        function createLinks() {
+            linkIndices = new Uint32Array(linkCount * 2);
+            const positions = new Float32Array(linkCount * 2 * 3);
+            const colors = new Float32Array(linkCount * 2 * 3);
+
+            for (let i = 0; i < linkCount; i += 1) {
+                const stride = Math.max(1, Math.floor(particleCount / linkCount));
+                const a = (i * stride + Math.floor(hash(i, 211) * stride)) % particleCount;
+                const b = (a + 11 + Math.floor(hash(i, 233) * 180)) % particleCount;
+                linkIndices[i * 2] = a;
+                linkIndices[i * 2 + 1] = b;
+            }
+
+            linkGeometry = new THREE.BufferGeometry();
+            linkGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
+            linkGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3).setUsage(THREE.DynamicDrawUsage));
+            linkGeometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 150);
+
+            const material = new THREE.LineBasicMaterial({
+                transparent: true,
+                opacity: 0.08,
+                vertexColors: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            linkMesh = new THREE.LineSegments(linkGeometry, material);
+            scene.add(linkMesh);
+            updateLinks(1);
+        }
+
+        function createFieldRings() {
+            fieldGroup = new THREE.Group();
+            const ringSpecs = [
+                { radius: 38, axis: 'xz', color: 0x5af1ff, opacity: 0.18 },
+                { radius: 52, axis: 'xy', color: 0xff5277, opacity: 0.13 },
+                { radius: 66, axis: 'yz', color: 0xffd166, opacity: 0.11 },
+                { radius: 82, axis: 'xz', color: 0xa78bfa, opacity: 0.09 }
+            ];
+
+            ringSpecs.forEach((spec, index) => {
+                const geometry = createRingGeometry(spec.radius, 240, spec.axis);
+                const material = new THREE.LineBasicMaterial({
+                    color: spec.color,
+                    transparent: true,
+                    opacity: spec.opacity,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                const ring = new THREE.LineLoop(geometry, material);
+                ring.userData.spin = 0.0018 + index * 0.0012;
+                ring.userData.axis = spec.axis;
+                fieldGroup.add(ring);
+            });
+
+            scene.add(fieldGroup);
+        }
+
+        function createRingGeometry(radius, segments, axis) {
+            const positions = new Float32Array(segments * 3);
+            for (let i = 0; i < segments; i += 1) {
+                const t = i / segments * TAU;
+                const x = Math.cos(t) * radius;
+                const y = Math.sin(t) * radius;
+                const offset = i * 3;
+
+                if (axis === 'xy') {
+                    positions[offset] = x;
+                    positions[offset + 1] = y;
+                    positions[offset + 2] = 0;
+                } else if (axis === 'yz') {
+                    positions[offset] = 0;
+                    positions[offset + 1] = x;
+                    positions[offset + 2] = y;
+                } else {
+                    positions[offset] = x;
+                    positions[offset + 1] = 0;
+                    positions[offset + 2] = y;
+                }
+            }
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            return geometry;
+        }
+
+        function createStars() {
+            const starCount = isCompact ? 1100 : 1900;
+            const positions = new Float32Array(starCount * 3);
+            const colors = new Float32Array(starCount * 3);
+            const color = new THREE.Color();
+
+            for (let i = 0; i < starCount; i += 1) {
+                const radius = 180 + hash(i, 317) * 380;
+                const theta = hash(i, 331) * TAU;
+                const phi = Math.acos(2 * hash(i, 347) - 1);
+                const offset = i * 3;
+                positions[offset] = radius * Math.sin(phi) * Math.cos(theta);
+                positions[offset + 1] = radius * Math.cos(phi);
+                positions[offset + 2] = radius * Math.sin(phi) * Math.sin(theta);
+                color.setHex(shapes[i % shapes.length].palette[i % 3]);
+                const fade = 0.16 + hash(i, 359) * 0.34;
+                colors[offset] = color.r * fade;
+                colors[offset + 1] = color.g * fade;
+                colors[offset + 2] = color.b * fade;
+            }
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            stars = new THREE.Points(
+                geometry,
+                new THREE.PointsMaterial({
+                    size: 1.35,
+                    transparent: true,
+                opacity: 0.38,
+                    vertexColors: true,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                })
+            );
+            scene.add(stars);
+        }
+
+        function bindEvents() {
+            window.addEventListener('resize', onResize);
+
+            ui.shapeButtons.forEach((button) => {
+                button.addEventListener('click', () => {
+                    setShape(Number(button.dataset.shape));
+                });
+            });
+
+            ui.previous.addEventListener('click', () => setShape((state.targetShape - 1 + shapes.length) % shapes.length));
+            ui.next.addEventListener('click', () => setShape((state.targetShape + 1) % shapes.length));
+
+            ui.auto.addEventListener('click', () => {
+                state.autoMorph = !state.autoMorph;
+                state.lastAutoMorph = performance.now();
+                ui.auto.classList.toggle('active', state.autoMorph);
+                ui.auto.setAttribute('aria-pressed', String(state.autoMorph));
+                updateUi();
+            });
+
+            ui.links.addEventListener('click', () => {
+                state.showLinks = !state.showLinks;
+                ui.links.classList.toggle('active', state.showLinks);
+                ui.links.setAttribute('aria-pressed', String(state.showLinks));
+                updateUi();
+            });
+
+            ui.energySlider.addEventListener('input', () => {
+                state.energy = Number(ui.energySlider.value) / 100;
+                particleMaterial.uniforms.uEnergy.value = state.energy;
+                updateUi();
+            });
+
+            ui.bloomSlider.addEventListener('input', () => {
+                state.bloom = Number(ui.bloomSlider.value) / 100;
+                bloomPass.strength = state.bloom * 0.55;
+                updateUi();
+            });
+
+            window.addEventListener('keydown', (event) => {
+                if (event.target instanceof HTMLInputElement) return;
+
+                if (event.key >= '1' && event.key <= String(shapes.length)) {
+                    setShape(Number(event.key) - 1);
+                } else if (event.key === 'ArrowRight') {
+                    setShape((state.targetShape + 1) % shapes.length);
+                } else if (event.key === 'ArrowLeft') {
+                    setShape((state.targetShape - 1 + shapes.length) % shapes.length);
+                } else if (event.key === ' ') {
+                    event.preventDefault();
+                    state.autoMorph = !state.autoMorph;
+                    ui.auto.classList.toggle('active', state.autoMorph);
+                    ui.auto.setAttribute('aria-pressed', String(state.autoMorph));
+                    updateUi();
+                }
+            });
+        }
+
+        function setShape(index) {
+            if (index === state.targetShape || index < 0 || index >= shapes.length) return;
+
+            const morphRaw = particleMaterial.uniforms.uMorph.value;
+            const eased = easeInOutCubic(morphRaw);
+            const fromPosition = particleGeometry.attributes.fromPosition.array;
+            const toPosition = particleGeometry.attributes.toPosition.array;
+            const fromColor = particleGeometry.attributes.fromColor.array;
+            const toColor = particleGeometry.attributes.toColor.array;
+            const nextPosition = shapeBuffers[index].positions;
+            const nextColor = shapeBuffers[index].colors;
+
+            for (let i = 0; i < fromPosition.length; i += 1) {
+                fromPosition[i] = fromPosition[i] * (1 - eased) + toPosition[i] * eased;
+                fromColor[i] = fromColor[i] * (1 - eased) + toColor[i] * eased;
+                toPosition[i] = nextPosition[i];
+                toColor[i] = nextColor[i];
+            }
+
+            particleGeometry.attributes.fromPosition.needsUpdate = true;
+            particleGeometry.attributes.toPosition.needsUpdate = true;
+            particleGeometry.attributes.fromColor.needsUpdate = true;
+            particleGeometry.attributes.toColor.needsUpdate = true;
+            particleMaterial.uniforms.uMorph.value = 0;
+
+            state.targetShape = index;
+            state.morphStart = performance.now();
+            state.morphing = true;
+            state.lastAutoMorph = performance.now();
+            updateUi();
+        }
+
+        function animate(now) {
+            const elapsed = clock.getElapsedTime();
+            particleMaterial.uniforms.uTime.value = elapsed;
+
+            if (state.morphing) {
+                const progress = Math.min((now - state.morphStart) / state.morphDuration, 1);
+                particleMaterial.uniforms.uMorph.value = progress;
+                if (progress >= 1) {
+                    state.morphing = false;
+                    state.currentShape = state.targetShape;
+                    state.lastAutoMorph = now;
+                    updateUi();
+                }
+            } else {
+                particleMaterial.uniforms.uMorph.value = 1;
+                if (state.autoMorph && now - state.lastAutoMorph > 6200) {
+                    setShape((state.targetShape + 1) % shapes.length);
+                }
+            }
+
+            controls.update();
+            updateLinks(easeInOutCubic(particleMaterial.uniforms.uMorph.value));
+            updateField(elapsed);
+            updateTelemetry(now);
+            composer.render();
+        }
+
+        function updateLinks(eased) {
+            linkMesh.visible = state.showLinks;
+            if (!state.showLinks) return;
+
+            const fromPosition = particleGeometry.attributes.fromPosition.array;
+            const toPosition = particleGeometry.attributes.toPosition.array;
+            const fromColor = particleGeometry.attributes.fromColor.array;
+            const toColor = particleGeometry.attributes.toColor.array;
+            const positions = linkGeometry.attributes.position.array;
+            const colors = linkGeometry.attributes.color.array;
+
+            for (let i = 0; i < linkIndices.length; i += 1) {
+                const particleIndex = linkIndices[i] * 3;
+                const lineIndex = i * 3;
+                positions[lineIndex] = fromPosition[particleIndex] * (1 - eased) + toPosition[particleIndex] * eased;
+                positions[lineIndex + 1] = fromPosition[particleIndex + 1] * (1 - eased) + toPosition[particleIndex + 1] * eased;
+                positions[lineIndex + 2] = fromPosition[particleIndex + 2] * (1 - eased) + toPosition[particleIndex + 2] * eased;
+                colors[lineIndex] = (fromColor[particleIndex] * (1 - eased) + toColor[particleIndex] * eased) * 0.76;
+                colors[lineIndex + 1] = (fromColor[particleIndex + 1] * (1 - eased) + toColor[particleIndex + 1] * eased) * 0.76;
+                colors[lineIndex + 2] = (fromColor[particleIndex + 2] * (1 - eased) + toColor[particleIndex + 2] * eased) * 0.76;
+            }
+
+            linkGeometry.attributes.position.needsUpdate = true;
+            linkGeometry.attributes.color.needsUpdate = true;
+            linkMesh.material.opacity = 0.035 + state.energy * 0.07;
+        }
+
+        function updateField(elapsed) {
+            const targetPalette = shapes[state.targetShape].palette;
+            fieldGroup.children.forEach((ring, index) => {
+                const direction = index % 2 === 0 ? 1 : -1;
+                ring.rotation.x += ring.userData.spin * direction * (0.8 + state.energy);
+                ring.rotation.y += ring.userData.spin * 0.72 * (index + 1);
+                ring.rotation.z += ring.userData.spin * direction * 0.48;
+                ring.material.color.lerp(new THREE.Color(targetPalette[index % targetPalette.length]), 0.04);
+                ring.material.opacity = 0.025 + state.energy * (0.035 + index * 0.008) + Math.sin(elapsed + index) * 0.006;
+            });
+
+            stars.rotation.y += 0.0007;
+            stars.rotation.x = Math.sin(elapsed * 0.08) * 0.06;
+        }
+
+        function updateTelemetry(now) {
+            state.frameCounter += 1;
+            const elapsed = now - state.frameWindowStart;
+            if (elapsed < 500) return;
+
+            state.fps = Math.round(state.frameCounter * 1000 / elapsed);
+            state.frameCounter = 0;
+            state.frameWindowStart = now;
+            ui.fpsValue.textContent = String(state.fps);
+            ui.fpsFill.style.width = `${Math.min(100, state.fps / 60 * 100)}%`;
+        }
+
+        function updateUi() {
+            const shape = shapes[state.targetShape];
+            document.documentElement.style.setProperty('--accent', `#${shape.palette[0].toString(16).padStart(6, '0')}`);
+            document.documentElement.style.setProperty('--accent-2', `#${shape.palette[1].toString(16).padStart(6, '0')}`);
+            document.documentElement.style.setProperty('--accent-3', `#${shape.palette[2].toString(16).padStart(6, '0')}`);
+            ui.shapeName.textContent = shape.name;
+            ui.phase.textContent = state.morphing ? 'Morphing' : state.autoMorph ? 'Sequencing' : 'Stable';
+            ui.particleValue.textContent = `${particleCount.toLocaleString()} particles`;
+            ui.energyLabel.textContent = String(Math.round(state.energy * 100));
+            ui.bloomLabel.textContent = String(Math.round(state.bloom * 100));
+            ui.energyValue.textContent = `${Math.round(state.energy * 100)}%`;
+            ui.energyFill.style.width = `${Math.round(state.energy * 100)}%`;
+            ui.linksValue.textContent = state.showLinks ? 'On' : 'Off';
+            ui.linksFill.style.width = state.showLinks ? '100%' : '0%';
+
+            ui.shapeButtons.forEach((button, index) => {
+                const active = index === state.targetShape;
+                button.classList.toggle('active', active);
+                button.setAttribute('aria-selected', String(active));
+            });
+        }
+
+        function onResize() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            camera.aspect = width / height;
+            camera.position.z = width < 720 ? 172 : 144;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            composer.setSize(width, height);
+            bloomPass.setSize(width, height);
+            particleMaterial.uniforms.uPixelRatio.value = Math.min(window.devicePixelRatio, 2);
+        }
+
+        function easeInOutCubic(x) {
+            const clamped = Math.min(1, Math.max(0, x));
+            return clamped < 0.5
+                ? 4 * clamped * clamped * clamped
+                : 1 - Math.pow(-2 * clamped + 2, 3) / 2;
+        }
+
+        function hash(index, salt) {
+            const value = Math.sin(index * 127.1 + salt * 311.7) * 43758.5453123;
+            return value - Math.floor(value);
+        }
+
+        function helixEngine(i, count) {
+            const strand = i % 6;
+            const t = i / count;
+            const angle = t * TAU * 9.4 + strand * TAU / 6;
+            const radius = 18 + (strand % 2) * 8 + Math.sin(t * TAU * 7 + strand) * 4;
+            const jitter = (hash(i, 3) - 0.5) * 4.5;
+            return {
+                x: Math.cos(angle) * (radius + jitter),
+                y: (t - 0.5) * 94 + Math.sin(angle * 1.5) * 3,
+                z: Math.sin(angle) * (radius + jitter)
+            };
+        }
+
+        function orbitalBloom(i, count) {
+            const arm = i % 7;
+            const t = (i + 0.5) / count;
+            const radius = Math.sqrt(t) * 70;
+            const angle = radius * 0.19 + arm * TAU / 7 + (hash(i, 19) - 0.5) * 0.58;
+            const height = (hash(i, 23) - 0.5) * (9 + radius * 0.08) + Math.sin(radius * 0.18) * 3.4;
+            return {
+                x: Math.cos(angle) * radius + (hash(i, 29) - 0.5) * 3.2,
+                y: height,
+                z: Math.sin(angle) * radius + (hash(i, 31) - 0.5) * 3.2
+            };
+        }
+
+        function crownReactor(i, count) {
+            const y = 1 - 2 * (i + 0.5) / count;
+            const radiusAtY = Math.sqrt(Math.max(0, 1 - y * y));
+            const theta = i * GOLDEN_ANGLE;
+            const crown = Math.pow(Math.max(0, Math.sin(theta * 8 + y * 11)), 5) * 0.34;
+            const band = Math.pow(Math.abs(Math.sin(y * Math.PI * 7)), 8) * 0.16;
+            const radius = 43 * (1 + crown + band + hash(i, 41) * 0.08);
+            return {
+                x: Math.cos(theta) * radiusAtY * radius,
+                y: y * radius * 0.86,
+                z: Math.sin(theta) * radiusAtY * radius
+            };
+        }
+
+        function latticeCity(i) {
+            const columns = 340;
+            const column = i % columns;
+            const levelSeed = Math.floor(i / columns);
+            const ring = column % 6;
+            const spoke = Math.floor(column / 6);
+            const angle = spoke * TAU / Math.ceil(columns / 6) + hash(column, 53) * 0.035;
+            const radius = 12 + ring * 9.2 + hash(column, 59) * 3.8;
+            const towerHeight = 24 + Math.pow(hash(column, 61), 0.62) * 62;
+            const floor = hash(levelSeed, column + 67);
+            const crown = floor > 0.9 ? 7 * hash(i, 71) : 0;
+            return {
+                x: Math.cos(angle) * radius + (hash(i, 73) - 0.5) * 1.4,
+                y: -40 + floor * towerHeight + crown,
+                z: Math.sin(angle) * radius + (hash(i, 79) - 0.5) * 1.4
+            };
+        }
+
+        function waveCathedral(i) {
+            const aisle = i % 13;
+            const side = hash(i, 83) > 0.5 ? 1 : -1;
+            const span = side * Math.pow(hash(i, 89), 0.58) * 58;
+            const normalized = Math.min(1, Math.abs(span) / 58);
+            const arch = Math.pow(1 - normalized * normalized, 0.64) * 72;
+            const depth = (aisle - 6) * 7.2 + Math.sin(hash(i, 97) * TAU) * 1.8;
+            const ripple = Math.sin((depth * 0.18) + (span * 0.08)) * 4.4;
+            return {
+                x: span,
+                y: -38 + arch + ripple + (hash(i, 101) - 0.5) * 4,
+                z: depth
+            };
+        }
+    </script>
+</body>
+</html>
