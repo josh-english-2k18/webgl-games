@@ -1,0 +1,1962 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Waveglyph Engine</title>
+    <style>
+        :root {
+            --bg: #030407;
+            --panel: rgba(5, 8, 13, 0.78);
+            --line: rgba(230, 246, 255, 0.16);
+            --line-hot: rgba(112, 232, 255, 0.66);
+            --ink: #edf8ff;
+            --muted: rgba(237, 248, 255, 0.62);
+            --cyan: #70e8ff;
+            --mint: #8effbf;
+            --amber: #ffd36a;
+            --rose: #ff6b91;
+            --violet: #a78bfa;
+            --shadow: rgba(112, 232, 255, 0.18);
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            letter-spacing: 0;
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        button {
+            touch-action: manipulation;
+        }
+
+        #stage {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background:
+                linear-gradient(120deg, rgba(255, 107, 145, 0.075), transparent 34%),
+                linear-gradient(245deg, rgba(142, 255, 191, 0.062), transparent 31%),
+                linear-gradient(180deg, #07090e 0%, #020303 100%);
+        }
+
+        #stage canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .backplane,
+        .scan,
+        .vignette {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .backplane {
+            opacity: 0.15;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.052) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.052) 1px, transparent 1px);
+            background-size: 58px 58px;
+            mask-image: linear-gradient(to bottom, transparent 0%, #000 18%, #000 78%, transparent 100%);
+            animation: driftGrid 28s linear infinite;
+        }
+
+        .scan {
+            opacity: 0.06;
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent 0,
+                transparent 9px,
+                rgba(255, 255, 255, 0.34) 10px
+            );
+            mix-blend-mode: screen;
+        }
+
+        .vignette {
+            background:
+                linear-gradient(to right, rgba(0, 0, 0, 0.64), transparent 19%, transparent 80%, rgba(0, 0, 0, 0.58)),
+                linear-gradient(to bottom, rgba(0, 0, 0, 0.52), transparent 23%, transparent 72%, rgba(0, 0, 0, 0.72));
+        }
+
+        @keyframes driftGrid {
+            from { transform: translate3d(0, 0, 0); }
+            to { transform: translate3d(58px, 58px, 0); }
+        }
+
+        .hud {
+            position: fixed;
+            top: 18px;
+            left: 18px;
+            z-index: 20;
+            min-width: 286px;
+            pointer-events: none;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 780;
+            text-transform: uppercase;
+        }
+
+        .brand-mark {
+            width: 30px;
+            height: 30px;
+            border: 1px solid var(--line-hot);
+            border-radius: 50%;
+            position: relative;
+            box-shadow: 0 0 22px var(--shadow), inset 0 0 16px rgba(112, 232, 255, 0.12);
+        }
+
+        .brand-mark::before,
+        .brand-mark::after {
+            content: "";
+            position: absolute;
+            border: 1px solid rgba(255, 211, 106, 0.7);
+        }
+
+        .brand-mark::before {
+            inset: 6px;
+            transform: rotate(45deg);
+        }
+
+        .brand-mark::after {
+            inset: 12px;
+            border-color: var(--rose);
+            border-radius: 50%;
+        }
+
+        h1 {
+            margin: 0;
+            color: var(--ink);
+            font-size: 30px;
+            line-height: 1.02;
+            font-weight: 860;
+            text-transform: uppercase;
+            text-shadow: 0 0 28px rgba(112, 232, 255, 0.22);
+        }
+
+        .status-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 720;
+            text-transform: uppercase;
+        }
+
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--cyan);
+            box-shadow: 0 0 18px var(--cyan);
+        }
+
+        .telemetry {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            z-index: 20;
+            width: 236px;
+            padding: 14px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+            backdrop-filter: blur(14px);
+        }
+
+        .metric {
+            display: grid;
+            grid-template-columns: 68px 1fr 44px;
+            align-items: center;
+            gap: 10px;
+            min-height: 24px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 780;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+        }
+
+        .metric + .metric {
+            margin-top: 10px;
+        }
+
+        .track {
+            height: 5px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: rgba(237, 248, 255, 0.1);
+        }
+
+        .fill {
+            display: block;
+            width: 0;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--cyan), var(--mint), var(--amber));
+            box-shadow: 0 0 14px rgba(112, 232, 255, 0.26);
+        }
+
+        .console {
+            position: fixed;
+            left: 18px;
+            right: 18px;
+            bottom: 18px;
+            z-index: 24;
+            display: grid;
+            grid-template-columns: minmax(270px, 0.86fr) minmax(370px, 1.12fr) minmax(320px, 1fr);
+            gap: 12px;
+            align-items: stretch;
+        }
+
+        .panel {
+            min-width: 0;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            box-shadow: 0 18px 60px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(16px);
+        }
+
+        .source-panel,
+        .signature-panel,
+        .mix-panel {
+            padding: 12px;
+        }
+
+        .mix-panel {
+            display: grid;
+            grid-template-rows: 112px 15px auto;
+            gap: 9px;
+        }
+
+        .button-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .control-btn,
+        .file-btn {
+            min-height: 40px;
+            min-width: 82px;
+            border: 1px solid rgba(237, 248, 255, 0.16);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.052);
+            color: var(--ink);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 830;
+            text-transform: uppercase;
+            transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+        }
+
+        .control-btn {
+            padding: 0 12px;
+        }
+
+        .file-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 12px;
+        }
+
+        .control-btn:hover,
+        .file-btn:hover,
+        .control-btn.active {
+            border-color: rgba(112, 232, 255, 0.62);
+            background: rgba(112, 232, 255, 0.11);
+        }
+
+        #file-input {
+            display: none;
+        }
+
+        .source-name {
+            display: block;
+            overflow: hidden;
+            margin: 10px 0 0;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 680;
+            text-overflow: ellipsis;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .signature-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1px;
+            overflow: hidden;
+            border: 1px solid rgba(237, 248, 255, 0.08);
+            border-radius: 6px;
+            background: rgba(237, 248, 255, 0.08);
+        }
+
+        .signature-cell {
+            min-width: 0;
+            padding: 10px;
+            background: rgba(2, 4, 7, 0.72);
+        }
+
+        .signature-cell span,
+        .signature-cell strong {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .signature-cell span {
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 830;
+            text-transform: uppercase;
+        }
+
+        .signature-cell strong {
+            margin-top: 5px;
+            font-size: 14px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .waveform {
+            position: relative;
+            height: 112px;
+            min-height: 112px;
+            overflow: hidden;
+            border: 1px solid rgba(237, 248, 255, 0.1);
+            border-radius: 6px;
+            background: rgba(2, 4, 6, 0.7);
+        }
+
+        #waveform-canvas {
+            display: block;
+            width: 100%;
+            height: 112px;
+        }
+
+        #seek-slider {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .transport-row {
+            display: grid;
+            grid-template-columns: 58px minmax(0, 1fr) 78px;
+            gap: 9px;
+            align-items: center;
+            min-height: 15px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 780;
+            font-variant-numeric: tabular-nums;
+            line-height: 1;
+            text-transform: uppercase;
+        }
+
+        .transport-time {
+            min-width: 0;
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .transport-row span,
+        .transport-time span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        #rms-readout {
+            text-align: right;
+        }
+
+        .sliders {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+        }
+
+        .slider {
+            min-width: 0;
+            display: grid;
+            gap: 6px;
+        }
+
+        .slider label {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 820;
+            text-transform: uppercase;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 20px;
+            margin: 0;
+            accent-color: var(--cyan);
+            cursor: pointer;
+        }
+
+        #fallback {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            display: none;
+            place-items: center;
+            background: #020304;
+            color: var(--ink);
+            text-align: center;
+        }
+
+        #fallback.visible {
+            display: grid;
+        }
+
+        @media (max-width: 1060px) {
+            .console {
+                grid-template-columns: 1fr;
+                max-height: 48vh;
+                overflow: auto;
+            }
+
+            .telemetry {
+                width: 208px;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .hud {
+                top: 12px;
+                left: 12px;
+                min-width: 0;
+                width: calc(100vw - 24px);
+            }
+
+            h1 {
+                font-size: 23px;
+            }
+
+            .telemetry {
+                display: none;
+            }
+
+            .console {
+                left: 10px;
+                right: 10px;
+                bottom: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main id="stage" aria-label="Waveform-derived particle scene"></main>
+    <div class="backplane"></div>
+    <div class="scan"></div>
+    <div class="vignette"></div>
+
+    <section class="hud" aria-live="polite">
+        <div class="brand">
+            <span class="brand-mark" aria-hidden="true"></span>
+            <span>Waveglyph Engine</span>
+        </div>
+        <h1 id="form-name">Track Glyph</h1>
+        <div class="status-row">
+            <span class="status-dot"></span>
+            <span id="phase-value">Idle Field</span>
+            <span id="particle-value">64000 particles</span>
+        </div>
+    </section>
+
+    <aside class="telemetry" aria-label="Audio telemetry">
+        <div class="metric"><span>FPS</span><span class="track"><span id="fps-fill" class="fill"></span></span><span id="fps-value">--</span></div>
+        <div class="metric"><span>Bass</span><span class="track"><span id="bass-fill" class="fill"></span></span><span id="bass-value">0</span></div>
+        <div class="metric"><span>Mid</span><span class="track"><span id="mid-fill" class="fill"></span></span><span id="mid-value">0</span></div>
+        <div class="metric"><span>Air</span><span class="track"><span id="air-fill" class="fill"></span></span><span id="air-value">0</span></div>
+        <div class="metric"><span>Beat</span><span class="track"><span id="beat-fill" class="fill"></span></span><span id="beat-value">0</span></div>
+    </aside>
+
+    <nav class="console" aria-label="Visualizer controls">
+        <section class="panel source-panel">
+            <div class="button-row">
+                <label class="file-btn">
+                    Source
+                    <input id="file-input" type="file" accept="audio/*" multiple>
+                </label>
+                <button id="prev-track" class="control-btn" type="button">Prev</button>
+                <button id="play-toggle" class="control-btn" type="button">Play</button>
+                <button id="next-track" class="control-btn" type="button">Next</button>
+            </div>
+            <span id="source-name" class="source-name">No source</span>
+        </section>
+
+        <section class="panel signature-panel">
+            <div class="signature-grid">
+                <div class="signature-cell"><span>Sections</span><strong id="segment-readout">0</strong></div>
+                <div class="signature-cell"><span>Contour</span><strong id="contour-readout">0</strong></div>
+                <div class="signature-cell"><span>Dynamics</span><strong id="dynamic-readout">0</strong></div>
+                <div class="signature-cell"><span>Spectrum</span><strong id="density-readout">0</strong></div>
+            </div>
+        </section>
+
+        <section class="panel mix-panel">
+            <div class="waveform">
+                <canvas id="waveform-canvas" width="920" height="224"></canvas>
+                <input id="seek-slider" type="range" min="0" max="1000" value="0" aria-label="Seek">
+            </div>
+            <div class="transport-row">
+                <span id="elapsed-readout">0:00</span>
+                <div class="transport-time">
+                    <span id="mode-readout">Glyph</span>
+                    <span id="duration-readout">0:00</span>
+                </div>
+                <span id="rms-readout">-inf</span>
+            </div>
+            <div class="sliders">
+                <div class="slider">
+                    <label for="energy-slider"><span>Energy</span><span id="energy-label">34</span></label>
+                    <input id="energy-slider" type="range" min="10" max="85" value="34">
+                </div>
+                <div class="slider">
+                    <label for="bloom-slider"><span>Bloom</span><span id="bloom-label">14</span></label>
+                    <input id="bloom-slider" type="range" min="0" max="48" value="14">
+                </div>
+                <div class="slider">
+                    <label for="detail-slider"><span>Detail</span><span id="detail-label">100</span></label>
+                    <input id="detail-slider" type="range" min="35" max="100" value="100">
+                </div>
+                <div class="slider">
+                    <label for="volume-slider"><span>Volume</span><span id="volume-label">80</span></label>
+                    <input id="volume-slider" type="range" min="0" max="100" value="80">
+                </div>
+            </div>
+        </section>
+    </nav>
+
+    <audio id="audio"></audio>
+
+    <div id="fallback">
+        <p>WebGL initialization failed.</p>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.174.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+        const compactQuery = window.matchMedia('(max-width: 720px)');
+        const reducedMotionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+        const isCompact = compactQuery.matches;
+        const particleCount = isCompact ? 34000 : 64000;
+        const linkCount = isCompact ? 720 : 1700;
+        const signatureSize = 768;
+        const TAU = Math.PI * 2;
+        const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+        const palette = [0x70e8ff, 0x8effbf, 0xffd36a, 0xff6b91, 0xa78bfa];
+
+        const ui = {
+            stage: document.getElementById('stage'),
+            fallback: document.getElementById('fallback'),
+            audio: document.getElementById('audio'),
+            fileInput: document.getElementById('file-input'),
+            sourceName: document.getElementById('source-name'),
+            play: document.getElementById('play-toggle'),
+            prev: document.getElementById('prev-track'),
+            next: document.getElementById('next-track'),
+            formName: document.getElementById('form-name'),
+            phase: document.getElementById('phase-value'),
+            particleValue: document.getElementById('particle-value'),
+            waveform: document.getElementById('waveform-canvas'),
+            seek: document.getElementById('seek-slider'),
+            elapsed: document.getElementById('elapsed-readout'),
+            duration: document.getElementById('duration-readout'),
+            rms: document.getElementById('rms-readout'),
+            mode: document.getElementById('mode-readout'),
+            energy: document.getElementById('energy-slider'),
+            bloom: document.getElementById('bloom-slider'),
+            detail: document.getElementById('detail-slider'),
+            volume: document.getElementById('volume-slider'),
+            energyLabel: document.getElementById('energy-label'),
+            bloomLabel: document.getElementById('bloom-label'),
+            detailLabel: document.getElementById('detail-label'),
+            volumeLabel: document.getElementById('volume-label'),
+            fpsFill: document.getElementById('fps-fill'),
+            fpsValue: document.getElementById('fps-value'),
+            bassFill: document.getElementById('bass-fill'),
+            midFill: document.getElementById('mid-fill'),
+            airFill: document.getElementById('air-fill'),
+            beatFill: document.getElementById('beat-fill'),
+            bassValue: document.getElementById('bass-value'),
+            midValue: document.getElementById('mid-value'),
+            airValue: document.getElementById('air-value'),
+            beatValue: document.getElementById('beat-value'),
+            segmentReadout: document.getElementById('segment-readout'),
+            contourReadout: document.getElementById('contour-readout'),
+            dynamicReadout: document.getElementById('dynamic-readout'),
+            densityReadout: document.getElementById('density-readout')
+        };
+
+        const waveformCtx = ui.waveform.getContext('2d');
+        const waveformBase = document.createElement('canvas');
+        const waveformBaseCtx = waveformBase.getContext('2d');
+        const uiCache = {};
+
+        const state = {
+            morphStart: 0,
+            morphDuration: 1650,
+            morphing: false,
+            energy: Number(ui.energy.value) / 100,
+            bloom: Number(ui.bloom.value) / 100,
+            detail: Number(ui.detail.value) / 100,
+            volume: Number(ui.volume.value) / 100,
+            fps: 0,
+            frameCount: 0,
+            fpsWindow: performance.now(),
+            signature: buildIdleSignature(),
+            audio: {
+                bass: 0,
+                mid: 0,
+                air: 0,
+                rms: 0,
+                peak: 0,
+                beat: 0,
+                beatFloor: 0.05
+            }
+        };
+
+        class AudioDeck {
+            constructor() {
+                this.context = null;
+                this.source = null;
+                this.gain = null;
+                this.analyser = null;
+                this.freq = new Uint8Array(1024);
+                this.time = new Uint8Array(2048);
+                this.playlist = [];
+                this.index = 0;
+                this.urls = [];
+            }
+
+            async ensure() {
+                if (!this.context) {
+                    this.context = new (window.AudioContext || window.webkitAudioContext)();
+                    this.gain = this.context.createGain();
+                    this.gain.gain.value = state.volume;
+                    this.analyser = this.context.createAnalyser();
+                    this.analyser.fftSize = 2048;
+                    this.analyser.smoothingTimeConstant = 0.76;
+                    this.source = this.context.createMediaElementSource(ui.audio);
+                    this.source.connect(this.gain).connect(this.analyser).connect(this.context.destination);
+                }
+                if (this.context.state === 'suspended') {
+                    await this.context.resume();
+                }
+            }
+
+            async load(files) {
+                await this.ensure();
+                this.urls.forEach((url) => URL.revokeObjectURL(url));
+                this.urls = [];
+                this.playlist = Array.from(files).map((file) => {
+                    const url = URL.createObjectURL(file);
+                    this.urls.push(url);
+                    return { file, url, buffer: null, signature: null };
+                });
+                this.index = 0;
+                await this.playTrack(0);
+            }
+
+            async playTrack(index) {
+                if (!this.playlist.length) return;
+                await this.ensure();
+                this.index = (index + this.playlist.length) % this.playlist.length;
+                const track = this.playlist[this.index];
+                if (!track.buffer) {
+                    const raw = await track.file.arrayBuffer();
+                    track.buffer = await this.context.decodeAudioData(raw.slice(0));
+                    track.signature = buildWaveSignature(track.buffer);
+                }
+                applyWaveformGlyph(track.signature, track.file.name);
+                drawWaveform(track.buffer);
+                ui.audio.src = track.url;
+                ui.audio.load();
+                await ui.audio.play().catch((error) => {
+                    console.error(error);
+                });
+                updateSourceLabel();
+            }
+
+            async toggle() {
+                if (!this.playlist.length) {
+                    ui.fileInput.click();
+                    return;
+                }
+                await this.ensure();
+                if (ui.audio.paused) {
+                    await ui.audio.play();
+                } else {
+                    ui.audio.pause();
+                }
+                updateSourceLabel();
+            }
+
+            next() {
+                return this.playTrack(this.index + 1);
+            }
+
+            previous() {
+                return this.playTrack(this.index - 1);
+            }
+
+            setVolume(value) {
+                if (this.gain) this.gain.gain.value = value;
+            }
+
+            read() {
+                if (!this.analyser) return null;
+                this.analyser.getByteFrequencyData(this.freq);
+                this.analyser.getByteTimeDomainData(this.time);
+                return {
+                    freq: this.freq,
+                    time: this.time,
+                    sampleRate: this.context.sampleRate,
+                    fftSize: this.analyser.fftSize
+                };
+            }
+        }
+
+        const audio = new AudioDeck();
+        let scene;
+        let camera;
+        let renderer;
+        let controls;
+        let composer;
+        let bloomPass;
+        let clock;
+        let fieldGroup;
+        let particleGeometry;
+        let particleMaterial;
+        let particleMesh;
+        let linkGeometry;
+        let linkMesh;
+        let linkIndices;
+        let starField;
+
+        init();
+
+        function init() {
+            try {
+                scene = new THREE.Scene();
+                scene.fog = new THREE.FogExp2(0x030407, 0.0065);
+
+                camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 1200);
+                camera.position.set(0, isCompact ? 20 : 24, isCompact ? 156 : 132);
+
+                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.outputColorSpace = THREE.SRGBColorSpace;
+                renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                renderer.toneMappingExposure = 0.78;
+                ui.stage.appendChild(renderer.domElement);
+
+                controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.065;
+                controls.enablePan = false;
+                controls.minDistance = 62;
+                controls.maxDistance = 235;
+                controls.autoRotate = !reducedMotionQuery.matches;
+                controls.autoRotateSpeed = 0.22;
+                controls.target.set(0, 0, 0);
+
+                composer = new EffectComposer(renderer);
+                composer.addPass(new RenderPass(scene, camera));
+                bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), state.bloom * 0.46, 0.32, 0.64);
+                composer.addPass(bloomPass);
+                composer.addPass(new OutputPass());
+
+                createParticles();
+                createLinks();
+                createField();
+                createStars();
+                bindEvents();
+                drawWaveform(null);
+                updateUi();
+
+                clock = new THREE.Clock();
+                renderer.setAnimationLoop(animate);
+                window.__waveglyphReady = true;
+            } catch (error) {
+                console.error(error);
+                ui.fallback.classList.add('visible');
+            }
+        }
+
+        function createParticles() {
+            const initialShape = buildWaveformShape(state.signature);
+            const seeds = new Float32Array(particleCount);
+            const sizes = new Float32Array(particleCount);
+
+            for (let i = 0; i < particleCount; i++) {
+                seeds[i] = hash(i, 131);
+                sizes[i] = 0.58 + Math.pow(hash(i, 163), 2.6) * 2.75;
+            }
+
+            particleGeometry = new THREE.BufferGeometry();
+            particleGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(initialShape.positions), 3));
+            particleGeometry.setAttribute('fromPosition', new THREE.BufferAttribute(new Float32Array(initialShape.positions), 3));
+            particleGeometry.setAttribute('toPosition', new THREE.BufferAttribute(new Float32Array(initialShape.positions), 3));
+            particleGeometry.setAttribute('fromColor', new THREE.BufferAttribute(new Float32Array(initialShape.colors), 3));
+            particleGeometry.setAttribute('toColor', new THREE.BufferAttribute(new Float32Array(initialShape.colors), 3));
+            particleGeometry.setAttribute('aTrack', new THREE.BufferAttribute(new Float32Array(initialShape.track), 1));
+            particleGeometry.setAttribute('aAmp', new THREE.BufferAttribute(new Float32Array(initialShape.amp), 1));
+            particleGeometry.setAttribute('aSlope', new THREE.BufferAttribute(new Float32Array(initialShape.slope), 1));
+            particleGeometry.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
+            particleGeometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+            particleGeometry.setDrawRange(0, Math.floor(particleCount * state.detail));
+            particleGeometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 160);
+
+            particleMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    uTime: { value: 0 },
+                    uMorph: { value: 1 },
+                    uPlayhead: { value: 0 },
+                    uEnergy: { value: state.energy },
+                    uBass: { value: 0 },
+                    uMid: { value: 0 },
+                    uAir: { value: 0 },
+                    uRms: { value: 0 },
+                    uBeat: { value: 0 },
+                    uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
+                    uFlow: { value: reducedMotionQuery.matches ? 0 : 1 }
+                },
+                vertexShader: `
+                    attribute vec3 fromPosition;
+                    attribute vec3 toPosition;
+                    attribute vec3 fromColor;
+                    attribute vec3 toColor;
+                    attribute float aTrack;
+                    attribute float aAmp;
+                    attribute float aSlope;
+                    attribute float aSeed;
+                    attribute float aSize;
+
+                    uniform float uTime;
+                    uniform float uMorph;
+                    uniform float uPlayhead;
+                    uniform float uEnergy;
+                    uniform float uBass;
+                    uniform float uMid;
+                    uniform float uAir;
+                    uniform float uRms;
+                    uniform float uBeat;
+                    uniform float uPixelRatio;
+                    uniform float uFlow;
+
+                    varying vec3 vColor;
+                    varying float vAlpha;
+                    varying float vSpark;
+                    varying float vLocal;
+
+                    float easeInOutCubic(float x) {
+                        return x < 0.5 ? 4.0 * x * x * x : 1.0 - pow(-2.0 * x + 2.0, 3.0) * 0.5;
+                    }
+
+                    mat2 rotate2d(float angle) {
+                        float s = sin(angle);
+                        float c = cos(angle);
+                        return mat2(c, -s, s, c);
+                    }
+
+                    void main() {
+                        float eased = easeInOutCubic(clamp(uMorph, 0.0, 1.0));
+                        vec3 p = mix(fromPosition, toPosition, eased);
+                        float distanceToPlayhead = abs(aTrack - uPlayhead);
+                        float local = smoothstep(0.065, 0.0, distanceToPlayhead);
+                        float radial = length(p.xz);
+                        float harmonic = sin(uTime * (0.72 + aSeed * 1.65) + radial * 0.105 + aSeed * 6.2831853);
+                        float carrier = cos(uTime * (0.38 + uMid * 0.8) + p.y * 0.09 + aSeed * 11.0);
+                        float spin = (0.0008 + aSeed * 0.0022) * uTime * uFlow * (0.35 + uEnergy + uAir * 0.55);
+
+                        p.xz = rotate2d(spin * (18.0 + radial * 0.14)) * p.xz;
+                        vec3 normal = normalize(p + vec3(0.007, 0.011, 0.013));
+                        p += normal * harmonic * uFlow * (uEnergy * 1.0 + uBass * 3.4 + uBeat * 1.7);
+                        p += normal * local * uFlow * (3.0 + aAmp * 16.0 + uBeat * 12.0);
+                        p.y += carrier * uFlow * (uEnergy * 0.8 + uMid * 3.0 + local * 6.0);
+                        p.xz += normalize(p.xz + vec2(0.01)) * uAir * uFlow * sin(uTime * 1.6 + p.y * 0.04) * 1.55;
+                        p.xz = rotate2d(local * (0.16 + aSlope * 0.8) * (1.0 + uBeat)) * p.xz;
+
+                        vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
+                        gl_Position = projectionMatrix * mvPosition;
+
+                        float perspective = clamp(410.0 / max(84.0, -mvPosition.z), 0.72, 5.0);
+                        float impulse = 0.72 + uRms * 0.85 + uBeat * 0.4 + local * 0.55 + harmonic * 0.045;
+                        gl_PointSize = aSize * perspective * uPixelRatio * impulse;
+
+                        vColor = mix(fromColor, toColor, eased) * (0.58 + uEnergy * 0.18 + uBass * 0.2 + uAir * 0.18 + local * 0.5);
+                        vAlpha = clamp(0.17 + uEnergy * 0.22 + uRms * 0.22 + local * 0.24 + harmonic * 0.04, 0.08, 0.72);
+                        vSpark = aSeed;
+                        vLocal = local;
+                    }
+                `,
+                fragmentShader: `
+                    precision highp float;
+
+                    varying vec3 vColor;
+                    varying float vAlpha;
+                    varying float vSpark;
+                    varying float vLocal;
+
+                    void main() {
+                        vec2 uv = gl_PointCoord - 0.5;
+                        float d = length(uv);
+                        float core = smoothstep(0.26, 0.018, d);
+                        float halo = smoothstep(0.49, 0.11, d) * (0.18 + vLocal * 0.12);
+                        float ring = smoothstep(0.49, 0.43, d) * smoothstep(0.16, 0.39, d) * 0.14;
+                        float spark = pow(max(0.0, 1.0 - d * 2.2), 7.0) * (0.12 + vSpark * 0.18 + vLocal * 0.2);
+                        float alpha = (core + halo + ring) * vAlpha;
+
+                        if (alpha < 0.01) discard;
+
+                        vec3 color = vColor * (0.62 + core * 0.82 + ring * 0.3 + spark);
+                        gl_FragColor = vec4(color, alpha);
+                    }
+                `,
+                transparent: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            });
+
+            particleMesh = new THREE.Points(particleGeometry, particleMaterial);
+            scene.add(particleMesh);
+        }
+
+        function applyWaveformGlyph(signature, sourceName) {
+            const next = buildWaveformShape(signature);
+            const morphRaw = particleMaterial.uniforms.uMorph.value;
+            const eased = easeInOutCubic(morphRaw);
+            const fromPosition = particleGeometry.attributes.fromPosition.array;
+            const toPosition = particleGeometry.attributes.toPosition.array;
+            const fromColor = particleGeometry.attributes.fromColor.array;
+            const toColor = particleGeometry.attributes.toColor.array;
+            const track = particleGeometry.attributes.aTrack.array;
+            const amp = particleGeometry.attributes.aAmp.array;
+            const slope = particleGeometry.attributes.aSlope.array;
+
+            for (let i = 0; i < fromPosition.length; i++) {
+                fromPosition[i] = fromPosition[i] * (1 - eased) + toPosition[i] * eased;
+                fromColor[i] = fromColor[i] * (1 - eased) + toColor[i] * eased;
+                toPosition[i] = next.positions[i];
+                toColor[i] = next.colors[i];
+            }
+            for (let i = 0; i < track.length; i++) {
+                track[i] = next.track[i];
+                amp[i] = next.amp[i];
+                slope[i] = next.slope[i];
+            }
+
+            particleGeometry.attributes.fromPosition.needsUpdate = true;
+            particleGeometry.attributes.toPosition.needsUpdate = true;
+            particleGeometry.attributes.fromColor.needsUpdate = true;
+            particleGeometry.attributes.toColor.needsUpdate = true;
+            particleGeometry.attributes.aTrack.needsUpdate = true;
+            particleGeometry.attributes.aAmp.needsUpdate = true;
+            particleGeometry.attributes.aSlope.needsUpdate = true;
+            particleMaterial.uniforms.uMorph.value = 0;
+
+            state.signature = signature;
+            state.morphStart = performance.now();
+            state.morphing = true;
+            setText(ui.formName, 'formName', sourceName ? sourceName.replace(/\.[^.]+$/, '') : 'Track Glyph');
+            updateSignatureUi();
+        }
+
+        function buildWaveSignature(buffer) {
+            const left = buffer.getChannelData(0);
+            const right = buffer.numberOfChannels > 1 ? buffer.getChannelData(1) : left;
+            const amp = new Float32Array(signatureSize);
+            const peak = new Float32Array(signatureSize);
+            const zero = new Float32Array(signatureSize);
+            const low = new Float32Array(signatureSize);
+            const mid = new Float32Array(signatureSize);
+            const high = new Float32Array(signatureSize);
+            const centroid = new Float32Array(signatureSize);
+            const transient = new Float32Array(signatureSize);
+            const slope = new Float32Array(signatureSize);
+            const curve = new Float32Array(signatureSize);
+            const step = Math.max(1, Math.floor(buffer.length / signatureSize));
+            let maxRms = 0.00001;
+            let maxPeak = 0.00001;
+            let maxLow = 0.00001;
+            let maxMid = 0.00001;
+            let maxHigh = 0.00001;
+
+            for (let i = 0; i < signatureSize; i++) {
+                const start = i * step;
+                const end = Math.min(buffer.length, start + step);
+                let sumSq = 0;
+                let maxAbs = 0;
+                let zeroCross = 0;
+                let previous = 0;
+                let lowState = 0;
+                let lowSq = 0;
+                let midSq = 0;
+                let highSq = 0;
+                const stride = Math.max(1, Math.floor((end - start) / 720));
+                for (let j = start; j < end; j += stride) {
+                    const sample = (left[j] + right[j]) * 0.5;
+                    sumSq += sample * sample;
+                    maxAbs = Math.max(maxAbs, Math.abs(sample));
+                    if (j > start && Math.sign(sample) !== Math.sign(previous)) zeroCross++;
+                    lowState += (sample - lowState) * 0.045;
+                    const highSample = sample - previous;
+                    const midSample = sample - lowState - highSample * 0.28;
+                    lowSq += lowState * lowState;
+                    midSq += midSample * midSample;
+                    highSq += highSample * highSample;
+                    previous = sample;
+                }
+                const count = Math.max(1, Math.ceil((end - start) / stride));
+                amp[i] = Math.sqrt(sumSq / count);
+                peak[i] = maxAbs;
+                zero[i] = zeroCross / count;
+                low[i] = Math.sqrt(lowSq / count);
+                mid[i] = Math.sqrt(midSq / count);
+                high[i] = Math.sqrt(highSq / count);
+                maxRms = Math.max(maxRms, amp[i]);
+                maxPeak = Math.max(maxPeak, peak[i]);
+                maxLow = Math.max(maxLow, low[i]);
+                maxMid = Math.max(maxMid, mid[i]);
+                maxHigh = Math.max(maxHigh, high[i]);
+            }
+
+            for (let pass = 0; pass < 2; pass++) {
+                smoothArray(amp);
+                smoothArray(peak);
+                smoothArray(zero);
+                smoothArray(low);
+                smoothArray(mid);
+                smoothArray(high);
+            }
+
+            for (let i = 0; i < signatureSize; i++) {
+                amp[i] = Math.pow(clamp(amp[i] / maxRms, 0, 1), 0.72);
+                peak[i] = Math.pow(clamp(peak[i] / maxPeak, 0, 1), 0.68);
+                low[i] = Math.pow(clamp(low[i] / maxLow, 0, 1), 0.72);
+                mid[i] = Math.pow(clamp(mid[i] / maxMid, 0, 1), 0.72);
+                high[i] = Math.pow(clamp(high[i] / maxHigh, 0, 1), 0.72);
+                const total = low[i] + mid[i] + high[i] + 0.00001;
+                centroid[i] = clamp((low[i] * 0.18 + mid[i] * 0.54 + high[i] * 0.96) / total, 0, 1);
+            }
+            for (let i = 0; i < signatureSize; i++) {
+                const previous = amp[(i - 1 + signatureSize) % signatureSize];
+                const next = amp[(i + 1) % signatureSize];
+                slope[i] = (next - previous) * 0.5;
+                transient[i] = clamp(Math.max(0, amp[i] - previous) * 1.8 + Math.max(0, peak[i] - peak[(i - 1 + signatureSize) % signatureSize]) * 1.15, 0, 1);
+            }
+            for (let i = 0; i < signatureSize; i++) {
+                const previous = slope[(i - 1 + signatureSize) % signatureSize];
+                const next = slope[(i + 1) % signatureSize];
+                curve[i] = (next - previous) * 0.5;
+            }
+
+            return summarizeSignature({ amp, peak, zero, low, mid, high, centroid, transient, slope, curve, duration: buffer.duration });
+        }
+
+        function buildIdleSignature() {
+            const amp = new Float32Array(signatureSize);
+            const peak = new Float32Array(signatureSize);
+            const zero = new Float32Array(signatureSize);
+            const low = new Float32Array(signatureSize);
+            const mid = new Float32Array(signatureSize);
+            const high = new Float32Array(signatureSize);
+            const centroid = new Float32Array(signatureSize);
+            const transient = new Float32Array(signatureSize);
+            const slope = new Float32Array(signatureSize);
+            const curve = new Float32Array(signatureSize);
+            for (let i = 0; i < signatureSize; i++) {
+                const t = i / signatureSize;
+                amp[i] = 0.35 + Math.sin(t * TAU * 5) * 0.08 + Math.sin(t * TAU * 13) * 0.04;
+                peak[i] = amp[i] + 0.12;
+                zero[i] = 0.06 + Math.sin(t * TAU * 8) * 0.025;
+                low[i] = 0.38 + Math.sin(t * TAU * 3) * 0.08;
+                mid[i] = 0.32 + Math.sin(t * TAU * 7 + 0.7) * 0.07;
+                high[i] = 0.22 + Math.sin(t * TAU * 11 + 1.3) * 0.06;
+                const total = low[i] + mid[i] + high[i] + 0.00001;
+                centroid[i] = (low[i] * 0.18 + mid[i] * 0.54 + high[i] * 0.96) / total;
+                transient[i] = Math.max(0, Math.sin(t * TAU * 9)) * 0.12;
+            }
+            for (let i = 0; i < signatureSize; i++) {
+                slope[i] = (amp[(i + 1) % signatureSize] - amp[(i - 1 + signatureSize) % signatureSize]) * 0.5;
+                curve[i] = (slope[(i + 1) % signatureSize] - slope[(i - 1 + signatureSize) % signatureSize]) * 0.5;
+            }
+            return summarizeSignature({ amp, peak, zero, low, mid, high, centroid, transient, slope, curve, duration: 120 });
+        }
+
+        function summarizeSignature(signature) {
+            let contour = 0;
+            let dynamic = 0;
+            let density = 0;
+            let mean = 0;
+            let centroidMean = 0;
+            let transientMean = 0;
+            for (let i = 0; i < signatureSize; i++) {
+                mean += signature.amp[i];
+                dynamic += signature.peak[i];
+                density += signature.zero[i];
+                centroidMean += signature.centroid[i];
+                transientMean += signature.transient[i];
+                contour += Math.abs(signature.slope[i]) + Math.abs(signature.curve[i]) * 0.5;
+            }
+            mean /= signatureSize;
+            signature.mean = mean;
+            signature.dynamic = dynamic / signatureSize;
+            signature.density = density / signatureSize;
+            signature.contour = contour / signatureSize;
+            signature.centroidMean = centroidMean / signatureSize;
+            signature.transientMean = transientMean / signatureSize;
+            signature.turns = 2.35 + signature.contour * 20 + signature.density * 18 + signature.centroidMean * 2.8;
+            signature.height = 68 + signature.dynamic * 36 + signature.transientMean * 40;
+            signature.radius = 18 + mean * 32 + signature.dynamic * 15 + signature.centroidMean * 16;
+            signature.hueBase = (0.48 + signature.centroidMean * 0.26 + signature.density * 2.2 + signature.transientMean * 0.4) % 1;
+            buildSections(signature);
+            buildSpine(signature);
+            return signature;
+        }
+
+        function buildWaveformShape(signature) {
+            const positions = new Float32Array(particleCount * 3);
+            const colors = new Float32Array(particleCount * 3);
+            const track = new Float32Array(particleCount);
+            const ampAttr = new Float32Array(particleCount);
+            const slopeAttr = new Float32Array(particleCount);
+            const color = new THREE.Color();
+            const nextColor = new THREE.Color();
+
+            for (let i = 0; i < particleCount; i++) {
+                const baseT = (i + hash(i, 13) * 0.8) / particleCount;
+                const anchorFloat = baseT * (signatureSize - 1);
+                const anchor = Math.min(signatureSize - 2, Math.floor(anchorFloat));
+                const frac = anchorFloat - anchor;
+                const local = hash(i, 17) * TAU;
+                const centerIndex = anchor * 3;
+                const nextIndex = (anchor + 1) * 3;
+                const amp = signature.amp[anchor];
+                const peak = signature.peak[anchor];
+                const zero = signature.zero[anchor];
+                const low = signature.low[anchor];
+                const mid = signature.mid[anchor];
+                const high = signature.high[anchor];
+                const centroid = signature.centroid[anchor];
+                const transient = signature.transient[anchor];
+                const slope = signature.slope[anchor];
+                const curve = signature.curve[anchor];
+                const section = signature.section[anchor];
+                const sectionStart = signature.sectionStarts[section] || 0;
+                const sectionEnd = signature.sectionEnds[section] || signatureSize;
+                const sectionT = clamp((anchor - sectionStart) / Math.max(1, sectionEnd - sectionStart), 0, 1);
+                const ribCount = 2 + (section % 5) + Math.round((signature.sections[section]?.density || 0) * 6);
+                const rib = Math.sin(sectionT * TAU * ribCount + section * 0.73);
+                const boundary = Math.max(0, 1 - Math.min(sectionT, 1 - sectionT) * 12);
+                const tube = 1.6 + peak * 6.5 + high * 6.8 + transient * 14 + Math.abs(slope) * 22 + boundary * 4 + hash(i, 19) * 1.5;
+                const tubeX = Math.cos(local) * tube * (0.74 + low * 0.55 + transient * 0.35);
+                const tubeY = Math.sin(local) * tube * (0.65 + centroid * 0.72 + mid * 0.28);
+                const facet = rib * (1.8 + transient * 6 + centroid * 3.5);
+                const cx = lerp(signature.spine[centerIndex], signature.spine[nextIndex], frac);
+                const cy = lerp(signature.spine[centerIndex + 1], signature.spine[nextIndex + 1], frac);
+                const cz = lerp(signature.spine[centerIndex + 2], signature.spine[nextIndex + 2], frac);
+                const ax = lerp(signature.normalA[centerIndex], signature.normalA[nextIndex], frac);
+                const ay = lerp(signature.normalA[centerIndex + 1], signature.normalA[nextIndex + 1], frac);
+                const az = lerp(signature.normalA[centerIndex + 2], signature.normalA[nextIndex + 2], frac);
+                const bx = lerp(signature.normalB[centerIndex], signature.normalB[nextIndex], frac);
+                const by = lerp(signature.normalB[centerIndex + 1], signature.normalB[nextIndex + 1], frac);
+                const bz = lerp(signature.normalB[centerIndex + 2], signature.normalB[nextIndex + 2], frac);
+                const offset = i * 3;
+
+                positions[offset] = cx + ax * (tubeX + facet) + bx * tubeY + curve * 22;
+                positions[offset + 1] = cy + ay * (tubeX + facet) + by * tubeY + rib * transient * 8;
+                positions[offset + 2] = cz + az * (tubeX + facet) + bz * tubeY + slope * 18;
+
+                const hue = (signature.hueBase + section * 0.071 + centroid * 0.18 + transient * 0.11 + zero * 0.9) % 1;
+                const sat = clamp(0.62 + high * 0.24 + transient * 0.22, 0.52, 0.96);
+                const light = clamp(0.46 + amp * 0.16 + peak * 0.14 + boundary * 0.1, 0.36, 0.78);
+                color.setHSL(hue, sat, light);
+                nextColor.setHSL((hue + 0.07 + high * 0.08) % 1, sat, clamp(light + 0.08, 0, 0.82));
+                color.lerp(nextColor, clamp(rib * 0.5 + 0.5, 0, 1) * 0.45);
+                const shade = 0.56 + amp * 0.22 + peak * 0.16 + boundary * 0.18;
+                colors[offset] = color.r * shade;
+                colors[offset + 1] = color.g * shade;
+                colors[offset + 2] = color.b * shade;
+
+                track[i] = baseT;
+                ampAttr[i] = amp;
+                slopeAttr[i] = slope;
+            }
+
+            return { positions, colors, track, amp: ampAttr, slope: slopeAttr };
+        }
+
+        function buildSections(signature) {
+            const novelty = new Float32Array(signatureSize);
+            const lag = Math.max(1, Math.floor(signatureSize / 256));
+
+            for (let i = 1; i < signatureSize; i++) {
+                const j = Math.max(0, i - lag);
+                novelty[i] =
+                    Math.abs(signature.amp[i] - signature.amp[j]) * 0.8 +
+                    Math.abs(signature.low[i] - signature.low[j]) * 0.44 +
+                    Math.abs(signature.mid[i] - signature.mid[j]) * 0.52 +
+                    Math.abs(signature.high[i] - signature.high[j]) * 0.64 +
+                    Math.abs(signature.centroid[i] - signature.centroid[j]) * 0.9 +
+                    signature.transient[i] * 0.55;
+            }
+
+            smoothArray(novelty);
+            smoothArray(novelty);
+
+            const targetSections = Math.round(clamp((signature.duration || 120) / 18, 4, 18));
+            const minSpacing = Math.max(22, Math.floor(signatureSize / (targetSections * 1.42)));
+            const candidates = [];
+
+            for (let i = 2; i < signatureSize - 2; i++) {
+                if (novelty[i] > novelty[i - 1] && novelty[i] > novelty[i + 1]) {
+                    candidates.push({ index: i, value: novelty[i] });
+                }
+            }
+
+            candidates.sort((a, b) => b.value - a.value);
+            const boundaries = [0];
+
+            candidates.forEach((candidate) => {
+                if (boundaries.length >= targetSections) return;
+                if (candidate.index < minSpacing || signatureSize - candidate.index < minSpacing) return;
+                if (boundaries.every((boundary) => Math.abs(boundary - candidate.index) >= minSpacing)) {
+                    boundaries.push(candidate.index);
+                }
+            });
+
+            for (let i = 1; boundaries.length < targetSections && i < targetSections; i++) {
+                const candidate = Math.round(i * signatureSize / targetSections);
+                if (boundaries.every((boundary) => Math.abs(boundary - candidate) >= minSpacing * 0.62)) {
+                    boundaries.push(candidate);
+                }
+            }
+
+            boundaries.sort((a, b) => a - b);
+            if (boundaries[boundaries.length - 1] !== signatureSize) {
+                boundaries.push(signatureSize);
+            }
+
+            const section = new Uint16Array(signatureSize);
+            const sectionStarts = [];
+            const sectionEnds = [];
+            const sections = [];
+
+            for (let s = 0; s < boundaries.length - 1; s++) {
+                const start = boundaries[s];
+                const end = boundaries[s + 1];
+                let amp = 0;
+                let dynamic = 0;
+                let density = 0;
+                let centroid = 0;
+                let transient = 0;
+                const count = Math.max(1, end - start);
+
+                for (let i = start; i < end; i++) {
+                    section[i] = s;
+                    amp += signature.amp[i];
+                    dynamic += signature.peak[i];
+                    density += signature.zero[i];
+                    centroid += signature.centroid[i];
+                    transient += signature.transient[i];
+                }
+
+                sectionStarts.push(start);
+                sectionEnds.push(end);
+                sections.push({
+                    start,
+                    end,
+                    amp: amp / count,
+                    dynamic: dynamic / count,
+                    density: density / count,
+                    centroid: centroid / count,
+                    transient: transient / count,
+                    novelty: novelty[start] || 0
+                });
+            }
+
+            signature.novelty = novelty;
+            signature.section = section;
+            signature.sections = sections;
+            signature.sectionStarts = sectionStarts;
+            signature.sectionEnds = sectionEnds;
+        }
+
+        function buildSpine(signature) {
+            const spine = new Float32Array(signatureSize * 3);
+            const normalA = new Float32Array(signatureSize * 3);
+            const normalB = new Float32Array(signatureSize * 3);
+            const baseStep = signature.turns * TAU / signatureSize;
+            let theta = 0;
+            let driftX = 0;
+            let driftZ = 0;
+            let meanX = 0;
+            let meanZ = 0;
+
+            for (let i = 0; i < signatureSize; i++) {
+                const section = signature.section[i] || 0;
+                const info = signature.sections[section] || signature.sections[0];
+                const sectionT = clamp((i - info.start) / Math.max(1, info.end - info.start), 0, 1);
+                const offset = i * 3;
+                theta += baseStep * (0.62 + signature.centroid[i] * 0.82 + signature.transient[i] * 0.5);
+
+                const sectionBend = Math.sin((section + 1) * 1.137) * 0.55 + Math.sin(sectionT * TAU) * 0.25;
+                const radius = signature.radius + signature.low[i] * 40 + signature.amp[i] * 26 - signature.high[i] * 8 + info.dynamic * 10;
+                driftX = driftX * 0.91 + (signature.centroid[i] - signature.centroidMean) * 5 + signature.slope[i] * 48 + signature.transient[i] * 4 * Math.sin(section + 1);
+                driftZ = driftZ * 0.91 + (signature.high[i] - signature.low[i]) * 4.5 + signature.curve[i] * 80;
+
+                spine[offset] = Math.cos(theta + sectionBend) * radius + driftX;
+                spine[offset + 1] = (i / Math.max(1, signatureSize - 1) - 0.5) * signature.height + signature.mid[i] * 44 - signature.low[i] * 24 + signature.curve[i] * 120 + Math.sin(sectionT * Math.PI) * info.dynamic * 18;
+                spine[offset + 2] = Math.sin(theta + sectionBend) * radius + driftZ;
+                meanX += spine[offset];
+                meanZ += spine[offset + 2];
+            }
+
+            meanX /= signatureSize;
+            meanZ /= signatureSize;
+            for (let i = 0; i < signatureSize; i++) {
+                spine[i * 3] -= meanX;
+                spine[i * 3 + 2] -= meanZ;
+            }
+
+            for (let i = 0; i < signatureSize; i++) {
+                const previous = ((i - 1 + signatureSize) % signatureSize) * 3;
+                const next = ((i + 1) % signatureSize) * 3;
+                const offset = i * 3;
+                let tx = spine[next] - spine[previous];
+                let ty = spine[next + 1] - spine[previous + 1];
+                let tz = spine[next + 2] - spine[previous + 2];
+                const tangentLength = Math.hypot(tx, ty, tz) || 1;
+                tx /= tangentLength;
+                ty /= tangentLength;
+                tz /= tangentLength;
+
+                let ax = tz;
+                let ay = 0;
+                let az = -tx;
+                let axisLength = Math.hypot(ax, ay, az);
+                if (axisLength < 0.0001) {
+                    ax = 1;
+                    ay = 0;
+                    az = 0;
+                    axisLength = 1;
+                }
+                ax /= axisLength;
+                ay /= axisLength;
+                az /= axisLength;
+
+                let bx = ty * az - tz * ay;
+                let by = tz * ax - tx * az;
+                let bz = tx * ay - ty * ax;
+                const binormalLength = Math.hypot(bx, by, bz) || 1;
+                bx /= binormalLength;
+                by /= binormalLength;
+                bz /= binormalLength;
+
+                normalA[offset] = ax;
+                normalA[offset + 1] = ay;
+                normalA[offset + 2] = az;
+                normalB[offset] = bx;
+                normalB[offset + 1] = by;
+                normalB[offset + 2] = bz;
+            }
+
+            signature.spine = spine;
+            signature.normalA = normalA;
+            signature.normalB = normalB;
+        }
+
+        function createLinks() {
+            linkIndices = new Uint32Array(linkCount * 2);
+            const positions = new Float32Array(linkCount * 2 * 3);
+            const colors = new Float32Array(linkCount * 2 * 3);
+            const stride = Math.max(1, Math.floor(particleCount / linkCount));
+
+            for (let i = 0; i < linkCount; i++) {
+                const a = (i * stride + Math.floor(hash(i, 211) * stride)) % particleCount;
+                const b = (a + 23 + Math.floor(hash(i, 233) * 240)) % particleCount;
+                linkIndices[i * 2] = a;
+                linkIndices[i * 2 + 1] = b;
+            }
+
+            linkGeometry = new THREE.BufferGeometry();
+            linkGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage));
+            linkGeometry.setAttribute('color', new THREE.BufferAttribute(colors, 3).setUsage(THREE.DynamicDrawUsage));
+            linkGeometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 160);
+
+            linkMesh = new THREE.LineSegments(
+                linkGeometry,
+                new THREE.LineBasicMaterial({
+                    transparent: true,
+                    opacity: 0.07,
+                    vertexColors: true,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                })
+            );
+            scene.add(linkMesh);
+        }
+
+        function createField() {
+            fieldGroup = new THREE.Group();
+            const specs = [
+                { radius: 36, axis: 'xz', color: 0x70e8ff, opacity: 0.17 },
+                { radius: 54, axis: 'xy', color: 0xffd36a, opacity: 0.11 },
+                { radius: 72, axis: 'yz', color: 0xff6b91, opacity: 0.1 },
+                { radius: 90, axis: 'xz', color: 0x8effbf, opacity: 0.075 }
+            ];
+
+            specs.forEach((spec, index) => {
+                const ring = new THREE.LineLoop(
+                    createRingGeometry(spec.radius, 256, spec.axis),
+                    new THREE.LineBasicMaterial({
+                        color: spec.color,
+                        transparent: true,
+                        opacity: spec.opacity,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false
+                    })
+                );
+                ring.userData.spin = 0.0009 + index * 0.00065;
+                ring.userData.axis = spec.axis;
+                fieldGroup.add(ring);
+            });
+
+            scene.add(fieldGroup);
+        }
+
+        function createRingGeometry(radius, segments, axis) {
+            const positions = new Float32Array(segments * 3);
+            for (let i = 0; i < segments; i++) {
+                const t = i / segments * TAU;
+                const a = Math.cos(t) * radius;
+                const b = Math.sin(t) * radius;
+                const offset = i * 3;
+                if (axis === 'xy') {
+                    positions[offset] = a;
+                    positions[offset + 1] = b;
+                    positions[offset + 2] = 0;
+                } else if (axis === 'yz') {
+                    positions[offset] = 0;
+                    positions[offset + 1] = a;
+                    positions[offset + 2] = b;
+                } else {
+                    positions[offset] = a;
+                    positions[offset + 1] = 0;
+                    positions[offset + 2] = b;
+                }
+            }
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            return geometry;
+        }
+
+        function createStars() {
+            const count = isCompact ? 900 : 1500;
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            const color = new THREE.Color();
+
+            for (let i = 0; i < count; i++) {
+                const radius = 170 + hash(i, 307) * 360;
+                const theta = hash(i, 311) * TAU;
+                const phi = Math.acos(2 * hash(i, 313) - 1);
+                const offset = i * 3;
+                positions[offset] = radius * Math.sin(phi) * Math.cos(theta);
+                positions[offset + 1] = radius * Math.cos(phi);
+                positions[offset + 2] = radius * Math.sin(phi) * Math.sin(theta);
+                color.setHex(palette[i % palette.length]);
+                const shade = 0.12 + hash(i, 331) * 0.3;
+                colors[offset] = color.r * shade;
+                colors[offset + 1] = color.g * shade;
+                colors[offset + 2] = color.b * shade;
+            }
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            starField = new THREE.Points(
+                geometry,
+                new THREE.PointsMaterial({
+                    size: 1.25,
+                    transparent: true,
+                    opacity: 0.34,
+                    vertexColors: true,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                })
+            );
+            scene.add(starField);
+        }
+
+        function bindEvents() {
+            window.addEventListener('resize', onResize);
+            ui.fileInput.addEventListener('change', async () => {
+                if (!ui.fileInput.files?.length) return;
+                await audio.load(ui.fileInput.files);
+            });
+            ui.play.addEventListener('click', () => audio.toggle());
+            ui.next.addEventListener('click', () => audio.next());
+            ui.prev.addEventListener('click', () => audio.previous());
+            ui.seek.addEventListener('input', () => {
+                if (!Number.isFinite(ui.audio.duration) || ui.audio.duration <= 0) return;
+                ui.audio.currentTime = Number(ui.seek.value) / 1000 * ui.audio.duration;
+            });
+            ui.audio.addEventListener('ended', () => audio.next());
+            ui.audio.addEventListener('play', updateSourceLabel);
+            ui.audio.addEventListener('pause', updateSourceLabel);
+            ui.audio.addEventListener('loadedmetadata', updateSourceLabel);
+            ui.energy.addEventListener('input', () => {
+                state.energy = Number(ui.energy.value) / 100;
+                particleMaterial.uniforms.uEnergy.value = state.energy;
+                updateUi();
+            });
+            ui.bloom.addEventListener('input', () => {
+                state.bloom = Number(ui.bloom.value) / 100;
+                bloomPass.strength = state.bloom * 0.46;
+                updateUi();
+            });
+            ui.detail.addEventListener('input', () => {
+                state.detail = Number(ui.detail.value) / 100;
+                particleGeometry.setDrawRange(0, Math.floor(particleCount * state.detail));
+                updateUi();
+            });
+            ui.volume.addEventListener('input', () => {
+                state.volume = Number(ui.volume.value) / 100;
+                audio.setVolume(state.volume);
+                updateUi();
+            });
+            window.addEventListener('keydown', (event) => {
+                if (event.target instanceof HTMLInputElement) return;
+                if (event.key === ' ') {
+                    event.preventDefault();
+                    audio.toggle();
+                } else if (event.key === 'ArrowRight') {
+                    audio.next();
+                } else if (event.key === 'ArrowLeft') {
+                    audio.previous();
+                }
+            });
+        }
+
+        function animate(now) {
+            const elapsed = clock.getElapsedTime();
+            updateAudio();
+            updateMorph(now);
+            updateLinks(easeInOutCubic(particleMaterial.uniforms.uMorph.value));
+            updateField(elapsed);
+            updateWaveformMarker();
+            updateTelemetry(now);
+
+            const playhead = Number.isFinite(ui.audio.duration) && ui.audio.duration > 0 ? ui.audio.currentTime / ui.audio.duration : 0;
+            particleMaterial.uniforms.uTime.value = elapsed;
+            particleMaterial.uniforms.uPlayhead.value = playhead;
+            particleMaterial.uniforms.uBass.value = state.audio.bass;
+            particleMaterial.uniforms.uMid.value = state.audio.mid;
+            particleMaterial.uniforms.uAir.value = state.audio.air;
+            particleMaterial.uniforms.uRms.value = state.audio.rms;
+            particleMaterial.uniforms.uBeat.value = state.audio.beat;
+
+            particleMesh.rotation.y += 0.00055 + state.audio.air * 0.0015;
+            particleMesh.rotation.x += Math.sin(elapsed * 0.19) * 0.00032;
+            starField.rotation.y -= 0.00012;
+            controls.update();
+
+            bloomPass.strength = state.bloom * 0.46 + Math.min(0.1, state.audio.beat * 0.15);
+            composer.render();
+        }
+
+        function updateMorph(now) {
+            if (!state.morphing) {
+                particleMaterial.uniforms.uMorph.value = 1;
+                return;
+            }
+            const progress = Math.min((now - state.morphStart) / state.morphDuration, 1);
+            particleMaterial.uniforms.uMorph.value = progress;
+            if (progress >= 1) {
+                state.morphing = false;
+            }
+        }
+
+        function updateAudio() {
+            const frame = audio.read();
+            if (!frame || ui.audio.paused) {
+                state.audio.bass *= 0.94;
+                state.audio.mid *= 0.95;
+                state.audio.air *= 0.95;
+                state.audio.rms *= 0.94;
+                state.audio.peak *= 0.93;
+                state.audio.beat *= 0.88;
+                return;
+            }
+
+            const freq = frame.freq;
+            const time = frame.time;
+            const bass = bandAverageHz(freq, frame.sampleRate, frame.fftSize, 28, 120) / 255;
+            const mid = bandAverageHz(freq, frame.sampleRate, frame.fftSize, 180, 1800) / 255;
+            const air = bandAverageHz(freq, frame.sampleRate, frame.fftSize, 4200, 14000) / 255;
+            let rmsSum = 0;
+            let peak = 0;
+
+            for (let i = 0; i < time.length; i++) {
+                const v = (time[i] - 128) / 128;
+                rmsSum += v * v;
+                peak = Math.max(peak, Math.abs(v));
+            }
+
+            const rms = Math.sqrt(rmsSum / time.length);
+            state.audio.beatFloor += (rms - state.audio.beatFloor) * 0.012;
+            const beatHit = Math.max(0, (rms - state.audio.beatFloor * 1.28) * 6);
+            state.audio.beat = Math.max(state.audio.beat * 0.84, clamp(beatHit, 0, 1));
+            state.audio.bass += (bass - state.audio.bass) * 0.22;
+            state.audio.mid += (mid - state.audio.mid) * 0.2;
+            state.audio.air += (air - state.audio.air) * 0.18;
+            state.audio.rms += (rms - state.audio.rms) * 0.18;
+            state.audio.peak += (peak - state.audio.peak) * 0.24;
+        }
+
+        function updateLinks(eased) {
+            const fromPosition = particleGeometry.attributes.fromPosition.array;
+            const toPosition = particleGeometry.attributes.toPosition.array;
+            const fromColor = particleGeometry.attributes.fromColor.array;
+            const toColor = particleGeometry.attributes.toColor.array;
+            const positions = linkGeometry.attributes.position.array;
+            const colors = linkGeometry.attributes.color.array;
+            const playhead = particleMaterial.uniforms.uPlayhead.value;
+            const audible = 0.22 + state.audio.rms * 1.35 + state.audio.beat * 0.68;
+
+            for (let i = 0; i < linkIndices.length; i++) {
+                const particleIndex = linkIndices[i] * 3;
+                const lineIndex = i * 3;
+                positions[lineIndex] = fromPosition[particleIndex] * (1 - eased) + toPosition[particleIndex] * eased;
+                positions[lineIndex + 1] = fromPosition[particleIndex + 1] * (1 - eased) + toPosition[particleIndex + 1] * eased;
+                positions[lineIndex + 2] = fromPosition[particleIndex + 2] * (1 - eased) + toPosition[particleIndex + 2] * eased;
+                const trackValue = particleGeometry.attributes.aTrack.array[linkIndices[i]];
+                const local = Math.max(0, 1 - Math.abs(trackValue - playhead) / 0.06);
+                const glow = audible + local * 0.7;
+                colors[lineIndex] = (fromColor[particleIndex] * (1 - eased) + toColor[particleIndex] * eased) * glow;
+                colors[lineIndex + 1] = (fromColor[particleIndex + 1] * (1 - eased) + toColor[particleIndex + 1] * eased) * glow;
+                colors[lineIndex + 2] = (fromColor[particleIndex + 2] * (1 - eased) + toColor[particleIndex + 2] * eased) * glow;
+            }
+
+            linkGeometry.attributes.position.needsUpdate = true;
+            linkGeometry.attributes.color.needsUpdate = true;
+            linkMesh.material.opacity = 0.024 + state.energy * 0.048 + state.audio.beat * 0.042;
+        }
+
+        function updateField(elapsed) {
+            fieldGroup.children.forEach((ring, index) => {
+                if (ring.userData.axis === 'xy') ring.rotation.z += ring.userData.spin * (1 + state.audio.mid * 4);
+                if (ring.userData.axis === 'yz') ring.rotation.x += ring.userData.spin * (1 + state.audio.air * 5);
+                if (ring.userData.axis === 'xz') ring.rotation.y += ring.userData.spin * (1 + state.audio.bass * 5);
+                ring.scale.setScalar(1 + Math.sin(elapsed * 0.7 + index) * 0.018 + state.audio.beat * 0.052);
+                ring.material.color.lerp(new THREE.Color(palette[(index + Math.floor(state.signature.dynamic * 5)) % palette.length]), 0.04);
+                ring.material.opacity = 0.055 + index * 0.024 + state.audio.rms * 0.15;
+            });
+        }
+
+        function updateTelemetry(now) {
+            state.frameCount += 1;
+            if (now - state.fpsWindow >= 500) {
+                state.fps = Math.round(state.frameCount * 1000 / (now - state.fpsWindow));
+                state.frameCount = 0;
+                state.fpsWindow = now;
+            }
+
+            setMetric(ui.fpsFill, ui.fpsValue, Math.min(1, state.fps / 75), String(state.fps || '--'));
+            setMetric(ui.bassFill, ui.bassValue, state.audio.bass, String(Math.round(state.audio.bass * 100)));
+            setMetric(ui.midFill, ui.midValue, state.audio.mid, String(Math.round(state.audio.mid * 100)));
+            setMetric(ui.airFill, ui.airValue, state.audio.air, String(Math.round(state.audio.air * 100)));
+            setMetric(ui.beatFill, ui.beatValue, state.audio.beat, String(Math.round(state.audio.beat * 100)));
+            setText(ui.rms, 'rms', formatDb(dbFromLinear(state.audio.rms)));
+            updateSourceLabel();
+        }
+
+        function updateSourceLabel() {
+            const track = audio.playlist[audio.index];
+            setText(ui.sourceName, 'sourceName', track ? track.file.name : 'No source');
+            setText(ui.play, 'play', ui.audio.paused ? 'Play' : 'Pause');
+            setText(ui.phase, 'phase', ui.audio.paused ? 'Idle Field' : 'Reactive Field');
+            setText(ui.elapsed, 'elapsed', formatTime(ui.audio.currentTime || 0));
+            setText(ui.duration, 'duration', formatTime(ui.audio.duration || 0));
+
+            const seekValue = Number.isFinite(ui.audio.duration) && ui.audio.duration > 0
+                ? String(Math.round(ui.audio.currentTime / ui.audio.duration * 1000))
+                : '0';
+            if (uiCache.seek !== seekValue) {
+                ui.seek.value = seekValue;
+                uiCache.seek = seekValue;
+            }
+        }
+
+        function updateUi() {
+            ui.particleValue.textContent = `${Math.round(particleCount * state.detail).toLocaleString()} particles`;
+            ui.energyLabel.textContent = String(Math.round(state.energy * 100));
+            ui.bloomLabel.textContent = String(Math.round(state.bloom * 100));
+            ui.detailLabel.textContent = String(Math.round(state.detail * 100));
+            ui.volumeLabel.textContent = String(Math.round(state.volume * 100));
+            updateSignatureUi();
+        }
+
+        function updateSignatureUi() {
+            setText(ui.segmentReadout, 'sections', String(state.signature.sections?.length || 0));
+            setText(ui.contourReadout, 'contour', String(Math.round(state.signature.contour * 1000)));
+            setText(ui.dynamicReadout, 'dynamic', String(Math.round(state.signature.dynamic * 100)));
+            setText(ui.densityReadout, 'spectrum', String(Math.round(state.signature.centroidMean * 100)));
+            setText(ui.mode, 'mode', 'Glyph');
+        }
+
+        function setMetric(fill, label, value, text) {
+            fill.style.width = `${clamp(value, 0, 1) * 100}%`;
+            label.textContent = text;
+        }
+
+        function setText(element, key, value) {
+            if (uiCache[key] === value) return;
+            element.textContent = value;
+            uiCache[key] = value;
+        }
+
+        function drawWaveform(buffer) {
+            const dpr = Math.min(window.devicePixelRatio, 2);
+            const rect = ui.waveform.getBoundingClientRect();
+            ui.waveform.width = Math.max(1, Math.floor(rect.width * dpr));
+            ui.waveform.height = Math.max(1, Math.floor(rect.height * dpr));
+            const width = ui.waveform.width;
+            const height = ui.waveform.height;
+            waveformBase.width = width;
+            waveformBase.height = height;
+            waveformBaseCtx.clearRect(0, 0, width, height);
+            waveformBaseCtx.fillStyle = 'rgba(2, 4, 6, 0.84)';
+            waveformBaseCtx.fillRect(0, 0, width, height);
+            drawWaveGrid(waveformBaseCtx, width, height);
+
+            const lanes = 8;
+            const laneHeight = height / lanes;
+            const data = buffer ? buffer.getChannelData(0) : null;
+
+            for (let lane = 0; lane < lanes; lane++) {
+                const y = lane * laneHeight;
+                const mid = y + laneHeight * 0.5;
+                const amp = laneHeight * 0.34;
+                const hue = lane / lanes;
+                const gradient = waveformBaseCtx.createLinearGradient(0, y, width, y + laneHeight);
+                gradient.addColorStop(0, `hsla(${190 + hue * 110}, 100%, 70%, 0.22)`);
+                gradient.addColorStop(0.5, `hsla(${38 + hue * 32}, 100%, 70%, 0.78)`);
+                gradient.addColorStop(1, `hsla(${145 + hue * 80}, 100%, 72%, 0.26)`);
+                waveformBaseCtx.strokeStyle = gradient;
+                waveformBaseCtx.lineWidth = Math.max(1, 1.1 * dpr);
+                waveformBaseCtx.beginPath();
+
+                if (data) {
+                    const start = Math.floor(data.length * lane / lanes);
+                    const end = Math.floor(data.length * (lane + 1) / lanes);
+                    const step = Math.max(1, Math.floor((end - start) / width));
+                    for (let x = 0; x < width; x++) {
+                        let min = 1;
+                        let max = -1;
+                        const index = start + x * step;
+                        for (let j = 0; j < step; j++) {
+                            const v = data[Math.min(end - 1, index + j)] || 0;
+                            min = Math.min(min, v);
+                            max = Math.max(max, v);
+                        }
+                        waveformBaseCtx.moveTo(x, mid - max * amp);
+                        waveformBaseCtx.lineTo(x, mid - min * amp);
+                    }
+                } else {
+                    for (let x = 0; x < width; x++) {
+                        const t = x / width;
+                        const v = Math.sin(t * TAU * (2 + lane * 0.35) + lane * 0.7) * 0.08;
+                        const yy = mid - v * amp;
+                        if (x === 0) waveformBaseCtx.moveTo(x, yy);
+                        else waveformBaseCtx.lineTo(x, yy);
+                    }
+                }
+                waveformBaseCtx.stroke();
+            }
+            renderWaveformFrame();
+        }
+
+        function drawWaveGrid(ctx, width, height) {
+            ctx.save();
+            ctx.strokeStyle = 'rgba(237, 248, 255, 0.075)';
+            ctx.lineWidth = 1;
+            for (let i = 1; i < 8; i++) {
+                const y = i / 8 * height;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(width, y);
+                ctx.stroke();
+            }
+            for (let i = 1; i < 12; i++) {
+                const x = i / 12 * width;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, height);
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        function updateWaveformMarker() {
+            renderWaveformFrame();
+        }
+
+        function renderWaveformFrame() {
+            const width = ui.waveform.width;
+            const height = ui.waveform.height;
+            waveformCtx.clearRect(0, 0, width, height);
+            waveformCtx.drawImage(waveformBase, 0, 0);
+            if (!Number.isFinite(ui.audio.duration) || ui.audio.duration <= 0) return;
+            const progress = ui.audio.currentTime / ui.audio.duration;
+            waveformCtx.save();
+            waveformCtx.strokeStyle = 'rgba(255, 107, 145, 0.86)';
+            waveformCtx.lineWidth = 2;
+            waveformCtx.shadowColor = 'rgba(255, 107, 145, 0.34)';
+            waveformCtx.shadowBlur = 10;
+            waveformCtx.beginPath();
+            waveformCtx.moveTo(progress * width, 0);
+            waveformCtx.lineTo(progress * width, height);
+            waveformCtx.stroke();
+            waveformCtx.restore();
+        }
+
+        function smoothArray(data) {
+            const copy = new Float32Array(data);
+            for (let i = 0; i < data.length; i++) {
+                const previous = copy[(i - 1 + data.length) % data.length];
+                const current = copy[i];
+                const next = copy[(i + 1) % data.length];
+                data[i] = previous * 0.24 + current * 0.52 + next * 0.24;
+            }
+        }
+
+        function bandAverage(data, start, end) {
+            let sum = 0;
+            let count = 0;
+            const last = Math.min(data.length - 1, end);
+            for (let i = start; i <= last; i++) {
+                sum += data[i];
+                count++;
+            }
+            return count ? sum / count : 0;
+        }
+
+        function bandAverageHz(data, sampleRate, fftSize, lowHz, highHz) {
+            const binHz = sampleRate / fftSize;
+            const start = clamp(Math.floor(lowHz / binHz), 1, data.length - 1);
+            const end = clamp(Math.ceil(highHz / binHz), start, data.length - 1);
+            return bandAverage(data, start, end);
+        }
+
+        function easeInOutCubic(x) {
+            return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+        }
+
+        function lerp(a, b, t) {
+            return a + (b - a) * t;
+        }
+
+        function hash(index, salt) {
+            const x = Math.sin(index * 127.1 + salt * 311.7) * 43758.5453123;
+            return x - Math.floor(x);
+        }
+
+        function dbFromLinear(value) {
+            return value > 0.00001 ? 20 * Math.log10(value) : -96;
+        }
+
+        function formatDb(db) {
+            return db <= -95 ? '-inf' : `${db.toFixed(1)} dB`;
+        }
+
+        function formatTime(seconds) {
+            if (!Number.isFinite(seconds)) return '0:00';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${String(secs).padStart(2, '0')}`;
+        }
+
+        function clamp(value, min, max) {
+            return Math.max(min, Math.min(max, value));
+        }
+
+        function onResize() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(width, height);
+            composer.setSize(width, height);
+            bloomPass.setSize(width, height);
+            drawWaveform(audio.playlist[audio.index]?.buffer || null);
+        }
+    </script>
+</body>
+</html>

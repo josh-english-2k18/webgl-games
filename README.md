@@ -12,6 +12,8 @@ A simple repository of WebGL games, prototypes and experiments.
 - [3D Ball Physics Simulation](https://josh-english-2k18.github.io/webgl-games/ball-physics-simulation.html)
 - [Vectorwing: Rift Patrol](https://josh-english-2k18.github.io/webgl-games/starfox.html)
 - [Fractal Music Visualizer](https://josh-english-2k18.github.io/webgl-games/fractal-music-visualizer.html)
+- [MandelTone Engine](https://josh-english-2k18.github.io/webgl-games/fractal-music-visualizer-v2.html)
+- [Waveglyph Engine](https://josh-english-2k18.github.io/webgl-games/fractal-music-visualizer-v3.html)
 - [Asteroids (Grok 4)](https://josh-english-2k18.github.io/webgl-games/grok-4-asteroids.html)
 - [Asteroids (GPT-5)](https://josh-english-2k18.github.io/webgl-games/gpt-5-asteroids.html)
 - [Holograph Particle Morphing](https://josh-english-2k18.github.io/webgl-games/holograph-particle-morphing.html)
