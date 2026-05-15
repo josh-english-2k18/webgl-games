@@ -1,0 +1,2277 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Axiom Breach</title>
+    <style>
+        :root {
+            --bg: #04070c;
+            --ink: #f4f7fb;
+            --muted: rgba(244, 247, 251, 0.62);
+            --line: rgba(244, 247, 251, 0.15);
+            --panel: rgba(7, 10, 16, 0.76);
+            --cyan: #73e8ff;
+            --green: #86f0b7;
+            --gold: #ffd36a;
+            --red: #ff657f;
+            --violet: #bba2ff;
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            letter-spacing: 0;
+        }
+
+        button {
+            font: inherit;
+        }
+
+        #stage {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 16% 18%, rgba(115, 232, 255, 0.12), transparent 30%),
+                radial-gradient(circle at 84% 76%, rgba(255, 101, 127, 0.11), transparent 32%),
+                linear-gradient(180deg, #101824 0%, #04070c 64%, #020306 100%);
+        }
+
+        #stage canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .grain,
+        .vignette {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .grain {
+            opacity: 0.06;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 56px 56px;
+            mask-image: radial-gradient(circle at 50% 52%, #000 0%, #000 58%, transparent 84%);
+        }
+
+        .vignette {
+            background:
+                linear-gradient(to right, rgba(0, 0, 0, 0.54), transparent 18%, transparent 82%, rgba(0, 0, 0, 0.54)),
+                linear-gradient(to bottom, rgba(0, 0, 0, 0.32), transparent 24%, transparent 72%, rgba(0, 0, 0, 0.72));
+        }
+
+        .hud {
+            position: fixed;
+            top: 18px;
+            left: 18px;
+            z-index: 20;
+            max-width: 470px;
+            pointer-events: none;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 11px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .mark {
+            position: relative;
+            width: 31px;
+            height: 31px;
+            border: 1px solid rgba(115, 232, 255, 0.84);
+            border-radius: 50%;
+            box-shadow: 0 0 24px rgba(115, 232, 255, 0.18), inset 0 0 16px rgba(115, 232, 255, 0.1);
+        }
+
+        .mark::before,
+        .mark::after {
+            content: "";
+            position: absolute;
+            inset: 7px;
+            border: 1px solid rgba(255, 211, 106, 0.72);
+            transform: rotate(45deg);
+        }
+
+        .mark::after {
+            inset: 12px;
+            border-color: rgba(255, 101, 127, 0.72);
+            border-radius: 50%;
+            transform: none;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 38px;
+            line-height: 0.95;
+            text-transform: uppercase;
+            text-shadow: 0 0 28px rgba(115, 232, 255, 0.18);
+        }
+
+        .readout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 820;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+        }
+
+        .readout strong {
+            color: var(--ink);
+        }
+
+        .side-panel {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            z-index: 22;
+            display: grid;
+            gap: 12px;
+            width: 360px;
+            pointer-events: none;
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.38);
+            pointer-events: auto;
+        }
+
+        .panel-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 13px 14px 0;
+        }
+
+        .panel h2 {
+            margin: 0;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        .panel-body {
+            padding: 12px 14px 14px;
+        }
+
+        #mission-copy,
+        #selection-copy,
+        #intent-copy {
+            min-height: 40px;
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .meter {
+            display: grid;
+            grid-template-columns: 78px 1fr 54px;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 850;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+        }
+
+        .track {
+            height: 5px;
+            overflow: hidden;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .fill {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--red), var(--gold), var(--green), var(--cyan));
+            transition: width 150ms ease;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1px;
+            overflow: hidden;
+            border: 1px solid rgba(244, 247, 251, 0.08);
+            border-radius: 6px;
+            background: rgba(244, 247, 251, 0.08);
+        }
+
+        .stat-cell {
+            min-width: 0;
+            padding: 10px;
+            background: rgba(4, 7, 12, 0.72);
+        }
+
+        .stat-cell span,
+        .stat-cell strong {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .stat-cell span {
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .stat-cell strong {
+            margin-top: 5px;
+            font-size: 15px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .action-log {
+            display: grid;
+            gap: 1px;
+            max-height: 168px;
+            overflow: auto;
+            border: 1px solid rgba(244, 247, 251, 0.08);
+            border-radius: 6px;
+            background: rgba(4, 7, 12, 0.66);
+        }
+
+        .log-entry {
+            padding: 8px 9px;
+            background: rgba(244, 247, 251, 0.055);
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        .log-entry strong {
+            color: var(--ink);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .log-entry.good {
+            color: rgba(134, 240, 183, 0.86);
+        }
+
+        .log-entry.bad {
+            color: rgba(255, 101, 127, 0.88);
+        }
+
+        .log-entry.system {
+            color: rgba(115, 232, 255, 0.84);
+        }
+
+        .controls {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            left: 18px;
+            z-index: 25;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 11px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.38);
+        }
+
+        .control-btn {
+            min-width: 92px;
+            min-height: 40px;
+            padding: 0 12px;
+            border: 1px solid rgba(244, 247, 251, 0.15);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--ink);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 840;
+            text-transform: uppercase;
+            transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+        }
+
+        .control-btn:hover,
+        .control-btn.active {
+            border-color: rgba(115, 232, 255, 0.64);
+            background: rgba(115, 232, 255, 0.12);
+        }
+
+        .control-btn.commit {
+            border-color: rgba(134, 240, 183, 0.42);
+            background: rgba(134, 240, 183, 0.1);
+        }
+
+        .control-btn:disabled {
+            border-color: rgba(244, 247, 251, 0.08);
+            background: rgba(255, 255, 255, 0.025);
+            color: rgba(244, 247, 251, 0.32);
+            cursor: not-allowed;
+        }
+
+        .debug-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 40;
+            display: none;
+            place-items: center;
+            padding: 18px;
+            background: rgba(0, 0, 0, 0.42);
+            backdrop-filter: blur(8px);
+        }
+
+        .debug-modal.visible {
+            display: grid;
+        }
+
+        .debug-panel {
+            width: min(620px, 100%);
+            border: 1px solid rgba(115, 232, 255, 0.32);
+            border-radius: var(--radius);
+            background: rgba(7, 10, 16, 0.92);
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.56);
+        }
+
+        .debug-head,
+        .debug-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 14px;
+        }
+
+        .debug-actions {
+            border-top: 1px solid rgba(244, 247, 251, 0.08);
+            justify-content: flex-start;
+        }
+
+        .debug-head h2 {
+            margin: 0;
+            font-size: 15px;
+            text-transform: uppercase;
+        }
+
+        .debug-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1px;
+            padding: 0 14px 14px;
+        }
+
+        .debug-stat {
+            min-width: 0;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.045);
+        }
+
+        .debug-stat span,
+        .debug-stat strong {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .debug-stat span {
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .debug-stat strong {
+            margin-top: 5px;
+            font-size: 14px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .debug-btn {
+            min-height: 36px;
+            padding: 0 11px;
+            border: 1px solid rgba(244, 247, 251, 0.15);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.055);
+            color: var(--ink);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 820;
+            text-transform: uppercase;
+        }
+
+        .debug-btn:hover {
+            border-color: rgba(115, 232, 255, 0.62);
+            background: rgba(115, 232, 255, 0.11);
+        }
+
+        #fallback {
+            position: fixed;
+            inset: 18px;
+            z-index: 100;
+            display: none;
+            place-items: center;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: rgba(6, 7, 10, 0.94);
+            text-align: center;
+        }
+
+        #fallback.visible {
+            display: grid;
+        }
+
+        @media (max-width: 960px) {
+            .side-panel {
+                top: auto;
+                right: 12px;
+                bottom: 92px;
+                left: 12px;
+                width: auto;
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .side-panel .panel:first-child {
+                grid-column: 1 / -1;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .hud {
+                top: 12px;
+                left: 12px;
+                max-width: 310px;
+            }
+
+            h1 {
+                font-size: 27px;
+            }
+
+            .side-panel {
+                display: none;
+            }
+
+            .controls {
+                right: 10px;
+                bottom: 10px;
+                left: 10px;
+                padding: 9px;
+            }
+
+            .control-btn {
+                flex: 1 1 92px;
+                min-width: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="stage"></div>
+    <div class="grain"></div>
+    <div class="vignette"></div>
+
+    <section class="hud" aria-label="Mission status">
+        <div class="brand"><span class="mark"></span><span>Deterministic Tactics Engine</span></div>
+        <h1>Axiom Breach</h1>
+        <div class="readout">
+            <span>Turn <strong id="turn">1</strong></span>
+            <span>Phase <strong id="phase">Planning</strong></span>
+            <span>Stability <strong id="stability">6</strong></span>
+            <span>Queue <strong id="queue-count">0</strong></span>
+        </div>
+    </section>
+
+    <aside class="side-panel">
+        <section class="panel" aria-label="Mission briefing">
+            <div class="panel-head">
+                <h2 id="mission-title">Breach Corridor</h2>
+            </div>
+            <div class="panel-body">
+                <p id="mission-copy">Survive six turns. Enemy intents are visible; use pushes, beams, traps, and shields to keep the breach from collapsing.</p>
+                <div class="meter">
+                    <span>Stability</span>
+                    <span class="track"><span id="stability-fill" class="fill"></span></span>
+                    <strong id="stability-label">6/6</strong>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Selected unit">
+            <div class="panel-head">
+                <h2 id="selection-title">No Unit Selected</h2>
+            </div>
+            <div class="panel-body">
+                <p id="selection-copy">Select a specialist to preview movement, action lines, and turn consequences.</p>
+                <div class="stat-grid">
+                    <div class="stat-cell"><span>Health</span><strong id="unit-hp">-</strong></div>
+                    <div class="stat-cell"><span>Cooldown</span><strong id="unit-cooldown">-</strong></div>
+                    <div class="stat-cell"><span>Action</span><strong id="action-mode">Move</strong></div>
+                    <div class="stat-cell"><span>Status</span><strong id="unit-status">Ready</strong></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Enemy intent">
+            <div class="panel-head">
+                <h2>Enemy Intent</h2>
+            </div>
+            <div class="panel-body">
+                <p id="intent-copy">Enemy actions are telegraphed before you commit the turn.</p>
+                <div class="stat-grid">
+                    <div class="stat-cell"><span>Enemies</span><strong id="enemy-count">0</strong></div>
+                    <div class="stat-cell"><span>Threats</span><strong id="threat-count">0</strong></div>
+                    <div class="stat-cell"><span>Traps</span><strong id="trap-count">0</strong></div>
+                    <div class="stat-cell"><span>Shields</span><strong id="shield-count">0</strong></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Tactical log">
+            <div class="panel-head">
+                <h2>Tactical Log</h2>
+            </div>
+            <div class="panel-body">
+                <div id="action-log" class="action-log"></div>
+            </div>
+        </section>
+    </aside>
+
+    <nav class="controls" aria-label="Game controls">
+        <button id="new-game" class="control-btn" type="button">New</button>
+        <button id="move-mode" class="control-btn active" type="button">Move</button>
+        <button id="skill-mode" class="control-btn" type="button">Skill</button>
+        <button id="special-mode" class="control-btn" type="button">Special</button>
+        <button id="undo-action" class="control-btn" type="button">Undo</button>
+        <button id="reset-plan" class="control-btn" type="button">Reset Plan</button>
+        <button id="hint" class="control-btn" type="button">Hint</button>
+        <button id="focus" class="control-btn" type="button">Focus</button>
+        <button id="commit" class="control-btn commit" type="button">Commit</button>
+    </nav>
+
+    <div id="debug-modal" class="debug-modal" aria-hidden="true">
+        <section class="debug-panel" role="dialog" aria-modal="true" aria-labelledby="debug-title">
+            <header class="debug-head">
+                <h2 id="debug-title">Debug Console</h2>
+                <button id="debug-close" class="debug-btn" type="button">Close</button>
+            </header>
+            <div class="debug-grid">
+                <div class="debug-stat"><span>Turn</span><strong id="debug-turn">1</strong></div>
+                <div class="debug-stat"><span>Units</span><strong id="debug-units">3</strong></div>
+                <div class="debug-stat"><span>Enemies</span><strong id="debug-enemies">0</strong></div>
+                <div class="debug-stat"><span>Queue</span><strong id="debug-queue">0</strong></div>
+                <div class="debug-stat"><span>Stability</span><strong id="debug-stability">6</strong></div>
+                <div class="debug-stat"><span>Phase</span><strong id="debug-phase">Planning</strong></div>
+            </div>
+            <div class="debug-actions">
+                <button class="debug-btn" type="button" data-debug="crawler">Spawn Crawler</button>
+                <button class="debug-btn" type="button" data-debug="lancer">Spawn Lancer</button>
+                <button class="debug-btn" type="button" data-debug="spitter">Spawn Spitter</button>
+                <button class="debug-btn" type="button" data-debug="stability">Add Stability</button>
+                <button class="debug-btn" type="button" data-debug="clear">Clear Enemies</button>
+                <button class="debug-btn" type="button" data-debug="resolve">Resolve Turn</button>
+            </div>
+        </section>
+    </div>
+
+    <div id="fallback">
+        <p>WebGL initialization failed.</p>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.174.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+        const SIZE = 8;
+        const MAX_STABILITY = 6;
+        const SURVIVE_TURNS = 6;
+        const FILES = 'ABCDEFGH';
+        const CARDINALS = [
+            { x: 0, y: -1 },
+            { x: 1, y: 0 },
+            { x: 0, y: 1 },
+            { x: -1, y: 0 }
+        ];
+        const breachTiles = [
+            { x: 2, y: 0 },
+            { x: 5, y: 0 },
+            { x: 0, y: 3 },
+            { x: 7, y: 4 }
+        ];
+
+        const ui = {
+            stage: document.getElementById('stage'),
+            fallback: document.getElementById('fallback'),
+            turn: document.getElementById('turn'),
+            phase: document.getElementById('phase'),
+            stability: document.getElementById('stability'),
+            queueCount: document.getElementById('queue-count'),
+            missionTitle: document.getElementById('mission-title'),
+            missionCopy: document.getElementById('mission-copy'),
+            stabilityFill: document.getElementById('stability-fill'),
+            stabilityLabel: document.getElementById('stability-label'),
+            selectionTitle: document.getElementById('selection-title'),
+            selectionCopy: document.getElementById('selection-copy'),
+            unitHp: document.getElementById('unit-hp'),
+            unitCooldown: document.getElementById('unit-cooldown'),
+            actionMode: document.getElementById('action-mode'),
+            unitStatus: document.getElementById('unit-status'),
+            intentCopy: document.getElementById('intent-copy'),
+            enemyCount: document.getElementById('enemy-count'),
+            threatCount: document.getElementById('threat-count'),
+            trapCount: document.getElementById('trap-count'),
+            shieldCount: document.getElementById('shield-count'),
+            actionLog: document.getElementById('action-log'),
+            newGame: document.getElementById('new-game'),
+            moveMode: document.getElementById('move-mode'),
+            skillMode: document.getElementById('skill-mode'),
+            specialMode: document.getElementById('special-mode'),
+            undoAction: document.getElementById('undo-action'),
+            resetPlan: document.getElementById('reset-plan'),
+            hint: document.getElementById('hint'),
+            focus: document.getElementById('focus'),
+            commit: document.getElementById('commit'),
+            debugModal: document.getElementById('debug-modal'),
+            debugClose: document.getElementById('debug-close'),
+            debugTurn: document.getElementById('debug-turn'),
+            debugUnits: document.getElementById('debug-units'),
+            debugEnemies: document.getElementById('debug-enemies'),
+            debugQueue: document.getElementById('debug-queue'),
+            debugStability: document.getElementById('debug-stability'),
+            debugPhase: document.getElementById('debug-phase')
+        };
+
+        const unitSpecs = {
+            knight: {
+                name: 'Vector Knight',
+                short: 'Knight',
+                color: new THREE.Color(0x73e8ff),
+                move: 3,
+                hp: 4,
+                skill: 'Push an adjacent enemy one tile.',
+                special: 'Anchor pulse pushes all adjacent enemies.'
+            },
+            archer: {
+                name: 'Flux Archer',
+                short: 'Archer',
+                color: new THREE.Color(0xffd36a),
+                move: 2,
+                hp: 3,
+                skill: 'Fire a beam down a row or column.',
+                special: 'Prism shot damages every enemy in a line.'
+            },
+            engineer: {
+                name: 'Ward Engineer',
+                short: 'Engineer',
+                color: new THREE.Color(0x86f0b7),
+                move: 2,
+                hp: 3,
+                skill: 'Place a trap-shield relay within range.',
+                special: 'Repair an ally and reinforce stability.'
+            }
+        };
+
+        const enemySpecs = {
+            crawler: { name: 'Crawler', hp: 2, color: new THREE.Color(0xff657f), damage: 1 },
+            lancer: { name: 'Lancer', hp: 2, color: new THREE.Color(0xbba2ff), damage: 2 },
+            spitter: { name: 'Spitter', hp: 1, color: new THREE.Color(0xffd36a), damage: 1 },
+            bulwark: { name: 'Bulwark', hp: 3, color: new THREE.Color(0xf073ff), damage: 1 }
+        };
+
+        const state = {
+            turn: 1,
+            phase: 'planning',
+            stability: MAX_STABILITY,
+            units: [],
+            enemies: [],
+            hazards: [],
+            queuedActions: [],
+            actionStack: [],
+            turnStart: null,
+            selectedUnit: null,
+            actionMode: 'move',
+            legalActions: [],
+            hoveredAction: null,
+            focused: false,
+            debugOpen: false,
+            log: [],
+            nextUnitId: 1,
+            nextEnemyId: 1,
+            status: 'Survive six turns. Enemy intents are visible before you commit.',
+            time: 0,
+            gameOver: false,
+            victory: false
+        };
+
+        let scene;
+        let camera;
+        let renderer;
+        let controls;
+        let composer;
+        let bloomPass;
+        let boardGroup;
+        let squareGroup;
+        let unitGroup;
+        let enemyGroup;
+        let hazardGroup;
+        let markerGroup;
+        let intentGroup;
+        let effectRoot;
+        let raycaster;
+        let pointer;
+        let clock;
+
+        const squareMeshes = [];
+        const effectParticles = [];
+        const effectAnimations = [];
+        const geometries = {};
+        const materials = {};
+
+        try {
+            init();
+        } catch (error) {
+            console.error(error);
+            ui.fallback.classList.add('visible');
+        }
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x04070c, 0.02);
+
+            camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 800);
+            camera.position.set(0, 12.4, 13.8);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 0.86;
+            ui.stage.appendChild(renderer.domElement);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.07;
+            controls.enablePan = false;
+            controls.minDistance = 8;
+            controls.maxDistance = 34;
+            controls.maxPolarAngle = Math.PI * 0.49;
+            controls.target.set(0, 0, 0);
+
+            composer = new EffectComposer(renderer);
+            composer.addPass(new RenderPass(scene, camera));
+            bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.13, 0.28, 0.76);
+            composer.addPass(bloomPass);
+            composer.addPass(new OutputPass());
+
+            raycaster = new THREE.Raycaster();
+            pointer = new THREE.Vector2();
+            clock = new THREE.Clock();
+            buildGeometries();
+            buildMaterials();
+            buildLights();
+            buildRoom();
+            bindEvents();
+            resetGame();
+            renderer.setAnimationLoop(animate);
+            window.__axiomBreachReady = true;
+        }
+
+        function buildGeometries() {
+            geometries.square = new THREE.BoxGeometry(0.98, 0.16, 0.98);
+            geometries.base = new THREE.BoxGeometry(9.2, 0.34, 9.2);
+            geometries.marker = new THREE.TorusGeometry(0.38, 0.022, 8, 52);
+            geometries.hazard = new THREE.TorusGeometry(0.42, 0.025, 8, 52);
+            geometries.unitBase = new THREE.CylinderGeometry(0.36, 0.42, 0.24, 32);
+            geometries.unitCore = new THREE.IcosahedronGeometry(0.36, 1);
+            geometries.enemy = new THREE.IcosahedronGeometry(0.48, 1);
+            geometries.lancer = new THREE.ConeGeometry(0.42, 0.92, 5);
+            geometries.spark = new THREE.SphereGeometry(0.055, 12, 8);
+        }
+
+        function buildMaterials() {
+            materials.base = new THREE.MeshStandardMaterial({
+                color: 0x151923,
+                roughness: 0.58,
+                metalness: 0.1,
+                emissive: 0x050a12,
+                emissiveIntensity: 0.14
+            });
+            materials.squareA = new THREE.MeshStandardMaterial({
+                color: 0x17253a,
+                roughness: 0.54,
+                metalness: 0.06,
+                emissive: 0x06101a,
+                emissiveIntensity: 0.13
+            });
+            materials.squareB = new THREE.MeshStandardMaterial({
+                color: 0x111a28,
+                roughness: 0.56,
+                metalness: 0.07,
+                emissive: 0x050b13,
+                emissiveIntensity: 0.12
+            });
+            materials.breach = new THREE.MeshStandardMaterial({
+                color: 0x2a1019,
+                roughness: 0.48,
+                metalness: 0.12,
+                emissive: 0x3c0712,
+                emissiveIntensity: 0.38
+            });
+            materials.move = new THREE.MeshBasicMaterial({
+                color: 0x86f0b7,
+                transparent: true,
+                opacity: 0.62,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            materials.skill = new THREE.MeshBasicMaterial({
+                color: 0xffd36a,
+                transparent: true,
+                opacity: 0.7,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            materials.danger = new THREE.MeshBasicMaterial({
+                color: 0xff657f,
+                transparent: true,
+                opacity: 0.64,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            materials.shield = new THREE.MeshBasicMaterial({
+                color: 0x73e8ff,
+                transparent: true,
+                opacity: 0.52,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+        }
+
+        function buildLights() {
+            scene.add(new THREE.AmbientLight(0xf4f7fb, 0.56));
+            const key = new THREE.DirectionalLight(0xffffff, 2.3);
+            key.position.set(-8, 16, 10);
+            scene.add(key);
+            const rim = new THREE.PointLight(0x73e8ff, 3.2, 40);
+            rim.position.set(7, 5.5, -8);
+            scene.add(rim);
+            const warm = new THREE.PointLight(0xff657f, 2.2, 36);
+            warm.position.set(-7, 4, 6);
+            scene.add(warm);
+        }
+
+        function buildRoom() {
+            boardGroup = new THREE.Group();
+            squareGroup = new THREE.Group();
+            unitGroup = new THREE.Group();
+            enemyGroup = new THREE.Group();
+            hazardGroup = new THREE.Group();
+            markerGroup = new THREE.Group();
+            intentGroup = new THREE.Group();
+            effectRoot = new THREE.Group();
+            scene.add(boardGroup, unitGroup, enemyGroup, hazardGroup, markerGroup, intentGroup, effectRoot);
+
+            const base = new THREE.Mesh(geometries.base, materials.base);
+            base.position.y = -0.18;
+            boardGroup.add(base);
+
+            for (let y = 0; y < SIZE; y++) {
+                for (let x = 0; x < SIZE; x++) {
+                    const breach = breachTiles.some((tile) => tile.x === x && tile.y === y);
+                    const square = new THREE.Mesh(geometries.square, breach ? materials.breach : (x + y) % 2 ? materials.squareA : materials.squareB);
+                    square.position.set(toWorld(x), 0, toWorld(y));
+                    square.userData.coord = { x, y };
+                    squareMeshes.push(square);
+                    squareGroup.add(square);
+                }
+            }
+            boardGroup.add(squareGroup);
+
+            const grid = new THREE.GridHelper(22, 22, 0x73e8ff, 0x26364d);
+            grid.position.y = -0.34;
+            grid.material.transparent = true;
+            grid.material.opacity = 0.07;
+            scene.add(grid);
+        }
+
+        function bindEvents() {
+            window.addEventListener('resize', onResize);
+            document.addEventListener('keydown', onKeyDown);
+            renderer.domElement.addEventListener('pointerdown', onPointerDown);
+            renderer.domElement.addEventListener('pointermove', onPointerMove);
+            renderer.domElement.addEventListener('pointerleave', () => {
+                document.body.style.cursor = 'default';
+                state.hoveredAction = null;
+            });
+            ui.newGame.addEventListener('click', resetGame);
+            ui.moveMode.addEventListener('click', () => setActionMode('move'));
+            ui.skillMode.addEventListener('click', () => setActionMode('skill'));
+            ui.specialMode.addEventListener('click', () => setActionMode('special'));
+            ui.undoAction.addEventListener('click', undoAction);
+            ui.resetPlan.addEventListener('click', resetPlanning);
+            ui.hint.addEventListener('click', showHint);
+            ui.focus.addEventListener('click', () => {
+                state.focused = !state.focused;
+                focusCamera();
+                syncScene();
+                updateUi();
+            });
+            ui.debugClose.addEventListener('click', () => setDebugOpen(false));
+            ui.commit.addEventListener('click', commitTurn);
+            document.querySelectorAll('[data-debug]').forEach((button) => {
+                button.addEventListener('click', () => runDebugAction(button.dataset.debug));
+            });
+        }
+
+        function onKeyDown(event) {
+            if (event.code === 'Backquote') {
+                event.preventDefault();
+                setDebugOpen(!state.debugOpen);
+            }
+            if (event.code === 'Escape' && state.debugOpen) {
+                event.preventDefault();
+                setDebugOpen(false);
+            }
+        }
+
+        function resetGame() {
+            clearVisualEffects();
+            state.turn = 1;
+            state.phase = 'planning';
+            state.stability = MAX_STABILITY;
+            state.nextUnitId = 1;
+            state.nextEnemyId = 1;
+            state.units = [
+                createUnit('knight', 1, 6),
+                createUnit('archer', 3, 6),
+                createUnit('engineer', 5, 6)
+            ];
+            state.enemies = [];
+            state.hazards = [];
+            state.queuedActions = [];
+            state.actionStack = [];
+            state.selectedUnit = state.units[0].id;
+            state.actionMode = 'move';
+            state.hoveredAction = null;
+            state.debugOpen = false;
+            state.log = [];
+            state.gameOver = false;
+            state.victory = false;
+            state.status = 'Survive six turns. Enemy intents are visible before you commit.';
+            ui.debugModal.classList.remove('visible');
+            ui.debugModal.setAttribute('aria-hidden', 'true');
+            spawnEnemy('crawler', 2, 0);
+            spawnEnemy('spitter', 5, 0);
+            generateEnemyIntents();
+            addLog('Mission start. Enemy intents are visible.', 'system');
+            state.turnStart = snapshotState();
+            refreshLegalActions();
+            syncScene();
+            updateUi();
+        }
+
+        function createUnit(type, x, y) {
+            const spec = unitSpecs[type];
+            return {
+                id: `u${state.nextUnitId++}`,
+                type,
+                x,
+                y,
+                hp: spec.hp,
+                maxHp: spec.hp,
+                cooldown: 0,
+                acted: false,
+                alive: true
+            };
+        }
+
+        function spawnEnemy(type, x, y) {
+            if (!inside(x, y) || unitAt(x, y) || enemyAt(x, y)) return null;
+            const spec = enemySpecs[type];
+            const enemy = {
+                id: `e${state.nextEnemyId++}`,
+                type,
+                x,
+                y,
+                hp: spec.hp,
+                maxHp: spec.hp,
+                intent: null,
+                alive: true
+            };
+            state.enemies.push(enemy);
+            spawnBurst({ x, y }, spec.color, 12);
+            return enemy;
+        }
+
+        function setActionMode(mode) {
+            state.actionMode = mode;
+            refreshLegalActions();
+            syncScene();
+            updateUi();
+        }
+
+        function refreshLegalActions() {
+            const unit = selectedUnit();
+            state.legalActions = unit && state.phase === 'planning' && !unit.acted && !state.gameOver
+                ? legalActionsForUnit(unit, state.actionMode, state)
+                : [];
+        }
+
+        function legalActionsForUnit(unit, mode, simState) {
+            if (!unit?.alive || unit.acted) return [];
+            if (mode === 'move') return legalMoveActions(unit, simState);
+            if (mode === 'skill') return legalSkillActions(unit, simState);
+            return legalSpecialActions(unit, simState);
+        }
+
+        function legalMoveActions(unit, simState) {
+            const actions = [];
+            const range = unitSpecs[unit.type].move;
+            for (let y = 0; y < SIZE; y++) {
+                for (let x = 0; x < SIZE; x++) {
+                    const distance = manhattan(unit, { x, y });
+                    if (distance < 1 || distance > range) continue;
+                    if (isBlocked(x, y, simState)) continue;
+                    actions.push({
+                        type: 'move',
+                        unitId: unit.id,
+                        target: { x, y },
+                        label: `Move to ${formatCoord(x, y)}`
+                    });
+                }
+            }
+            return actions;
+        }
+
+        function legalSkillActions(unit, simState) {
+            if (unit.type === 'knight') {
+                return CARDINALS
+                    .map((dir) => ({ dir, enemy: enemyAt(unit.x + dir.x, unit.y + dir.y, simState) }))
+                    .filter((item) => item.enemy)
+                    .map((item) => ({
+                        type: 'push',
+                        unitId: unit.id,
+                        target: { x: item.enemy.x, y: item.enemy.y },
+                        dir: { ...item.dir },
+                        label: `Push ${enemySpecs[item.enemy.type].name}`
+                    }));
+            }
+            if (unit.type === 'archer') {
+                const actions = [];
+                for (const dir of CARDINALS) {
+                    let x = unit.x + dir.x;
+                    let y = unit.y + dir.y;
+                    while (inside(x, y)) {
+                        const enemy = enemyAt(x, y, simState);
+                        if (enemy) {
+                            actions.push({
+                                type: 'beam',
+                                unitId: unit.id,
+                                target: { x, y },
+                                dir: { ...dir },
+                                label: `Beam ${enemySpecs[enemy.type].name}`
+                            });
+                            break;
+                        }
+                        x += dir.x;
+                        y += dir.y;
+                    }
+                }
+                return actions;
+            }
+            return tilesInRange(unit.x, unit.y, 2)
+                .filter((tile) => !isBlocked(tile.x, tile.y, simState))
+                .map((tile) => ({
+                    type: 'ward',
+                    unitId: unit.id,
+                    target: tile,
+                    label: `Ward ${formatCoord(tile.x, tile.y)}`
+                }));
+        }
+
+        function legalSpecialActions(unit, simState) {
+            if (unit.cooldown > 0) return [];
+            if (unit.type === 'knight') {
+                const adjacentEnemies = CARDINALS
+                    .map((dir) => enemyAt(unit.x + dir.x, unit.y + dir.y, simState))
+                    .filter(Boolean);
+                return adjacentEnemies.length ? [{
+                    type: 'anchor',
+                    unitId: unit.id,
+                    target: { x: unit.x, y: unit.y },
+                    label: 'Anchor Pulse'
+                }] : [];
+            }
+            if (unit.type === 'archer') {
+                const actions = [];
+                for (const dir of CARDINALS) {
+                    const enemies = enemiesInLine(unit.x, unit.y, dir, simState);
+                    if (enemies.length) {
+                        actions.push({
+                            type: 'prism',
+                            unitId: unit.id,
+                            target: { x: enemies[0].x, y: enemies[0].y },
+                            dir: { ...dir },
+                            label: `Prism ${enemies.length}`
+                        });
+                    }
+                }
+                return actions;
+            }
+            return tilesInRange(unit.x, unit.y, 3)
+                .filter((tile) => unitAt(tile.x, tile.y, simState))
+                .map((tile) => ({
+                    type: 'repair',
+                    unitId: unit.id,
+                    target: tile,
+                    label: `Repair ${formatCoord(tile.x, tile.y)}`
+                }));
+        }
+
+        function onPointerDown(event) {
+            if (event.button !== 0 || state.phase !== 'planning' || state.gameOver) return;
+            const coord = pickBoardCoord(event);
+            if (!coord) return;
+            const unit = unitAt(coord.x, coord.y);
+            if (unit && !unit.acted) {
+                state.selectedUnit = unit.id;
+                refreshLegalActions();
+                syncScene();
+                updateUi();
+                return;
+            }
+            const action = state.legalActions.find((candidate) => sameSquare(candidate.target, coord));
+            if (action) applyPlannedAction(action);
+        }
+
+        function onPointerMove(event) {
+            const coord = pickBoardCoord(event);
+            const action = coord ? state.legalActions.find((candidate) => sameSquare(candidate.target, coord)) : null;
+            state.hoveredAction = action || null;
+            document.body.style.cursor = action || (coord && unitAt(coord.x, coord.y)) ? 'pointer' : 'default';
+            syncMarkers();
+        }
+
+        function applyPlannedAction(action) {
+            if (state.phase !== 'planning' || state.gameOver) return;
+            state.actionStack.push(snapshotState());
+            const result = applyActionToState(state, action, true);
+            state.queuedActions.push({
+                ...action,
+                summary: result.summary
+            });
+            state.status = result.summary;
+            addLog(result.summary, action.type === 'move' ? 'system' : 'good');
+            refreshLegalActions();
+            syncScene();
+            updateUi();
+        }
+
+        function applyActionToState(simState, action, visual = false) {
+            const unit = simState.units.find((candidate) => candidate.id === action.unitId && candidate.alive);
+            if (!unit || unit.acted) return { score: -100, summary: 'Action unavailable.' };
+            let score = 0;
+            let summary = action.label || 'Action queued.';
+
+            if (action.type === 'move') {
+                unit.x = action.target.x;
+                unit.y = action.target.y;
+                unit.acted = true;
+                score += 4;
+                summary = `${unitSpecs[unit.type].short} moved to ${formatCoord(unit.x, unit.y)}.`;
+                if (visual) {
+                    spawnRingEffect(action.target, unitSpecs[unit.type].color, 0.5, 1.05);
+                    spawnBurst(action.target, unitSpecs[unit.type].color, 8);
+                }
+            }
+
+            if (action.type === 'push') {
+                const enemy = enemyAt(action.target.x, action.target.y, simState);
+                if (visual) {
+                    spawnBeamEffect(unit, action.target, unitSpecs[unit.type].color, 0.5, 0.045);
+                    spawnTravelEffect(unit, action.target, unitSpecs[unit.type].color, 0.44, 0.18);
+                    spawnRingEffect(action.target, unitSpecs[unit.type].color, 0.62, 1.55);
+                }
+                if (enemy) score += pushEnemy(enemy, action.dir, simState, visual);
+                unit.acted = true;
+                summary = `${unitSpecs[unit.type].short} pushed ${enemy ? enemySpecs[enemy.type].name : 'empty air'}.`;
+                if (visual) spawnBurst(action.target, unitSpecs[unit.type].color, 12);
+            }
+
+            if (action.type === 'beam') {
+                const hits = enemiesInLine(unit.x, unit.y, action.dir, simState);
+                if (visual) {
+                    spawnLineEffect(unit, action.dir, unitSpecs[unit.type].color, 0.62, 0.04);
+                    spawnTravelEffect(unit, action.target, unitSpecs[unit.type].color, 0.42, 0.16);
+                }
+                hits.slice(0, 2).forEach((enemy, index) => {
+                    score += damageEnemy(enemy, index === 0 ? 2 : 1, simState, visual);
+                });
+                unit.acted = true;
+                summary = `${unitSpecs[unit.type].short} fired a beam through ${hits.length} target${hits.length === 1 ? '' : 's'}.`;
+                if (visual) spawnLineBurst(unit, action.dir, unitSpecs[unit.type].color);
+            }
+
+            if (action.type === 'ward') {
+                addHazard(simState, {
+                    type: 'ward',
+                    x: action.target.x,
+                    y: action.target.y,
+                    duration: 2
+                });
+                unit.acted = true;
+                score += 12;
+                summary = `${unitSpecs[unit.type].short} placed a trap-shield relay.`;
+                if (visual) {
+                    spawnBeamEffect(unit, action.target, unitSpecs[unit.type].color, 0.5, 0.035);
+                    spawnTravelEffect(unit, action.target, unitSpecs[unit.type].color, 0.46, 0.16);
+                    spawnRingEffect(action.target, unitSpecs[unit.type].color, 0.8, 2.1);
+                    spawnBurst(action.target, unitSpecs[unit.type].color, 14);
+                }
+            }
+
+            if (action.type === 'anchor') {
+                if (visual) {
+                    spawnRingEffect(unit, unitSpecs[unit.type].color, 0.95, 3.35);
+                    CARDINALS.forEach((dir) => {
+                        spawnBeamEffect(unit, { x: unit.x + dir.x, y: unit.y + dir.y }, unitSpecs[unit.type].color, 0.5, 0.03);
+                    });
+                }
+                CARDINALS.forEach((dir) => {
+                    const enemy = enemyAt(unit.x + dir.x, unit.y + dir.y, simState);
+                    if (enemy) score += pushEnemy(enemy, dir, simState, visual) + 5;
+                });
+                addHazard(simState, { type: 'shield', x: unit.x, y: unit.y, duration: 1 });
+                unit.cooldown = 3;
+                unit.acted = true;
+                summary = `${unitSpecs[unit.type].short} released an anchor pulse.`;
+                if (visual) spawnBurst(unit, unitSpecs[unit.type].color, 22);
+            }
+
+            if (action.type === 'prism') {
+                const hits = enemiesInLine(unit.x, unit.y, action.dir, simState);
+                if (visual) {
+                    spawnLineEffect(unit, action.dir, unitSpecs[unit.type].color, 0.82, 0.07);
+                    hits.forEach((enemy, index) => {
+                        spawnTravelEffect(unit, enemy, unitSpecs[unit.type].color, 0.44 + index * 0.06, 0.18);
+                        spawnRingEffect(enemy, unitSpecs[unit.type].color, 0.58 + index * 0.04, 1.35);
+                    });
+                    spawnRingEffect(unit, unitSpecs[unit.type].color, 0.76, 2.0);
+                }
+                hits.forEach((enemy) => {
+                    score += damageEnemy(enemy, 2, simState, visual) + 6;
+                });
+                unit.cooldown = 3;
+                unit.acted = true;
+                summary = `${unitSpecs[unit.type].short} refracted a prism shot through ${hits.length} target${hits.length === 1 ? '' : 's'}.`;
+                if (visual) spawnLineBurst(unit, action.dir, unitSpecs[unit.type].color);
+            }
+
+            if (action.type === 'repair') {
+                const target = unitAt(action.target.x, action.target.y, simState);
+                if (target) target.hp = Math.min(target.maxHp, target.hp + 1);
+                simState.stability = Math.min(MAX_STABILITY, simState.stability + 1);
+                addHazard(simState, { type: 'shield', x: action.target.x, y: action.target.y, duration: 2 });
+                unit.cooldown = 3;
+                unit.acted = true;
+                score += 18;
+                summary = `${unitSpecs[unit.type].short} repaired the line and reinforced stability.`;
+                if (visual) {
+                    spawnBeamEffect(unit, action.target, unitSpecs[unit.type].color, 0.62, 0.04);
+                    spawnTravelEffect(unit, action.target, unitSpecs[unit.type].color, 0.52, 0.18);
+                    spawnRingEffect(action.target, unitSpecs[unit.type].color, 0.9, 2.35);
+                    spawnBurst(action.target, unitSpecs[unit.type].color, 18);
+                }
+            }
+
+            removeDeadEnemies(simState);
+            return { score, summary };
+        }
+
+        function commitTurn() {
+            if (state.phase !== 'planning' || state.gameOver) return;
+            state.phase = 'resolving';
+            state.status = 'Enemy intents resolving.';
+            addLog(`Committed ${state.queuedActions.length} planned action${state.queuedActions.length === 1 ? '' : 's'}.`, 'system');
+            resolveEnemyIntents();
+            decrementHazards();
+            state.units.forEach((unit) => {
+                if (!unit.alive) return;
+                unit.acted = false;
+                unit.cooldown = Math.max(0, unit.cooldown - 1);
+            });
+            state.turn += 1;
+            spawnWaveIfNeeded();
+            removeDeadEnemies(state);
+            checkEndState();
+            if (!state.gameOver) {
+                state.phase = 'planning';
+                state.queuedActions = [];
+                state.actionStack = [];
+                state.status = `Turn ${state.turn}. Enemy intents are visible.`;
+                generateEnemyIntents();
+                state.turnStart = snapshotState();
+                const ready = state.units.find((unit) => unit.alive && !unit.acted);
+                state.selectedUnit = ready?.id || null;
+            }
+            refreshLegalActions();
+            syncScene();
+            updateUi();
+        }
+
+        function resolveEnemyIntents() {
+            const enemies = state.enemies.slice();
+            for (const enemy of enemies) {
+                if (!enemy.alive || !enemy.intent) continue;
+                const intent = enemy.intent;
+                const enemyName = enemySpecs[enemy.type].name;
+                if (intent.type === 'move') {
+                    if (!isBlocked(intent.to.x, intent.to.y, state)) {
+                        enemy.x = intent.to.x;
+                        enemy.y = intent.to.y;
+                        triggerWard(enemy, state, true);
+                        addLog(`${enemyName} advanced to ${formatCoord(enemy.x, enemy.y)}.`, 'bad');
+                    } else {
+                        addLog(`${enemyName} could not advance.`, 'system');
+                    }
+                }
+                if (intent.type === 'attack' || intent.type === 'blast' || intent.type === 'charge') {
+                    if (intent.type === 'charge' && !isBlocked(intent.to.x, intent.to.y, state)) {
+                        enemy.x = intent.to.x;
+                        enemy.y = intent.to.y;
+                    }
+                    const targets = state.units.filter((unit) => unit.alive && intent.tiles.some((tile) => sameSquare(tile, unit)));
+                    if (targets.length) {
+                        addLog(`${enemyName} ${intent.type === 'charge' ? 'charged' : intent.type === 'blast' ? 'blasted' : 'struck'} ${targets.map((unit) => unitSpecs[unit.type].short).join(', ')}.`, 'bad');
+                    } else {
+                        addLog(`${enemyName} ${intent.type === 'charge' ? 'charged' : intent.type === 'blast' ? 'blasted' : 'attacked'} empty space.`, 'system');
+                    }
+                    targets.forEach((unit) => damageUnit(unit, enemySpecs[enemy.type].damage));
+                    intent.tiles.forEach((tile) => spawnBurst(tile, enemySpecs[enemy.type].color, 8));
+                }
+            }
+            removeDeadEnemies(state);
+        }
+
+        function triggerWard(enemy, simState = state, visual = false) {
+            const hazard = hazardAt(enemy.x, enemy.y, simState);
+            if (hazard?.type === 'ward') {
+                damageEnemy(enemy, 2, simState, visual);
+                hazard.duration = 0;
+                if (visual) {
+                    addLog(`Ward detonated under ${enemySpecs[enemy.type].name}.`, 'good');
+                    spawnRingEffect(enemy, new THREE.Color(0x86f0b7), 0.7, 2.0);
+                    spawnBurst(enemy, new THREE.Color(0x86f0b7), 18);
+                }
+            }
+        }
+
+        function damageUnit(unit, amount) {
+            const shield = hazardAt(unit.x, unit.y, state);
+            if (shield?.type === 'shield' || shield?.type === 'ward') {
+                shield.duration = Math.max(0, shield.duration - 1);
+                addLog(`${unitSpecs[unit.type].short} absorbed a hit behind a ward.`, 'good');
+                spawnBurst(unit, new THREE.Color(0x73e8ff), 14);
+                return;
+            }
+            unit.hp -= amount;
+            addLog(`${unitSpecs[unit.type].short} took ${amount} damage.`, 'bad');
+            spawnBurst(unit, new THREE.Color(0xff657f), 16);
+            if (unit.hp <= 0) {
+                unit.alive = false;
+                state.stability -= 1;
+                addLog(`${unitSpecs[unit.type].short} went down. Stability dropped.`, 'bad');
+            }
+        }
+
+        function pushEnemy(enemy, dir, simState, visual = false) {
+            const target = { x: enemy.x + dir.x, y: enemy.y + dir.y };
+            if (!inside(target.x, target.y)) {
+                enemy.hp = 0;
+                enemy.alive = false;
+                if (visual) {
+                    addLog(`${enemySpecs[enemy.type].name} was driven out of the corridor.`, 'good');
+                    spawnBurst(enemy, enemySpecs[enemy.type].color, 26);
+                }
+                return 35;
+            }
+            const blocker = enemyAt(target.x, target.y, simState);
+            if (blocker) {
+                damageEnemy(enemy, 1, simState, visual);
+                damageEnemy(blocker, 1, simState, visual);
+                return 20;
+            }
+            if (unitAt(target.x, target.y, simState)) {
+                damageEnemy(enemy, 1, simState, visual);
+                return 8;
+            }
+            enemy.x = target.x;
+            enemy.y = target.y;
+            triggerWard(enemy, simState, visual);
+            return 14;
+        }
+
+        function damageEnemy(enemy, amount, simState, visual = false) {
+            enemy.hp -= amount;
+            if (visual) spawnBurst(enemy, enemySpecs[enemy.type].color, amount > 1 ? 18 : 8);
+            if (enemy.hp <= 0) {
+                enemy.alive = false;
+                if (visual) addLog(`${enemySpecs[enemy.type].name} destroyed.`, 'good');
+                return 30 + enemy.maxHp * 5;
+            }
+            if (visual) addLog(`${enemySpecs[enemy.type].name} took ${amount} damage.`, 'good');
+            return amount * 6;
+        }
+
+        function removeDeadEnemies(simState) {
+            simState.enemies = simState.enemies.filter((enemy) => enemy.alive && enemy.hp > 0);
+        }
+
+        function generateEnemyIntents() {
+            state.enemies.forEach((enemy) => {
+                enemy.intent = intentForEnemy(enemy, state);
+            });
+        }
+
+        function intentForEnemy(enemy, simState = state) {
+            const target = closestUnit(enemy, simState);
+            if (!target) return { type: 'idle', tiles: [] };
+            if (enemy.type === 'spitter') {
+                return { type: 'blast', tiles: [{ x: target.x, y: target.y }], label: `Blast ${formatCoord(target.x, target.y)}` };
+            }
+            if (enemy.type === 'lancer' && (enemy.x === target.x || enemy.y === target.y)) {
+                const dir = stepToward(enemy, target, true);
+                const to = furthestOpen(enemy, dir, 3, simState);
+                const tiles = lineTiles(enemy, dir, 3, simState);
+                return { type: 'charge', to, tiles, label: `Charge ${formatCoord(to.x, to.y)}` };
+            }
+            if (manhattan(enemy, target) <= 1) {
+                return { type: 'attack', tiles: [{ x: target.x, y: target.y }], label: `Attack ${unitSpecs[target.type].short}` };
+            }
+            const dir = stepToward(enemy, target);
+            const to = { x: enemy.x + dir.x, y: enemy.y + dir.y };
+            return { type: 'move', to, tiles: [to], label: `Move ${formatCoord(to.x, to.y)}` };
+        }
+
+        function spawnWaveIfNeeded() {
+            if (state.turn > SURVIVE_TURNS) return;
+            const count = state.turn % 2 === 0 ? 2 : 1;
+            const types = state.turn < 3 ? ['crawler', 'spitter'] : state.turn < 5 ? ['crawler', 'lancer', 'spitter'] : ['crawler', 'lancer', 'spitter', 'bulwark'];
+            for (let i = 0; i < count; i++) {
+                const tile = breachTiles[(state.turn + i) % breachTiles.length];
+                const type = types[(state.turn + i) % types.length];
+                const spawned = spawnEnemy(type, tile.x, tile.y);
+                if (spawned) {
+                    addLog(`${enemySpecs[type].name} entered at ${formatCoord(tile.x, tile.y)}.`, 'bad');
+                } else {
+                    state.stability -= 1;
+                    addLog(`Breach entry at ${formatCoord(tile.x, tile.y)} was blocked. Stability dropped.`, 'bad');
+                    spawnBurst(tile, new THREE.Color(0xff657f), 18);
+                }
+            }
+        }
+
+        function decrementHazards() {
+            state.hazards.forEach((hazard) => {
+                hazard.duration -= 1;
+            });
+            state.hazards = state.hazards.filter((hazard) => hazard.duration > 0);
+        }
+
+        function checkEndState() {
+            if (state.stability <= 0 || !state.units.some((unit) => unit.alive)) {
+                state.gameOver = true;
+                state.victory = false;
+                state.status = 'Breach collapse. The tactical line failed.';
+                addLog('Breach collapse. The tactical line failed.', 'bad');
+                return;
+            }
+            if (state.turn > SURVIVE_TURNS) {
+                state.gameOver = true;
+                state.victory = true;
+                state.status = 'Mission complete. The breach corridor held.';
+                addLog('Mission complete. The breach corridor held.', 'good');
+            }
+        }
+
+        function undoAction() {
+            if (!state.actionStack.length || state.phase !== 'planning') return;
+            restoreSnapshot(state.actionStack.pop());
+            addLog('Undid the last planned action.', 'system');
+            refreshLegalActions();
+            syncScene();
+            updateUi();
+        }
+
+        function resetPlanning() {
+            if (!state.turnStart || state.phase !== 'planning') return;
+            restoreSnapshot(state.turnStart);
+            state.actionStack = [];
+            state.status = `Planning reset for turn ${state.turn}.`;
+            addLog(`Planning reset for turn ${state.turn}.`, 'system');
+            refreshLegalActions();
+            syncScene();
+            updateUi();
+        }
+
+        function showHint() {
+            if (state.phase !== 'planning' || state.gameOver) return;
+            const hint = chooseHint();
+            if (!hint) {
+                state.status = 'No productive action available.';
+                updateUi();
+                return;
+            }
+            state.selectedUnit = hint.action.unitId;
+            state.actionMode = hint.mode;
+            refreshLegalActions();
+            state.status = `Suggested: ${hint.action.label}. Projected swing ${hint.score.toFixed(1)}.`;
+            addLog(`Hint: ${hint.action.label}.`, 'system');
+            syncScene();
+            updateUi();
+        }
+
+        function chooseHint() {
+            let best = null;
+            for (const unit of state.units.filter((candidate) => candidate.alive && !candidate.acted)) {
+                for (const mode of ['skill', 'special', 'move']) {
+                    const actions = legalActionsForUnit(unit, mode, state);
+                    for (const action of actions) {
+                        const clone = snapshotState();
+                        const result = applyActionToState(clone, action, false);
+                        generateIntentsForState(clone);
+                        const score = scoreState(clone) + result.score;
+                        if (!best || score > best.score) {
+                            best = { action, mode, score };
+                        }
+                    }
+                }
+            }
+            return best;
+        }
+
+        function scoreState(simState) {
+            let score = simState.stability * 18;
+            score += simState.units.filter((unit) => unit.alive).reduce((sum, unit) => sum + unit.hp * 8, 0);
+            score -= simState.enemies.reduce((sum, enemy) => sum + enemy.hp * 7 + threatScore(enemy.intent), 0);
+            score += simState.hazards.length * 4;
+            return score;
+        }
+
+        function threatScore(intent) {
+            if (!intent) return 0;
+            if (intent.type === 'attack') return 20;
+            if (intent.type === 'charge') return 24;
+            if (intent.type === 'blast') return 18;
+            return 4;
+        }
+
+        function syncScene() {
+            syncEntities();
+            syncHazards();
+            syncMarkers();
+            syncIntents();
+            updateButtons();
+        }
+
+        function syncEntities() {
+            unitGroup.clear();
+            enemyGroup.clear();
+            state.units.filter((unit) => unit.alive).forEach((unit) => {
+                unitGroup.add(createUnitMesh(unit));
+            });
+            state.enemies.filter((enemy) => enemy.alive).forEach((enemy) => {
+                enemyGroup.add(createEnemyMesh(enemy));
+            });
+        }
+
+        function createUnitMesh(unit) {
+            const spec = unitSpecs[unit.type];
+            const group = new THREE.Group();
+            const material = new THREE.MeshPhysicalMaterial({
+                color: spec.color,
+                roughness: 0.3,
+                metalness: 0.28,
+                clearcoat: 0.66,
+                emissive: spec.color.clone().multiplyScalar(0.2),
+                emissiveIntensity: unit.acted ? 0.08 : 0.28
+            });
+            const base = new THREE.Mesh(geometries.unitBase, material);
+            const core = new THREE.Mesh(geometries.unitCore, material);
+            core.position.y = 0.42;
+            core.scale.setScalar(unit.type === 'knight' ? 1.12 : unit.type === 'archer' ? 0.94 : 1.0);
+            group.add(base, core);
+            if (state.selectedUnit === unit.id) {
+                const ring = new THREE.Mesh(geometries.marker, materials.skill);
+                ring.rotation.x = Math.PI / 2;
+                ring.position.y = 0.08;
+                group.add(ring);
+            }
+            group.position.set(toWorld(unit.x), 0.34, toWorld(unit.y));
+            group.userData.unitId = unit.id;
+            return group;
+        }
+
+        function createEnemyMesh(enemy) {
+            const spec = enemySpecs[enemy.type];
+            const material = new THREE.MeshStandardMaterial({
+                color: spec.color,
+                roughness: 0.42,
+                metalness: 0.18,
+                emissive: spec.color.clone().multiplyScalar(0.22),
+                emissiveIntensity: 0.34,
+                flatShading: true
+            });
+            const mesh = new THREE.Mesh(enemy.type === 'lancer' ? geometries.lancer : geometries.enemy, material);
+            mesh.position.set(toWorld(enemy.x), 0.58, toWorld(enemy.y));
+            mesh.scale.setScalar(0.82 + enemy.hp / enemy.maxHp * 0.24);
+            mesh.userData.enemyId = enemy.id;
+            return mesh;
+        }
+
+        function syncHazards() {
+            hazardGroup.clear();
+            state.hazards.forEach((hazard) => {
+                const material = hazard.type === 'ward' ? materials.shield : materials.skill;
+                const mesh = new THREE.Mesh(geometries.hazard, material);
+                mesh.position.set(toWorld(hazard.x), 0.06, toWorld(hazard.y));
+                mesh.rotation.x = Math.PI / 2;
+                mesh.userData.baseScale = hazard.type === 'ward' ? 1.05 : 0.92;
+                mesh.scale.setScalar(mesh.userData.baseScale);
+                hazardGroup.add(mesh);
+            });
+        }
+
+        function syncMarkers() {
+            markerGroup.clear();
+            state.legalActions.forEach((action) => {
+                const active = state.hoveredAction && sameSquare(state.hoveredAction.target, action.target);
+                const material = action.type === 'move' ? materials.move : action.type === 'ward' || action.type === 'repair' ? materials.shield : materials.skill;
+                const marker = new THREE.Mesh(action.type === 'move' ? geometries.marker : geometries.hazard, material);
+                marker.position.set(toWorld(action.target.x), active ? 0.085 : 0.062, toWorld(action.target.y));
+                marker.rotation.x = Math.PI / 2;
+                marker.userData.baseScale = active ? 1.2 : 1;
+                marker.scale.setScalar(marker.userData.baseScale);
+                marker.userData.phase = Math.random() * Math.PI * 2;
+                markerGroup.add(marker);
+            });
+        }
+
+        function syncIntents() {
+            intentGroup.clear();
+            let threats = 0;
+            state.enemies.forEach((enemy) => {
+                if (!enemy.intent) return;
+                enemy.intent.tiles.forEach((tile) => {
+                    const marker = new THREE.Mesh(geometries.hazard, materials.danger);
+                    marker.position.set(toWorld(tile.x), 0.045, toWorld(tile.y));
+                    marker.rotation.x = Math.PI / 2;
+                    marker.userData.baseScale = enemy.intent.type === 'charge' ? 1.12 : 0.9;
+                    marker.scale.setScalar(marker.userData.baseScale);
+                    intentGroup.add(marker);
+                    threats += 1;
+                });
+                if (enemy.intent.to) {
+                    addIntentLine(enemy, enemy.intent.to, enemySpecs[enemy.type].color);
+                } else if (enemy.intent.tiles[0]) {
+                    addIntentLine(enemy, enemy.intent.tiles[0], enemySpecs[enemy.type].color);
+                }
+            });
+            ui.threatCount.textContent = String(threats);
+        }
+
+        function addIntentLine(from, to, color) {
+            const geometry = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(toWorld(from.x), 0.22, toWorld(from.y)),
+                new THREE.Vector3(toWorld(to.x), 0.22, toWorld(to.y))
+            ]);
+            const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({
+                color,
+                transparent: true,
+                opacity: 0.62
+            }));
+            intentGroup.add(line);
+        }
+
+        function spawnBurst(coord, color, count) {
+            const base = color instanceof THREE.Color ? color : new THREE.Color(color);
+            const burstCount = Math.min(count, 24);
+            for (let i = 0; i < burstCount; i++) {
+                const material = new THREE.MeshBasicMaterial({
+                    color: base.clone().lerp(new THREE.Color(0xffffff), Math.random() * 0.24),
+                    transparent: true,
+                    opacity: 0.48,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                const particle = new THREE.Mesh(geometries.spark, material);
+                const size = 0.68 + Math.random() * 0.58;
+                particle.position.set(
+                    toWorld(coord.x) + (Math.random() - 0.5) * 0.24,
+                    0.52 + Math.random() * 0.24,
+                    toWorld(coord.y) + (Math.random() - 0.5) * 0.24
+                );
+                particle.scale.setScalar(size);
+                particle.userData.velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 1.25,
+                    Math.random() * 1.1 + 0.34,
+                    (Math.random() - 0.5) * 1.25
+                );
+                particle.userData.life = 0.42 + Math.random() * 0.36;
+                particle.userData.maxLife = particle.userData.life;
+                particle.userData.size = size;
+                effectRoot.add(particle);
+                effectParticles.push(particle);
+            }
+            while (effectParticles.length > 220) {
+                const old = effectParticles.shift();
+                effectRoot.remove(old);
+                old.material.dispose();
+            }
+        }
+
+        function spawnLineBurst(unit, dir, color) {
+            let x = unit.x + dir.x;
+            let y = unit.y + dir.y;
+            while (inside(x, y)) {
+                if (Math.random() > 0.35) spawnBurst({ x, y }, color, 2);
+                x += dir.x;
+                y += dir.y;
+            }
+        }
+
+        function spawnLineEffect(origin, dir, color, life = 0.62, radius = 0.04) {
+            spawnBeamEffect(origin, lineEndCoord(origin, dir), color, life, radius);
+        }
+
+        function spawnBeamEffect(from, to, color, life = 0.55, radius = 0.04) {
+            const start = worldPoint(from, 0.72);
+            const end = worldPoint(to, 0.72);
+            const delta = end.clone().sub(start);
+            const length = delta.length();
+            if (length < 0.01) return;
+            const base = color instanceof THREE.Color ? color : new THREE.Color(color);
+            const material = new THREE.MeshBasicMaterial({
+                color: base.clone().lerp(new THREE.Color(0xffffff), 0.18),
+                transparent: true,
+                opacity: 0.58,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, length, 16, 1, true), material);
+            mesh.position.copy(start.clone().add(end).multiplyScalar(0.5));
+            mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize());
+            mesh.userData.disposeGeometry = true;
+            mesh.userData.baseScale = 1;
+            effectRoot.add(mesh);
+            effectAnimations.push({ mesh, material, life, maxLife: life, type: 'beam' });
+        }
+
+        function spawnRingEffect(coord, color, life = 0.7, scale = 1.7) {
+            const base = color instanceof THREE.Color ? color : new THREE.Color(color);
+            const material = new THREE.MeshBasicMaterial({
+                color: base.clone().lerp(new THREE.Color(0xffffff), 0.12),
+                transparent: true,
+                opacity: 0.56,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            const mesh = new THREE.Mesh(geometries.hazard, material);
+            mesh.position.set(toWorld(coord.x), 0.12, toWorld(coord.y));
+            mesh.rotation.x = Math.PI / 2;
+            mesh.scale.setScalar(0.36);
+            effectRoot.add(mesh);
+            effectAnimations.push({ mesh, material, life, maxLife: life, type: 'ring', targetScale: scale });
+        }
+
+        function spawnTravelEffect(from, to, color, life = 0.46, scale = 0.16) {
+            const base = color instanceof THREE.Color ? color : new THREE.Color(color);
+            const material = new THREE.MeshBasicMaterial({
+                color: base.clone().lerp(new THREE.Color(0xffffff), 0.28),
+                transparent: true,
+                opacity: 0.76,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            const mesh = new THREE.Mesh(geometries.spark, material);
+            const start = worldPoint(from, 0.86);
+            const end = worldPoint(to, 0.86);
+            const visibleScale = scale * 12;
+            mesh.position.copy(start);
+            mesh.scale.setScalar(visibleScale);
+            effectRoot.add(mesh);
+            effectAnimations.push({ mesh, material, life, maxLife: life, type: 'travel', start, end, scale: visibleScale });
+        }
+
+        function lineEndCoord(origin, dir) {
+            const end = { x: origin.x, y: origin.y };
+            let x = origin.x + dir.x;
+            let y = origin.y + dir.y;
+            while (inside(x, y)) {
+                end.x = x;
+                end.y = y;
+                x += dir.x;
+                y += dir.y;
+            }
+            return end;
+        }
+
+        function worldPoint(coord, y = 0.72) {
+            return new THREE.Vector3(toWorld(coord.x), y, toWorld(coord.y));
+        }
+
+        function updateEffectAnimations(dt) {
+            for (let i = effectAnimations.length - 1; i >= 0; i--) {
+                const effect = effectAnimations[i];
+                effect.life -= dt;
+                const alpha = Math.max(0, effect.life / effect.maxLife);
+                const progress = 1 - alpha;
+                effect.material.opacity = alpha * 0.64;
+
+                if (effect.type === 'ring') {
+                    const eased = 1 - Math.pow(1 - progress, 2);
+                    effect.mesh.scale.setScalar(0.36 + eased * effect.targetScale);
+                }
+
+                if (effect.type === 'beam') {
+                    const width = 0.42 + alpha * 0.58;
+                    effect.mesh.scale.set(width, 1, width);
+                }
+
+                if (effect.type === 'travel') {
+                    const eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                    effect.mesh.position.lerpVectors(effect.start, effect.end, eased);
+                    effect.mesh.scale.setScalar(effect.scale * (1.05 + Math.sin(progress * Math.PI) * 0.65));
+                }
+
+                if (effect.life <= 0) {
+                    effectRoot.remove(effect.mesh);
+                    if (effect.mesh.userData.disposeGeometry) effect.mesh.geometry.dispose();
+                    effect.material.dispose();
+                    effectAnimations.splice(i, 1);
+                }
+            }
+        }
+
+        function clearVisualEffects() {
+            while (effectParticles.length) {
+                const particle = effectParticles.pop();
+                effectRoot.remove(particle);
+                particle.material.dispose();
+            }
+            while (effectAnimations.length) {
+                const effect = effectAnimations.pop();
+                effectRoot.remove(effect.mesh);
+                if (effect.mesh.userData.disposeGeometry) effect.mesh.geometry.dispose();
+                effect.material.dispose();
+            }
+        }
+
+        function updateParticles(dt) {
+            for (let i = effectParticles.length - 1; i >= 0; i--) {
+                const particle = effectParticles[i];
+                particle.userData.life -= dt;
+                particle.userData.velocity.y -= dt * 2.45;
+                particle.position.addScaledVector(particle.userData.velocity, dt);
+                const alpha = Math.max(0, particle.userData.life / particle.userData.maxLife);
+                particle.material.opacity = alpha * 0.44;
+                particle.scale.setScalar(particle.userData.size * (0.78 + (1 - alpha) * 0.36));
+                if (particle.userData.life <= 0) {
+                    effectRoot.remove(particle);
+                    particle.material.dispose();
+                    effectParticles.splice(i, 1);
+                }
+            }
+        }
+
+        function updateMarkers() {
+            [markerGroup, hazardGroup, intentGroup].forEach((group) => {
+                group.children.forEach((child) => {
+                    if (child.type === 'Mesh') {
+                        const pulse = 1 + Math.sin(state.time * 5 + (child.userData.phase || 0)) * 0.035;
+                        child.scale.setScalar((child.userData.baseScale || 1) * pulse);
+                    }
+                });
+            });
+        }
+
+        function addLog(text, tone = 'system') {
+            state.log.unshift({ turn: state.turn, text, tone });
+            state.log = state.log.slice(0, 18);
+        }
+
+        function renderLog() {
+            ui.actionLog.replaceChildren();
+            state.log.forEach((entry) => {
+                const item = document.createElement('div');
+                item.className = `log-entry ${entry.tone}`;
+                const turn = document.createElement('strong');
+                turn.textContent = `T${entry.turn}`;
+                item.append(turn, ` ${entry.text}`);
+                ui.actionLog.append(item);
+            });
+        }
+
+        function updateUi() {
+            const selected = selectedUnit();
+            const enemies = state.enemies.filter((enemy) => enemy.alive);
+            const traps = state.hazards.filter((hazard) => hazard.type === 'ward').length;
+            const shields = state.hazards.filter((hazard) => hazard.type === 'shield').length;
+            ui.turn.textContent = String(state.turn);
+            ui.phase.textContent = state.gameOver ? (state.victory ? 'Victory' : 'Failed') : state.phase === 'planning' ? 'Planning' : 'Resolving';
+            ui.stability.textContent = String(state.stability);
+            ui.queueCount.textContent = String(state.queuedActions.length);
+            ui.stabilityFill.style.width = `${clamp(state.stability / MAX_STABILITY * 100, 0, 100)}%`;
+            ui.stabilityLabel.textContent = `${state.stability}/${MAX_STABILITY}`;
+            ui.missionTitle.textContent = state.gameOver ? (state.victory ? 'Corridor Held' : 'Breach Collapse') : `Turn ${state.turn} / ${SURVIVE_TURNS}`;
+            ui.missionCopy.textContent = state.status;
+            ui.selectionTitle.textContent = selected ? unitSpecs[selected.type].name : 'No Unit Selected';
+            ui.selectionCopy.textContent = selected ? `${unitSpecs[selected.type].skill} ${unitSpecs[selected.type].special}` : 'Select a specialist to preview movement, action lines, and turn consequences.';
+            ui.unitHp.textContent = selected ? `${selected.hp}/${selected.maxHp}` : '-';
+            ui.unitCooldown.textContent = selected ? String(selected.cooldown) : '-';
+            ui.actionMode.textContent = capitalize(state.actionMode);
+            ui.unitStatus.textContent = selected ? selected.acted ? 'Queued' : 'Ready' : '-';
+            ui.enemyCount.textContent = String(enemies.length);
+            ui.trapCount.textContent = String(traps);
+            ui.shieldCount.textContent = String(shields);
+            ui.intentCopy.textContent = summarizeIntents();
+            ui.debugTurn.textContent = String(state.turn);
+            ui.debugUnits.textContent = String(state.units.filter((unit) => unit.alive).length);
+            ui.debugEnemies.textContent = String(enemies.length);
+            ui.debugQueue.textContent = String(state.queuedActions.length);
+            ui.debugStability.textContent = String(state.stability);
+            ui.debugPhase.textContent = state.phase;
+            renderLog();
+            updateButtons();
+        }
+
+        function updateButtons() {
+            ui.moveMode.classList.toggle('active', state.actionMode === 'move');
+            ui.skillMode.classList.toggle('active', state.actionMode === 'skill');
+            ui.specialMode.classList.toggle('active', state.actionMode === 'special');
+            ui.focus.classList.toggle('active', state.focused);
+            const locked = state.phase !== 'planning' || state.gameOver;
+            ui.moveMode.disabled = locked;
+            ui.skillMode.disabled = locked;
+            ui.specialMode.disabled = locked;
+            ui.undoAction.disabled = locked || !state.actionStack.length;
+            ui.resetPlan.disabled = locked || !state.queuedActions.length;
+            ui.hint.disabled = locked;
+            ui.commit.disabled = locked;
+        }
+
+        function summarizeIntents() {
+            const pieces = state.enemies
+                .filter((enemy) => enemy.alive && enemy.intent)
+                .slice(0, 4)
+                .map((enemy) => `${enemySpecs[enemy.type].name}: ${enemy.intent.label || enemy.intent.type}`);
+            return pieces.length ? pieces.join(' | ') : 'No active enemy intent.';
+        }
+
+        function runDebugAction(action) {
+            if (action === 'stability') state.stability = Math.min(MAX_STABILITY, state.stability + 1);
+            if (action === 'clear') state.enemies = [];
+            if (action === 'resolve') commitTurn();
+            if (['crawler', 'lancer', 'spitter'].includes(action)) {
+                const tile = breachTiles[state.enemies.length % breachTiles.length];
+                spawnEnemy(action, tile.x, tile.y);
+            }
+            addLog(`Debug action: ${action}.`, 'system');
+            generateEnemyIntents();
+            refreshLegalActions();
+            syncScene();
+            updateUi();
+        }
+
+        function setDebugOpen(open) {
+            state.debugOpen = open;
+            ui.debugModal.classList.toggle('visible', open);
+            ui.debugModal.setAttribute('aria-hidden', open ? 'false' : 'true');
+            updateUi();
+        }
+
+        function pickBoardCoord(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            pointer.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
+            raycaster.setFromCamera(pointer, camera);
+            const hits = raycaster.intersectObjects(squareMeshes, false);
+            return hits[0]?.object.userData.coord || null;
+        }
+
+        function selectedUnit() {
+            return state.units.find((unit) => unit.id === state.selectedUnit && unit.alive) || null;
+        }
+
+        function unitAt(x, y, simState = state) {
+            return simState.units.find((unit) => unit.alive && unit.x === x && unit.y === y) || null;
+        }
+
+        function enemyAt(x, y, simState = state) {
+            return simState.enemies.find((enemy) => enemy.alive && enemy.x === x && enemy.y === y) || null;
+        }
+
+        function hazardAt(x, y, simState = state) {
+            return simState.hazards.find((hazard) => hazard.x === x && hazard.y === y) || null;
+        }
+
+        function addHazard(simState, hazard) {
+            simState.hazards = simState.hazards.filter((item) => item.x !== hazard.x || item.y !== hazard.y);
+            simState.hazards.push(hazard);
+        }
+
+        function isBlocked(x, y, simState = state) {
+            return !inside(x, y) || unitAt(x, y, simState) || enemyAt(x, y, simState);
+        }
+
+        function tilesInRange(x, y, range) {
+            const tiles = [];
+            for (let yy = 0; yy < SIZE; yy++) {
+                for (let xx = 0; xx < SIZE; xx++) {
+                    if (manhattan({ x, y }, { x: xx, y: yy }) <= range && (xx !== x || yy !== y)) {
+                        tiles.push({ x: xx, y: yy });
+                    }
+                }
+            }
+            return tiles;
+        }
+
+        function enemiesInLine(x, y, dir, simState = state) {
+            const enemies = [];
+            let cx = x + dir.x;
+            let cy = y + dir.y;
+            while (inside(cx, cy)) {
+                const enemy = enemyAt(cx, cy, simState);
+                if (enemy) enemies.push(enemy);
+                cx += dir.x;
+                cy += dir.y;
+            }
+            return enemies;
+        }
+
+        function closestUnit(enemy, simState = state) {
+            let best = null;
+            let bestDistance = Infinity;
+            simState.units.forEach((unit) => {
+                if (!unit.alive) return;
+                const distance = manhattan(enemy, unit);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    best = unit;
+                }
+            });
+            return best;
+        }
+
+        function stepToward(from, to, preferLine = false) {
+            const dx = Math.sign(to.x - from.x);
+            const dy = Math.sign(to.y - from.y);
+            if (preferLine && from.x === to.x) return { x: 0, y: dy };
+            if (preferLine && from.y === to.y) return { x: dx, y: 0 };
+            return Math.abs(to.x - from.x) > Math.abs(to.y - from.y) ? { x: dx, y: 0 } : { x: 0, y: dy };
+        }
+
+        function furthestOpen(enemy, dir, max, simState = state) {
+            let result = { x: enemy.x, y: enemy.y };
+            for (let i = 0; i < max; i++) {
+                const next = { x: result.x + dir.x, y: result.y + dir.y };
+                if (!inside(next.x, next.y)) break;
+                result = next;
+                if (unitAt(next.x, next.y, simState)) break;
+            }
+            return result;
+        }
+
+        function lineTiles(enemy, dir, max, simState = state) {
+            const tiles = [];
+            let x = enemy.x + dir.x;
+            let y = enemy.y + dir.y;
+            for (let i = 0; i < max && inside(x, y); i++) {
+                tiles.push({ x, y });
+                if (unitAt(x, y, simState)) break;
+                x += dir.x;
+                y += dir.y;
+            }
+            return tiles;
+        }
+
+        function generateIntentsForState(simState) {
+            simState.enemies.forEach((enemy) => {
+                enemy.intent = intentForEnemy(enemy, simState);
+            });
+        }
+
+        function snapshotState() {
+            return {
+                turn: state.turn,
+                phase: state.phase,
+                stability: state.stability,
+                units: state.units.map((unit) => ({ ...unit })),
+                enemies: state.enemies.map((enemy) => ({ ...enemy, intent: enemy.intent ? cloneIntent(enemy.intent) : null })),
+                hazards: state.hazards.map((hazard) => ({ ...hazard })),
+                queuedActions: state.queuedActions.map((action) => cloneAction(action)),
+                actionStack: [],
+                turnStart: null,
+                selectedUnit: state.selectedUnit,
+                actionMode: state.actionMode,
+                legalActions: [],
+                hoveredAction: null,
+                focused: state.focused,
+                debugOpen: state.debugOpen,
+                log: state.log.map((entry) => ({ ...entry })),
+                nextUnitId: state.nextUnitId,
+                nextEnemyId: state.nextEnemyId,
+                status: state.status,
+                time: state.time,
+                gameOver: state.gameOver,
+                victory: state.victory
+            };
+        }
+
+        function restoreSnapshot(snapshot) {
+            state.turn = snapshot.turn;
+            state.phase = snapshot.phase;
+            state.stability = snapshot.stability;
+            state.units = snapshot.units.map((unit) => ({ ...unit }));
+            state.enemies = snapshot.enemies.map((enemy) => ({ ...enemy, intent: enemy.intent ? cloneIntent(enemy.intent) : null }));
+            state.hazards = snapshot.hazards.map((hazard) => ({ ...hazard }));
+            state.queuedActions = snapshot.queuedActions.map((action) => cloneAction(action));
+            state.selectedUnit = snapshot.selectedUnit;
+            state.actionMode = snapshot.actionMode;
+            state.focused = snapshot.focused;
+            state.debugOpen = snapshot.debugOpen;
+            state.log = snapshot.log ? snapshot.log.map((entry) => ({ ...entry })) : [];
+            state.nextUnitId = snapshot.nextUnitId;
+            state.nextEnemyId = snapshot.nextEnemyId;
+            state.status = snapshot.status;
+            state.time = snapshot.time;
+            state.gameOver = snapshot.gameOver;
+            state.victory = snapshot.victory;
+        }
+
+        function cloneAction(action) {
+            return {
+                ...action,
+                target: action.target ? { ...action.target } : null,
+                dir: action.dir ? { ...action.dir } : null
+            };
+        }
+
+        function cloneIntent(intent) {
+            return {
+                ...intent,
+                to: intent.to ? { ...intent.to } : null,
+                tiles: intent.tiles ? intent.tiles.map((tile) => ({ ...tile })) : []
+            };
+        }
+
+        function sameSquare(a, b) {
+            return a?.x === b?.x && a?.y === b?.y;
+        }
+
+        function manhattan(a, b) {
+            return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+        }
+
+        function inside(x, y) {
+            return x >= 0 && x < SIZE && y >= 0 && y < SIZE;
+        }
+
+        function toWorld(index) {
+            return index - (SIZE - 1) / 2;
+        }
+
+        function formatCoord(x, y) {
+            return `${FILES[x]}${SIZE - y}`;
+        }
+
+        function capitalize(value) {
+            return value.charAt(0).toUpperCase() + value.slice(1);
+        }
+
+        function clamp(value, min, max) {
+            return Math.max(min, Math.min(max, value));
+        }
+
+        function focusCamera() {
+            if (state.focused) {
+                camera.position.set(0, 16.8, 0.2);
+            } else {
+                camera.position.set(0, 12.4, 13.8);
+            }
+            controls.target.set(0, 0, 0);
+            controls.update();
+        }
+
+        function animate() {
+            const dt = Math.min(clock.getDelta(), 0.033);
+            state.time += dt;
+            updateParticles(dt);
+            updateEffectAnimations(dt);
+            updateMarkers();
+            controls.update();
+            bloomPass.strength = 0.1 + Math.min(0.05, (effectParticles.length + effectAnimations.length * 6) * 0.0012) + (state.hoveredAction ? 0.02 : 0);
+            composer.render();
+        }
+
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+            bloomPass.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+</body>
+</html>
