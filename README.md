@@ -6,9 +6,9 @@ The strategic direction is to use small, self-contained WebGL experiments to exp
 ## games
 
 - [3D Audio Meter](https://josh-english-2k18.github.io/webgl-games/3d-audio-meter.html) (`3d-audio-meter.html`)
-- [Asteroids](https://josh-english-2k18.github.io/webgl-games/asteroids.html) (`asteroids.html`)
+- [Vesper Belt](https://josh-english-2k18.github.io/webgl-games/asteroids.html) (`asteroids.html`)
 - [Crownfield Chess](https://josh-english-2k18.github.io/webgl-games/chess.html) (`chess.html`)
-- [Go (3D)](https://josh-english-2k18.github.io/webgl-games/go.webgl.html) (`go.webgl.html`)
+- [Sente Garden](https://josh-english-2k18.github.io/webgl-games/go.webgl.html) (`go.webgl.html`)
 - [Matrix Audio Visualizer](https://josh-english-2k18.github.io/webgl-games/matrix-audio-visualizer.html) (`matrix-audio-visualizer.html`)
 - [Auralith Mastering Console](https://josh-english-2k18.github.io/webgl-games/mastering-console-visualizer.html) (`mastering-console-visualizer.html`)
 - [3D Ball Physics Simulation](https://josh-english-2k18.github.io/webgl-games/ball-physics-simulation.html) (`ball-physics-simulation.html`)

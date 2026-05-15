@@ -1,820 +1,1436 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Matrix Go</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sente Garden</title>
     <style>
+        :root {
+            --bg: #05070a;
+            --ink: #f6f0df;
+            --muted: rgba(246, 240, 223, 0.62);
+            --line: rgba(246, 240, 223, 0.16);
+            --panel: rgba(7, 9, 12, 0.74);
+            --cyan: #7de8ff;
+            --jade: #83f0ba;
+            --gold: #ffd36a;
+            --red: #ff6b86;
+            --stone: #f7f1e5;
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
         body {
+            width: 100%;
+            height: 100%;
             margin: 0;
             overflow: hidden;
-            background: #000;
-            font-family: 'Courier New', monospace;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            letter-spacing: 0;
         }
-        canvas {
-            display: block;
+
+        button,
+        select {
+            font: inherit;
         }
-        #ui-overlay {
+
+        #stage {
             position: fixed;
-            top: 20px;
-            right: 20px;
-            color: #00ff00;
-            background: rgba(0, 20, 0, 0.8);
-            padding: 15px;
-            border: 1px solid #00ff00;
+            inset: 0;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 18% 20%, rgba(125, 232, 255, 0.11), transparent 32%),
+                radial-gradient(circle at 82% 76%, rgba(255, 211, 106, 0.11), transparent 30%),
+                linear-gradient(180deg, #111820 0%, #05070a 58%, #020305 100%);
+        }
+
+        #stage canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .grain,
+        .vignette {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .grain {
+            opacity: 0.065;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 54px 54px;
+            mask-image: radial-gradient(circle at 50% 52%, #000 0%, #000 54%, transparent 82%);
+        }
+
+        .vignette {
+            background:
+                linear-gradient(to right, rgba(0, 0, 0, 0.56), transparent 18%, transparent 82%, rgba(0, 0, 0, 0.56)),
+                linear-gradient(to bottom, rgba(0, 0, 0, 0.38), transparent 24%, transparent 72%, rgba(0, 0, 0, 0.68));
+        }
+
+        .hud {
+            position: fixed;
+            top: 18px;
+            left: 18px;
+            z-index: 20;
+            max-width: 440px;
+            pointer-events: none;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 11px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .mark {
+            width: 30px;
+            height: 30px;
+            position: relative;
+            border: 1px solid rgba(125, 232, 255, 0.78);
+            border-radius: 50%;
+            box-shadow: 0 0 24px rgba(125, 232, 255, 0.18), inset 0 0 16px rgba(125, 232, 255, 0.12);
+        }
+
+        .mark::before,
+        .mark::after {
+            content: "";
+            position: absolute;
+            inset: 7px;
+            border: 1px solid rgba(255, 211, 106, 0.74);
+            transform: rotate(45deg);
+        }
+
+        .mark::after {
+            inset: 12px;
+            border-color: rgba(255, 107, 134, 0.78);
+            border-radius: 50%;
+            transform: none;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 38px;
+            line-height: 0.95;
+            text-transform: uppercase;
+            text-shadow: 0 0 28px rgba(125, 232, 255, 0.18);
+        }
+
+        .readout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 820;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+        }
+
+        .readout strong {
+            color: var(--ink);
+        }
+
+        .side-panel {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            z-index: 22;
+            display: grid;
+            gap: 12px;
+            width: 342px;
+            pointer-events: none;
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.38);
+            pointer-events: auto;
+        }
+
+        .panel-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 13px 14px 0;
+        }
+
+        .panel h2 {
+            margin: 0;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        .panel-body {
+            padding: 12px 14px 14px;
+        }
+
+        #status-copy {
+            min-height: 42px;
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .meter {
+            display: grid;
+            grid-template-columns: 70px 1fr 52px;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 850;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+        }
+
+        .track {
+            height: 5px;
+            overflow: hidden;
             border-radius: 5px;
-            z-index: 1000;
+            background: rgba(255, 255, 255, 0.08);
         }
-        #status {
-            font-size: 1.2em;
-            margin-bottom: 10px;
+
+        .fill {
+            display: block;
+            width: 50%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--red), var(--gold), var(--jade));
+            transition: width 160ms ease;
         }
-        #score {
-            font-size: 1em;
+
+        .score-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1px;
+            overflow: hidden;
+            border: 1px solid rgba(246, 240, 223, 0.08);
+            border-radius: 6px;
+            background: rgba(246, 240, 223, 0.08);
         }
-        .matrix-button {
-            background: #001400;
-            color: #00ff00;
-            border: 1px solid #00ff00;
-            padding: 8px 15px;
-            margin: 5px;
+
+        .score-cell {
+            min-width: 0;
+            padding: 10px;
+            background: rgba(5, 7, 10, 0.72);
+        }
+
+        .score-cell span,
+        .score-cell strong {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .score-cell span {
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .score-cell strong {
+            margin-top: 5px;
+            font-size: 15px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .move-list {
+            max-height: 208px;
+            overflow: auto;
+            display: grid;
+            grid-template-columns: 38px 1fr 1fr;
+            gap: 1px;
+            border: 1px solid rgba(246, 240, 223, 0.08);
+            border-radius: 6px;
+            background: rgba(246, 240, 223, 0.08);
+        }
+
+        .move-list span {
+            min-width: 0;
+            padding: 7px 8px;
+            overflow: hidden;
+            background: rgba(5, 7, 10, 0.72);
+            color: var(--muted);
+            font-size: 12px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .move-list .coord {
+            color: var(--ink);
+            font-weight: 760;
+        }
+
+        .controls {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            left: 18px;
+            z-index: 25;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-width: 920px;
+            margin: 0 auto;
+            padding: 11px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.38);
+        }
+
+        .control-btn,
+        .control-select {
+            min-height: 40px;
+            border: 1px solid rgba(246, 240, 223, 0.15);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--ink);
             cursor: pointer;
-            font-family: 'Courier New', monospace;
-            transition: all 0.3s ease;
+            font-size: 12px;
+            font-weight: 840;
+            text-transform: uppercase;
+            transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
         }
-        .matrix-button:hover {
-            background: #003000;
-            box-shadow: 0 0 10px #00ff00;
+
+        .control-btn {
+            min-width: 88px;
+            padding: 0 12px;
+        }
+
+        .control-select {
+            min-width: 98px;
+            padding: 0 10px;
+        }
+
+        .control-btn:hover,
+        .control-select:hover,
+        .control-btn.active {
+            border-color: rgba(125, 232, 255, 0.64);
+            background: rgba(125, 232, 255, 0.12);
+        }
+
+        .control-btn:disabled {
+            border-color: rgba(246, 240, 223, 0.08);
+            background: rgba(255, 255, 255, 0.025);
+            color: rgba(246, 240, 223, 0.32);
+            cursor: not-allowed;
+        }
+
+        #fallback {
+            position: fixed;
+            inset: 18px;
+            z-index: 100;
+            display: none;
+            place-items: center;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: rgba(6, 7, 10, 0.94);
+            text-align: center;
+        }
+
+        #fallback.visible {
+            display: grid;
+        }
+
+        @media (max-width: 940px) {
+            .side-panel {
+                top: auto;
+                right: 12px;
+                bottom: 84px;
+                left: 12px;
+                width: auto;
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .move-list {
+                max-height: 122px;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .hud {
+                top: 12px;
+                left: 12px;
+                max-width: 310px;
+            }
+
+            h1 {
+                font-size: 27px;
+            }
+
+            .side-panel {
+                display: none;
+            }
+
+            .controls {
+                right: 10px;
+                bottom: 10px;
+                left: 10px;
+                padding: 9px;
+            }
+
+            .control-btn,
+            .control-select {
+                flex: 1 1 88px;
+                min-width: 0;
+            }
         }
     </style>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
 </head>
 <body>
-    <div id="ui-overlay">
-        <div id="status">Black's Turn</div>
-        <div id="score">Black: 0 | White: 0</div>
-        <button class="matrix-button" id="pass-button">Pass</button>
-        <button class="matrix-button" id="reset-button">Reset</button>
+    <div id="stage"></div>
+    <div class="grain"></div>
+    <div class="vignette"></div>
+
+    <section class="hud" aria-label="Game status">
+        <div class="brand"><span class="mark"></span><span>Quiet Territory Engine</span></div>
+        <h1>Sente Garden</h1>
+        <div class="readout">
+            <span>Turn <strong id="turn">Black</strong></span>
+            <span>Move <strong id="move-number">1</strong></span>
+            <span>Board <strong id="board-readout">13x13</strong></span>
+            <span>Mode <strong id="mode">Engine</strong></span>
+        </div>
+    </section>
+
+    <aside class="side-panel">
+        <section class="panel" aria-label="Position analysis">
+            <div class="panel-head">
+                <h2 id="status-title">Opening Position</h2>
+            </div>
+            <div class="panel-body">
+                <p id="status-copy">Black to play. Build influence, protect shape, and watch for capture pressure.</p>
+                <div class="meter">
+                    <span>Balance</span>
+                    <span class="track"><span id="balance-fill" class="fill"></span></span>
+                    <strong id="balance-label">0.0</strong>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Score estimate">
+            <div class="panel-head">
+                <h2>Score</h2>
+            </div>
+            <div class="panel-body">
+                <div class="score-grid">
+                    <div class="score-cell"><span>Black cap</span><strong id="black-captures">0</strong></div>
+                    <div class="score-cell"><span>White cap</span><strong id="white-captures">0</strong></div>
+                    <div class="score-cell"><span>Black terr</span><strong id="black-territory">0</strong></div>
+                    <div class="score-cell"><span>White terr</span><strong id="white-territory">6.5</strong></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Move history">
+            <div class="panel-head">
+                <h2>Record</h2>
+            </div>
+            <div class="panel-body">
+                <div id="move-list" class="move-list"></div>
+            </div>
+        </section>
+    </aside>
+
+    <nav class="controls" aria-label="Game controls">
+        <button id="new-game" class="control-btn" type="button">New</button>
+        <button id="pass" class="control-btn" type="button">Pass</button>
+        <button id="undo" class="control-btn" type="button">Undo</button>
+        <button id="engine" class="control-btn active" type="button">Engine On</button>
+        <button id="focus" class="control-btn" type="button">Focus</button>
+        <select id="board-size" class="control-select" aria-label="Board size">
+            <option value="9">9x9</option>
+            <option value="13" selected>13x13</option>
+            <option value="19">19x19</option>
+        </select>
+    </nav>
+
+    <div id="fallback">
+        <p>WebGL initialization failed.</p>
     </div>
 
-    <script>
-        // Constants
-        const BOARD_SIZE = 13;
-        const AI_SIMULATIONS = 3; // Adjust this for AI strength
-        const STONE_RADIUS = 0.4;
-        const CELL_SIZE = 1;
-
-        // Three.js setup
-        const scene = new THREE.Scene();
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.setClearColor(0x000000);
-        document.body.appendChild(renderer.domElement);
-
-        // Matrix background effect
-        class MatrixBackground {
-            constructor() {
-                this.canvas = document.createElement('canvas');
-                this.canvas.width = 1024;
-                this.canvas.height = 1024;
-                this.ctx = this.canvas.getContext('2d');
-                this.characters = "日月火水木金土あいうえお天地人";
-                this.drops = [];
-                this.fontSize = 16;
-                this.columns = this.canvas.width / this.fontSize;
-                
-                for(let i = 0; i < this.columns; i++) {
-                    this.drops[i] = 1;
-                }
-
-                this.texture = new THREE.CanvasTexture(this.canvas);
-                this.material = new THREE.MeshBasicMaterial({
-                    map: this.texture,
-                    transparent: true,
-                    opacity: 0.2
-                });
-
-                const geometry = new THREE.PlaneGeometry(50, 50);
-                this.mesh = new THREE.Mesh(geometry, this.material);
-                this.mesh.position.z = -20;
-                scene.add(this.mesh);
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.174.0/examples/jsm/"
             }
+        }
+    </script>
 
-            update() {
-                this.ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
-                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-                this.ctx.fillStyle = '#0F0';
-                this.ctx.font = this.fontSize + 'px monospace';
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-                for(let i = 0; i < this.drops.length; i++) {
-                    const text = this.characters[Math.floor(Math.random() * this.characters.length)];
-                    this.ctx.fillText(text, i * this.fontSize, this.drops[i] * this.fontSize);
-                    if(this.drops[i] * this.fontSize > this.canvas.height && Math.random() > 0.975) {
-                        this.drops[i] = 0;
-                    }
-                    this.drops[i]++;
-                }
-                this.texture.needsUpdate = true;
+        const KOMI = 6.5;
+        const COLUMNS = 'ABCDEFGHJKLMNOPQRST';
+        const ui = {
+            stage: document.getElementById('stage'),
+            fallback: document.getElementById('fallback'),
+            turn: document.getElementById('turn'),
+            moveNumber: document.getElementById('move-number'),
+            boardReadout: document.getElementById('board-readout'),
+            mode: document.getElementById('mode'),
+            statusTitle: document.getElementById('status-title'),
+            statusCopy: document.getElementById('status-copy'),
+            balanceFill: document.getElementById('balance-fill'),
+            balanceLabel: document.getElementById('balance-label'),
+            blackCaptures: document.getElementById('black-captures'),
+            whiteCaptures: document.getElementById('white-captures'),
+            blackTerritory: document.getElementById('black-territory'),
+            whiteTerritory: document.getElementById('white-territory'),
+            moveList: document.getElementById('move-list'),
+            newGame: document.getElementById('new-game'),
+            pass: document.getElementById('pass'),
+            undo: document.getElementById('undo'),
+            engine: document.getElementById('engine'),
+            focus: document.getElementById('focus'),
+            boardSize: document.getElementById('board-size')
+        };
+
+        const state = {
+            size: 13,
+            board: [],
+            current: 'black',
+            captures: { black: 0, white: 0 },
+            moveHistory: [],
+            snapshots: [],
+            positionHashes: new Set(),
+            lastMove: null,
+            passedLast: false,
+            gameOver: false,
+            engine: true,
+            thinking: false,
+            focused: false,
+            hover: null,
+            status: 'Black to play. Build influence, protect shape, and watch for capture pressure.',
+            time: 0
+        };
+
+        let scene;
+        let camera;
+        let renderer;
+        let controls;
+        let composer;
+        let bloomPass;
+        let boardGroup;
+        let boardSurface;
+        let gridGroup;
+        let stoneGroup;
+        let markerGroup;
+        let influenceMesh;
+        let influenceGeometry;
+        let ghostStone;
+        let lastMoveRing;
+        let sparkRoot;
+        let sparkGeometry;
+        let raycaster;
+        let pointer;
+        let clock;
+        let boardExtent = 13;
+        const stoneMeshes = new Map();
+        const sparkParticles = [];
+        const materials = {};
+        const tempColor = new THREE.Color();
+
+        init();
+
+        function init() {
+            try {
+                scene = new THREE.Scene();
+                scene.fog = new THREE.FogExp2(0x05070a, 0.018);
+
+                camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 900);
+                camera.position.set(0, 15.5, 17.5);
+
+                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.outputColorSpace = THREE.SRGBColorSpace;
+                renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                renderer.toneMappingExposure = 0.82;
+                ui.stage.appendChild(renderer.domElement);
+
+                controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.07;
+                controls.enablePan = false;
+                controls.minDistance = 9;
+                controls.maxDistance = 42;
+                controls.maxPolarAngle = Math.PI * 0.47;
+                controls.target.set(0, 0, 0);
+
+                composer = new EffectComposer(renderer);
+                composer.addPass(new RenderPass(scene, camera));
+                bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.11, 0.32, 0.72);
+                composer.addPass(bloomPass);
+                composer.addPass(new OutputPass());
+
+                raycaster = new THREE.Raycaster();
+                pointer = new THREE.Vector2();
+                clock = new THREE.Clock();
+                buildMaterials();
+                buildLights();
+                buildRoom();
+                createSparkSystem();
+                resetGame(13);
+                bindEvents();
+                renderer.setAnimationLoop(animate);
+                window.__senteGardenReady = true;
+            } catch (error) {
+                console.error(error);
+                ui.fallback.classList.add('visible');
             }
         }
 
-        // Initialize matrix background
-        const matrixBg = new MatrixBackground();
-
-        // Create board geometry
-        function createBoard() {
-            const boardGroup = new THREE.Group();
-            
-            // Create board surface
-            const boardGeometry = new THREE.BoxGeometry(BOARD_SIZE + 1, BOARD_SIZE + 1, 0.2);
-            const boardMaterial = new THREE.MeshPhongMaterial({
-                color: 0x001a00,
-                specular: 0x004400,
-                shininess: 50
+        function buildMaterials() {
+            materials.board = new THREE.MeshStandardMaterial({
+                color: 0xb98447,
+                roughness: 0.54,
+                metalness: 0.06,
+                emissive: 0x1c0f05,
+                emissiveIntensity: 0.08
             });
-            const board = new THREE.Mesh(boardGeometry, boardMaterial);
-            boardGroup.add(board);
+            materials.grid = new THREE.LineBasicMaterial({
+                color: 0x2b1608,
+                transparent: true,
+                opacity: 0.74
+            });
+            materials.star = new THREE.MeshBasicMaterial({
+                color: 0x2b1608,
+                transparent: true,
+                opacity: 0.82
+            });
+            materials.blackStone = new THREE.MeshPhysicalMaterial({
+                color: 0x050608,
+                roughness: 0.34,
+                metalness: 0.1,
+                clearcoat: 0.72,
+                clearcoatRoughness: 0.28,
+                emissive: 0x02090c,
+                emissiveIntensity: 0.16
+            });
+            materials.whiteStone = new THREE.MeshPhysicalMaterial({
+                color: 0xf6efe1,
+                roughness: 0.28,
+                metalness: 0.03,
+                clearcoat: 0.62,
+                clearcoatRoughness: 0.22,
+                emissive: 0x2b2418,
+                emissiveIntensity: 0.08
+            });
+            materials.lastMove = new THREE.MeshBasicMaterial({
+                color: 0xffd36a,
+                transparent: true,
+                opacity: 0.76,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            materials.ghostBlack = new THREE.MeshPhysicalMaterial({
+                color: 0x050608,
+                roughness: 0.28,
+                clearcoat: 0.68,
+                transparent: true,
+                opacity: 0.42,
+                depthWrite: false
+            });
+            materials.ghostWhite = new THREE.MeshPhysicalMaterial({
+                color: 0xf6efe1,
+                roughness: 0.26,
+                clearcoat: 0.58,
+                transparent: true,
+                opacity: 0.42,
+                depthWrite: false
+            });
+        }
 
-            // Create grid lines
-            const lineMaterial = new THREE.LineBasicMaterial({ color: 0x00ff00 });
-            for(let i = 0; i < BOARD_SIZE; i++) {
-                // Vertical lines
-                const verticalGeometry = new THREE.BufferGeometry().setFromPoints([
-                    new THREE.Vector3(i - BOARD_SIZE/2 + 0.5, -BOARD_SIZE/2 + 0.5, 0.11),
-                    new THREE.Vector3(i - BOARD_SIZE/2 + 0.5, BOARD_SIZE/2 - 0.5, 0.11)
-                ]);
-                const verticalLine = new THREE.Line(verticalGeometry, lineMaterial);
-                boardGroup.add(verticalLine);
+        function buildLights() {
+            scene.add(new THREE.HemisphereLight(0xd7f4ff, 0x16100a, 1.45));
+            const key = new THREE.DirectionalLight(0xfff1d0, 2.5);
+            key.position.set(-9, 18, 12);
+            scene.add(key);
+            const rim = new THREE.DirectionalLight(0x7de8ff, 1.15);
+            rim.position.set(12, 10, -10);
+            scene.add(rim);
+            const glow = new THREE.PointLight(0xffd36a, 1.6, 42, 2);
+            glow.position.set(0, 6, 5);
+            scene.add(glow);
+        }
 
-                // Horizontal lines
-                const horizontalGeometry = new THREE.BufferGeometry().setFromPoints([
-                    new THREE.Vector3(-BOARD_SIZE/2 + 0.5, i - BOARD_SIZE/2 + 0.5, 0.11),
-                    new THREE.Vector3(BOARD_SIZE/2 - 0.5, i - BOARD_SIZE/2 + 0.5, 0.11)
-                ]);
-                const horizontalLine = new THREE.Line(horizontalGeometry, lineMaterial);
-                boardGroup.add(horizontalLine);
+        function buildRoom() {
+            const floor = new THREE.Mesh(
+                new THREE.PlaneGeometry(90, 90),
+                new THREE.MeshBasicMaterial({ color: 0x05080a, transparent: true, opacity: 0.92 })
+            );
+            floor.rotation.x = -Math.PI / 2;
+            floor.position.y = -0.35;
+            scene.add(floor);
+
+            const ringGeometry = new THREE.RingGeometry(12, 18, 96);
+            const ring = new THREE.Mesh(
+                ringGeometry,
+                new THREE.MeshBasicMaterial({
+                    color: 0x7de8ff,
+                    transparent: true,
+                    opacity: 0.055,
+                    blending: THREE.AdditiveBlending,
+                    side: THREE.DoubleSide,
+                    depthWrite: false
+                })
+            );
+            ring.rotation.x = -Math.PI / 2;
+            ring.position.y = -0.28;
+            scene.add(ring);
+        }
+
+        function resetGame(size = state.size) {
+            state.size = size;
+            state.board = emptyBoard(size);
+            state.current = 'black';
+            state.captures = { black: 0, white: 0 };
+            state.moveHistory = [];
+            state.snapshots = [];
+            state.positionHashes = new Set([hashBoard(state.board)]);
+            state.lastMove = null;
+            state.passedLast = false;
+            state.gameOver = false;
+            state.thinking = false;
+            state.status = 'Black to play. Build influence, protect shape, and watch for capture pressure.';
+            clearBoardVisuals();
+            createBoard(size);
+            renderAllStones();
+            updateInfluence();
+            updateUi();
+        }
+
+        function clearBoardVisuals() {
+            if (boardGroup) scene.remove(boardGroup);
+            boardGroup = new THREE.Group();
+            gridGroup = new THREE.Group();
+            stoneGroup = new THREE.Group();
+            markerGroup = new THREE.Group();
+            stoneMeshes.clear();
+            scene.add(boardGroup);
+            boardGroup.add(gridGroup, stoneGroup, markerGroup);
+        }
+
+        function createBoard(size) {
+            boardExtent = size - 1;
+            const baseSize = boardExtent + 1.55;
+            boardSurface = new THREE.Mesh(new THREE.BoxGeometry(baseSize, 0.42, baseSize), materials.board);
+            boardSurface.position.y = 0;
+            boardSurface.userData.isBoardSurface = true;
+            boardGroup.add(boardSurface);
+
+            const edge = new THREE.Mesh(
+                new THREE.BoxGeometry(baseSize + 0.28, 0.24, baseSize + 0.28),
+                new THREE.MeshStandardMaterial({
+                    color: 0x3b1f0e,
+                    roughness: 0.48,
+                    metalness: 0.08
+                })
+            );
+            edge.position.y = -0.27;
+            boardGroup.add(edge);
+
+            const half = boardExtent / 2;
+            for (let i = 0; i < size; i++) {
+                const p = i - half;
+                addGridLine(new THREE.Vector3(p, 0.235, -half), new THREE.Vector3(p, 0.235, half));
+                addGridLine(new THREE.Vector3(-half, 0.235, p), new THREE.Vector3(half, 0.235, p));
             }
 
-            return boardGroup;
+            starPoints(size).forEach(([x, y]) => {
+                const point = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.014, 28), materials.star);
+                point.position.set(toWorld(x), 0.252, toWorld(y));
+                gridGroup.add(point);
+            });
+
+            influenceGeometry = new THREE.BufferGeometry();
+            influenceGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(size * size * 3), 3).setUsage(THREE.DynamicDrawUsage));
+            influenceGeometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(size * size * 3), 3).setUsage(THREE.DynamicDrawUsage));
+            influenceMesh = new THREE.Points(
+                influenceGeometry,
+                new THREE.PointsMaterial({
+                    size: 0.16,
+                    transparent: true,
+                    opacity: 0.42,
+                    vertexColors: true,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                })
+            );
+            boardGroup.add(influenceMesh);
+
+            ghostStone = createStoneMesh('black', true);
+            ghostStone.visible = false;
+            boardGroup.add(ghostStone);
+
+            lastMoveRing = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.018, 8, 64), materials.lastMove);
+            lastMoveRing.rotation.x = Math.PI / 2;
+            lastMoveRing.visible = false;
+            markerGroup.add(lastMoveRing);
         }
 
-        // Initialize scene
-        const board = createBoard();
-        scene.add(board);
+        function addGridLine(a, b) {
+            const geometry = new THREE.BufferGeometry().setFromPoints([a, b]);
+            gridGroup.add(new THREE.Line(geometry, materials.grid));
+        }
 
-        // Add lighting
-        const ambientLight = new THREE.AmbientLight(0x404040);
-        scene.add(ambientLight);
+        function starPoints(size) {
+            if (size === 9) return [[2, 2], [6, 2], [4, 4], [2, 6], [6, 6]];
+            if (size === 13) return [[3, 3], [9, 3], [6, 6], [3, 9], [9, 9]];
+            return [[3, 3], [9, 3], [15, 3], [3, 9], [9, 9], [15, 9], [3, 15], [9, 15], [15, 15]];
+        }
 
-        const directionalLight = new THREE.DirectionalLight(0x00ff00, 0.5);
-        directionalLight.position.set(5, 5, 5);
-        scene.add(directionalLight);
+        function createStoneMesh(color, ghost = false) {
+            const material = ghost
+                ? (color === 'black' ? materials.ghostBlack : materials.ghostWhite)
+                : (color === 'black' ? materials.blackStone : materials.whiteStone);
+            const stone = new THREE.Mesh(new THREE.SphereGeometry(0.46, 48, 24), material);
+            stone.scale.y = 0.34;
+            stone.castShadow = false;
+            stone.receiveShadow = false;
+            return stone;
+        }
 
-        camera.position.set(0, -12, 12);
-        //camera.position.set(0, -15, 12);
-        camera.lookAt(0, 0, 0);
-		
-		// Add some additional lighting to make stones more visible
-		const pointLight = new THREE.PointLight(0x00ff00, 0.5);
-		pointLight.position.set(0, 0, 10);
-		//scene.add(pointLight);
+        function addStoneMesh(x, y, color, animate = true) {
+            const stone = createStoneMesh(color);
+            stone.position.set(toWorld(x), 0.51, toWorld(y));
+            stone.userData.birth = state.time;
+            stone.userData.targetScale = new THREE.Vector3(1, 0.34, 1);
+            if (animate) stone.scale.set(0.08, 0.03, 0.08);
+            stoneGroup.add(stone);
+            stoneMeshes.set(keyOf(x, y), stone);
+            return stone;
+        }
 
-        // Animation loop
+        function renderAllStones() {
+            stoneGroup.clear();
+            stoneMeshes.clear();
+            for (let y = 0; y < state.size; y++) {
+                for (let x = 0; x < state.size; x++) {
+                    if (state.board[y][x]) {
+                        addStoneMesh(x, y, state.board[y][x], false);
+                    }
+                }
+            }
+            updateLastMoveRing();
+        }
+
+        function bindEvents() {
+            window.addEventListener('resize', onResize);
+            renderer.domElement.addEventListener('pointermove', onPointerMove);
+            renderer.domElement.addEventListener('pointerleave', () => {
+                state.hover = null;
+                ghostStone.visible = false;
+            });
+            renderer.domElement.addEventListener('click', onClick);
+            ui.newGame.addEventListener('click', () => resetGame(Number(ui.boardSize.value)));
+            ui.pass.addEventListener('click', () => passTurn());
+            ui.undo.addEventListener('click', () => undoMove());
+            ui.engine.addEventListener('click', () => {
+                state.engine = !state.engine;
+                ui.engine.classList.toggle('active', state.engine);
+                ui.engine.textContent = state.engine ? 'Engine On' : 'Engine Off';
+                state.status = state.engine ? 'Engine assistance restored. White will answer automatically.' : 'Engine disabled. Play both colors manually.';
+                updateUi();
+                maybeEngineMove();
+            });
+            ui.focus.addEventListener('click', () => {
+                state.focused = !state.focused;
+                ui.focus.classList.toggle('active', state.focused);
+                focusCamera();
+            });
+            ui.boardSize.addEventListener('change', () => resetGame(Number(ui.boardSize.value)));
+            window.addEventListener('keydown', (event) => {
+                if (event.target instanceof HTMLSelectElement) return;
+                if (event.key.toLowerCase() === 'p') passTurn();
+                if (event.key.toLowerCase() === 'u') undoMove();
+                if (event.key.toLowerCase() === 'f') {
+                    state.focused = !state.focused;
+                    ui.focus.classList.toggle('active', state.focused);
+                    focusCamera();
+                }
+            });
+        }
+
+        function onPointerMove(event) {
+            pointer.x = event.clientX / window.innerWidth * 2 - 1;
+            pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(pointer, camera);
+            const hit = raycaster.intersectObject(boardSurface, false)[0];
+            if (!hit || state.gameOver || state.thinking || (state.engine && state.current === 'white')) {
+                state.hover = null;
+                ghostStone.visible = false;
+                return;
+            }
+
+            const coord = worldToCoord(hit.point);
+            const legal = coord && isLegalMove(state.board, coord.x, coord.y, state.current, state.positionHashes).legal;
+            if (!coord || !legal) {
+                state.hover = null;
+                ghostStone.visible = false;
+                return;
+            }
+
+            state.hover = coord;
+            ghostStone.material = state.current === 'black' ? materials.ghostBlack : materials.ghostWhite;
+            ghostStone.position.set(toWorld(coord.x), 0.53, toWorld(coord.y));
+            ghostStone.visible = true;
+        }
+
+        function onClick(event) {
+            if (state.gameOver || state.thinking || (state.engine && state.current === 'white')) return;
+            pointer.x = event.clientX / window.innerWidth * 2 - 1;
+            pointer.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(pointer, camera);
+            const hit = raycaster.intersectObject(boardSurface, false)[0];
+            if (!hit) return;
+            const coord = worldToCoord(hit.point);
+            if (!coord) return;
+            playMove(coord.x, coord.y, state.current, 'player');
+        }
+
+        function playMove(x, y, color, source) {
+            if (state.gameOver) return false;
+            const result = isLegalMove(state.board, x, y, color, state.positionHashes);
+            if (!result.legal) {
+                state.status = result.reason || 'That move is not legal.';
+                updateUi();
+                return false;
+            }
+
+            pushSnapshot();
+            state.board = result.board;
+            state.positionHashes.add(result.hash);
+            state.captures[color] += result.captured.length;
+            state.lastMove = { x, y, color };
+            state.passedLast = false;
+            state.current = opposite(color);
+            state.moveHistory.push({ color, x, y, pass: false, captures: result.captured.length, source });
+            state.status = buildMoveStatus(color, x, y, result.captured.length, source);
+            addStoneMesh(x, y, color, true);
+            result.captured.forEach((stone) => removeStoneMesh(stone.x, stone.y, color));
+            spawnBurst(toWorld(x), 0.75, toWorld(y), color, 10);
+            updateLastMoveRing();
+            updateInfluence();
+            updateUi();
+            maybeEngineMove();
+            return true;
+        }
+
+        function passTurn(source = 'player') {
+            if (state.gameOver || state.thinking) return;
+            if (state.engine && state.current === 'white' && source === 'player') return;
+            pushSnapshot();
+            const color = state.current;
+            state.moveHistory.push({ color, pass: true, captures: 0, source });
+            if (state.passedLast) {
+                state.gameOver = true;
+                state.status = `${labelColor(winnerColor())} wins by estimated area.`;
+            } else {
+                state.passedLast = true;
+                state.current = opposite(color);
+                state.status = `${labelColor(color)} passed. ${labelColor(state.current)} to move.`;
+            }
+            updateUi();
+            maybeEngineMove();
+        }
+
+        function maybeEngineMove() {
+            if (!state.engine || state.gameOver || state.current !== 'white' || state.thinking) return;
+            state.thinking = true;
+            updateUi();
+            setTimeout(() => {
+                const move = chooseEngineMove('white');
+                state.thinking = false;
+                if (move) playMove(move.x, move.y, 'white', 'engine');
+                else passTurn('engine');
+            }, 360);
+        }
+
+        function chooseEngineMove(color) {
+            const moves = [];
+            for (let y = 0; y < state.size; y++) {
+                for (let x = 0; x < state.size; x++) {
+                    const result = isLegalMove(state.board, x, y, color, state.positionHashes);
+                    if (result.legal) {
+                        moves.push({ x, y, result, score: scoreMove(x, y, color, result) });
+                    }
+                }
+            }
+            if (!moves.length) return null;
+            moves.sort((a, b) => b.score - a.score);
+            const limit = Math.min(5, moves.length);
+            const weighted = moves.slice(0, limit).map((move, index) => ({ move, weight: Math.pow(limit - index, 1.8) }));
+            const total = weighted.reduce((sum, item) => sum + item.weight, 0);
+            let roll = Math.random() * total;
+            for (const item of weighted) {
+                roll -= item.weight;
+                if (roll <= 0) return item.move;
+            }
+            return moves[0];
+        }
+
+        function scoreMove(x, y, color, result) {
+            const center = (state.size - 1) / 2;
+            const distance = Math.hypot(x - center, y - center) / Math.max(1, center);
+            const neighbors = adjacent(x, y).filter((p) => inside(p.x, p.y));
+            const own = neighbors.filter((p) => state.board[p.y][p.x] === color).length;
+            const enemy = neighbors.filter((p) => state.board[p.y][p.x] === opposite(color)).length;
+            const group = getGroup(result.board, x, y);
+            const liberties = groupLiberties(result.board, group).size;
+            const territory = estimateTerritory(result.board);
+            const whiteLead = territory.white + result.captures.white + KOMI - territory.black - result.captures.black;
+            let score = 0;
+            score += result.captured.length * 12;
+            score += own * 1.6 + enemy * 1.1;
+            score += Math.max(0, 1 - distance) * 2.2;
+            score += liberties * 0.18;
+            score += whiteLead * 0.18;
+            score -= liberties <= 1 && result.captured.length === 0 ? 7 : 0;
+            score -= own >= 3 && result.captured.length === 0 ? 2.4 : 0;
+            score += Math.random() * 0.8;
+            return score;
+        }
+
+        function undoMove() {
+            if (!state.snapshots.length) return;
+            const snapshot = state.snapshots.pop();
+            state.size = snapshot.size;
+            state.board = cloneBoard(snapshot.board);
+            state.current = snapshot.current;
+            state.captures = { ...snapshot.captures };
+            state.moveHistory = snapshot.moveHistory.map((move) => ({ ...move }));
+            state.positionHashes = new Set(snapshot.positionHashes);
+            state.lastMove = snapshot.lastMove ? { ...snapshot.lastMove } : null;
+            state.passedLast = snapshot.passedLast;
+            state.gameOver = snapshot.gameOver;
+            state.thinking = false;
+            state.status = 'Move undone. Position restored.';
+            ui.boardSize.value = String(state.size);
+            if (boardExtent !== state.size - 1) {
+                clearBoardVisuals();
+                createBoard(state.size);
+            }
+            renderAllStones();
+            updateInfluence();
+            updateUi();
+        }
+
+        function pushSnapshot() {
+            state.snapshots.push({
+                size: state.size,
+                board: cloneBoard(state.board),
+                current: state.current,
+                captures: { ...state.captures },
+                moveHistory: state.moveHistory.map((move) => ({ ...move })),
+                positionHashes: Array.from(state.positionHashes),
+                lastMove: state.lastMove ? { ...state.lastMove } : null,
+                passedLast: state.passedLast,
+                gameOver: state.gameOver
+            });
+            if (state.snapshots.length > 240) state.snapshots.shift();
+        }
+
+        function isLegalMove(board, x, y, color, hashes = new Set()) {
+            if (!inside(x, y)) return { legal: false, reason: 'Move is outside the board.' };
+            if (board[y][x]) return { legal: false, reason: 'That intersection is occupied.' };
+            const next = cloneBoard(board);
+            next[y][x] = color;
+            const captured = [];
+            adjacent(x, y).forEach((p) => {
+                if (!inside(p.x, p.y) || next[p.y][p.x] !== opposite(color)) return;
+                const group = getGroup(next, p.x, p.y);
+                if (!groupLiberties(next, group).size) captured.push(...group);
+            });
+            captured.forEach((stone) => {
+                next[stone.y][stone.x] = null;
+            });
+            const ownGroup = getGroup(next, x, y);
+            if (!groupLiberties(next, ownGroup).size) {
+                return { legal: false, reason: 'Self-capture is not legal.' };
+            }
+            const hash = hashBoard(next);
+            if (hashes.has(hash)) {
+                return { legal: false, reason: 'Ko prevents repeating this position.' };
+            }
+            const captures = { ...state.captures };
+            captures[color] += captured.length;
+            return { legal: true, board: next, captured, hash, captures };
+        }
+
+        function getGroup(board, x, y, visited = new Set()) {
+            const color = board[y][x];
+            if (!color) return [];
+            const key = keyOf(x, y);
+            if (visited.has(key)) return [];
+            visited.add(key);
+            const stones = [{ x, y }];
+            adjacent(x, y).forEach((p) => {
+                if (inside(p.x, p.y) && board[p.y][p.x] === color) {
+                    stones.push(...getGroup(board, p.x, p.y, visited));
+                }
+            });
+            return stones;
+        }
+
+        function groupLiberties(board, group) {
+            const liberties = new Set();
+            group.forEach(({ x, y }) => {
+                adjacent(x, y).forEach((p) => {
+                    if (inside(p.x, p.y) && !board[p.y][p.x]) liberties.add(keyOf(p.x, p.y));
+                });
+            });
+            return liberties;
+        }
+
+        function estimateTerritory(board = state.board) {
+            const visited = new Set();
+            const territory = { black: 0, white: 0 };
+            for (let y = 0; y < state.size; y++) {
+                for (let x = 0; x < state.size; x++) {
+                    if (board[y][x] || visited.has(keyOf(x, y))) continue;
+                    const region = [];
+                    const borders = new Set();
+                    const queue = [{ x, y }];
+                    while (queue.length) {
+                        const point = queue.shift();
+                        const key = keyOf(point.x, point.y);
+                        if (visited.has(key)) continue;
+                        visited.add(key);
+                        region.push(point);
+                        adjacent(point.x, point.y).forEach((p) => {
+                            if (!inside(p.x, p.y)) return;
+                            const stone = board[p.y][p.x];
+                            if (!stone && !visited.has(keyOf(p.x, p.y))) queue.push(p);
+                            if (stone) borders.add(stone);
+                        });
+                    }
+                    if (borders.size === 1) {
+                        territory[Array.from(borders)[0]] += region.length;
+                    }
+                }
+            }
+            return territory;
+        }
+
+        function updateInfluence() {
+            if (!influenceGeometry) return;
+            const positions = influenceGeometry.attributes.position.array;
+            const colors = influenceGeometry.attributes.color.array;
+            let cursor = 0;
+            for (let y = 0; y < state.size; y++) {
+                for (let x = 0; x < state.size; x++) {
+                    const offset = cursor * 3;
+                    positions[offset] = toWorld(x);
+                    positions[offset + 1] = 0.34;
+                    positions[offset + 2] = toWorld(y);
+                    const influence = influenceAt(x, y);
+                    const occupied = state.board[y][x];
+                    const strength = occupied ? 0 : clamp(Math.abs(influence) / 2.8, 0, 1);
+                    const color = influence >= 0 ? tempColor.set(0x7de8ff) : tempColor.set(0xffd36a);
+                    colors[offset] = color.r * strength;
+                    colors[offset + 1] = color.g * strength;
+                    colors[offset + 2] = color.b * strength;
+                    cursor++;
+                }
+            }
+            influenceGeometry.attributes.position.needsUpdate = true;
+            influenceGeometry.attributes.color.needsUpdate = true;
+        }
+
+        function influenceAt(x, y) {
+            let value = 0;
+            for (let yy = 0; yy < state.size; yy++) {
+                for (let xx = 0; xx < state.size; xx++) {
+                    const stone = state.board[yy][xx];
+                    if (!stone) continue;
+                    const distance = Math.hypot(x - xx, y - yy);
+                    const weight = 1 / (1 + distance * distance * 0.34);
+                    value += stone === 'black' ? weight : -weight;
+                }
+            }
+            return value;
+        }
+
+        function removeStoneMesh(x, y, captor) {
+            const key = keyOf(x, y);
+            const stone = stoneMeshes.get(key);
+            if (!stone) return;
+            stoneMeshes.delete(key);
+            stone.material = stone.material.clone();
+            stone.material.transparent = true;
+            stone.material.depthWrite = false;
+            stone.userData.captured = state.time;
+            stone.userData.velocity = new THREE.Vector3((Math.random() - 0.5) * 0.04, 0.06, (Math.random() - 0.5) * 0.04);
+            spawnBurst(toWorld(x), 0.68, toWorld(y), captor, 18);
+        }
+
+        function updateLastMoveRing() {
+            if (!lastMoveRing) return;
+            if (!state.lastMove) {
+                lastMoveRing.visible = false;
+                return;
+            }
+            lastMoveRing.position.set(toWorld(state.lastMove.x), 0.58, toWorld(state.lastMove.y));
+            lastMoveRing.visible = true;
+        }
+
+        function createSparkSystem() {
+            sparkRoot = new THREE.Group();
+            sparkGeometry = new THREE.SphereGeometry(0.055, 14, 10);
+            scene.add(sparkRoot);
+        }
+
+        function spawnBurst(x, y, z, color, count) {
+            const base = new THREE.Color(color === 'black' ? 0x7de8ff : 0xffd36a);
+            const burstCount = Math.min(count, 12);
+            for (let i = 0; i < burstCount; i++) {
+                const material = new THREE.MeshBasicMaterial({
+                    color: base.clone().lerp(new THREE.Color(0xf7f0df), Math.random() * 0.28),
+                    transparent: true,
+                    opacity: 0.48,
+                    depthWrite: false
+                });
+                const spark = new THREE.Mesh(sparkGeometry, material);
+                const size = 0.74 + Math.random() * 0.62;
+                spark.position.set(
+                    x + (Math.random() - 0.5) * 0.18,
+                    y + Math.random() * 0.18,
+                    z + (Math.random() - 0.5) * 0.18
+                );
+                spark.scale.setScalar(size);
+                spark.userData.velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 1.15,
+                    Math.random() * 1.2 + 0.34,
+                    (Math.random() - 0.5) * 1.15
+                );
+                spark.userData.life = 0.42 + Math.random() * 0.36;
+                spark.userData.maxLife = spark.userData.life;
+                spark.userData.size = size;
+                sparkRoot.add(spark);
+                sparkParticles.push(spark);
+            }
+            while (sparkParticles.length > 180) {
+                const oldSpark = sparkParticles.shift();
+                sparkRoot.remove(oldSpark);
+                oldSpark.material.dispose();
+            }
+        }
+
+        function updateSparks(dt) {
+            for (let i = sparkParticles.length - 1; i >= 0; i--) {
+                const spark = sparkParticles[i];
+                spark.userData.life -= dt;
+                spark.userData.velocity.y -= dt * 2.5;
+                spark.position.addScaledVector(spark.userData.velocity, dt);
+                const alpha = clamp(spark.userData.life / spark.userData.maxLife, 0, 1);
+                spark.material.opacity = alpha * 0.44;
+                spark.scale.setScalar(spark.userData.size * (0.78 + (1 - alpha) * 0.36));
+                if (spark.userData.life <= 0) {
+                    sparkRoot.remove(spark);
+                    spark.material.dispose();
+                    sparkParticles.splice(i, 1);
+                }
+            }
+        }
+
+        function updateStones(dt) {
+            stoneMeshes.forEach((stone) => {
+                if (stone.userData.targetScale) {
+                    stone.scale.lerp(stone.userData.targetScale, 1 - Math.pow(0.002, dt));
+                }
+            });
+            for (let i = stoneGroup.children.length - 1; i >= 0; i--) {
+                const stone = stoneGroup.children[i];
+                if (!stone.userData.captured) continue;
+                stone.position.add(stone.userData.velocity);
+                stone.userData.velocity.y -= dt * 0.11;
+                stone.scale.multiplyScalar(0.965);
+                stone.material.opacity = Math.max(0, (stone.material.opacity ?? 1) - dt * 1.4);
+                if (state.time - stone.userData.captured > 0.7) {
+                    stoneGroup.remove(stone);
+                }
+            }
+            if (lastMoveRing?.visible) {
+                const pulse = 1 + Math.sin(state.time * 5.5) * 0.045;
+                lastMoveRing.scale.setScalar(pulse);
+            }
+        }
+
+        function updateUi() {
+            const estimate = estimateTerritory();
+            const blackScore = state.captures.black + estimate.black;
+            const whiteScore = state.captures.white + estimate.white + KOMI;
+            const balance = blackScore - whiteScore;
+            const balancePct = clamp((balance + 24) / 48 * 100, 0, 100);
+            const moveNumber = Math.floor(state.moveHistory.filter((move) => !move.pass || move.color === 'black').length / 2) + 1;
+
+            ui.turn.textContent = state.thinking ? 'White thinking' : labelColor(state.current);
+            ui.moveNumber.textContent = String(Math.max(1, moveNumber));
+            ui.boardReadout.textContent = `${state.size}x${state.size}`;
+            ui.mode.textContent = state.engine ? 'Engine' : 'Local';
+            ui.statusTitle.textContent = state.gameOver ? 'Game Complete' : state.thinking ? 'Engine Reading' : `${labelColor(state.current)} to Move`;
+            ui.statusCopy.textContent = state.thinking ? 'White is reading the board for capture, shape, and influence.' : state.status;
+            ui.balanceFill.style.width = `${balancePct}%`;
+            ui.balanceLabel.textContent = `${balance >= 0 ? 'B+' : 'W+'}${Math.abs(balance).toFixed(1)}`;
+            ui.blackCaptures.textContent = String(state.captures.black);
+            ui.whiteCaptures.textContent = String(state.captures.white);
+            ui.blackTerritory.textContent = String(estimate.black);
+            ui.whiteTerritory.textContent = (estimate.white + KOMI).toFixed(1);
+            ui.pass.disabled = state.gameOver || state.thinking || (state.engine && state.current === 'white');
+            ui.undo.disabled = !state.snapshots.length || state.thinking;
+            ui.engine.textContent = state.engine ? 'Engine On' : 'Engine Off';
+            ui.engine.classList.toggle('active', state.engine);
+            renderMoveList();
+        }
+
+        function renderMoveList() {
+            const rows = [];
+            const moves = state.moveHistory;
+            for (let i = 0; i < moves.length; i += 2) {
+                const black = moves[i];
+                const white = moves[i + 1];
+                rows.push(`<span>${Math.floor(i / 2) + 1}</span>`);
+                rows.push(`<span class="coord">${black ? formatMove(black) : ''}</span>`);
+                rows.push(`<span class="coord">${white ? formatMove(white) : ''}</span>`);
+            }
+            ui.moveList.innerHTML = rows.join('');
+        }
+
+        function buildMoveStatus(color, x, y, captures, source) {
+            const actor = source === 'engine' ? 'Engine' : labelColor(color);
+            const captureText = captures ? `, capturing ${captures}` : '';
+            return `${actor} played ${formatCoord(x, y)}${captureText}. ${labelColor(opposite(color))} to move.`;
+        }
+
+        function formatMove(move) {
+            if (move.pass) return `${labelColor(move.color)[0]} pass`;
+            return `${formatCoord(move.x, move.y)}${move.captures ? ` x${move.captures}` : ''}`;
+        }
+
+        function winnerColor() {
+            const estimate = estimateTerritory();
+            const blackScore = state.captures.black + estimate.black;
+            const whiteScore = state.captures.white + estimate.white + KOMI;
+            return blackScore > whiteScore ? 'black' : 'white';
+        }
+
+        function focusCamera() {
+            if (state.focused) {
+                camera.position.set(0, 24, 0.2);
+            } else {
+                camera.position.set(0, 15.5, 17.5);
+            }
+            controls.target.set(0, 0, 0);
+            controls.update();
+        }
+
         function animate() {
-            requestAnimationFrame(animate);
-            matrixBg.update();
-            renderer.render(scene, camera);
+            const dt = Math.min(clock.getDelta(), 0.033);
+            state.time += dt;
+            updateSparks(dt);
+            updateStones(dt);
+            controls.update();
+            composer.render();
         }
-        animate();
 
-        // Window resize handler
-        window.addEventListener('resize', () => {
+        function emptyBoard(size) {
+            return Array.from({ length: size }, () => Array.from({ length: size }, () => null));
+        }
+
+        function cloneBoard(board) {
+            return board.map((row) => row.slice());
+        }
+
+        function adjacent(x, y) {
+            return [
+                { x: x + 1, y },
+                { x: x - 1, y },
+                { x, y: y + 1 },
+                { x, y: y - 1 }
+            ];
+        }
+
+        function inside(x, y) {
+            return x >= 0 && x < state.size && y >= 0 && y < state.size;
+        }
+
+        function opposite(color) {
+            return color === 'black' ? 'white' : 'black';
+        }
+
+        function labelColor(color) {
+            return color === 'black' ? 'Black' : 'White';
+        }
+
+        function keyOf(x, y) {
+            return `${x},${y}`;
+        }
+
+        function toWorld(index) {
+            return index - (state.size - 1) / 2;
+        }
+
+        function worldToCoord(point) {
+            const x = Math.round(point.x + (state.size - 1) / 2);
+            const y = Math.round(point.z + (state.size - 1) / 2);
+            if (!inside(x, y)) return null;
+            return { x, y };
+        }
+
+        function formatCoord(x, y) {
+            return `${COLUMNS[x]}${state.size - y}`;
+        }
+
+        function hashBoard(board) {
+            return board.map((row) => row.map((cell) => cell ? cell[0] : '.').join('')).join('/');
+        }
+
+        function clamp(value, min, max) {
+            return Math.max(min, Math.min(max, value));
+        }
+
+        function onResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
             renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-// Add this code after the previous section
-
-// Game state
-const gameState = {
-    board: Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(null)),
-    currentPlayer: 'black',
-    lastMove: null,
-    passed: false,
-    gameOver: false,
-    captures: { black: 0, white: 0 }
-};
-
-// Stone materials
-const stoneMaterials = {
-    black: new THREE.MeshPhongMaterial({
-        color: 0x000000,
-        specular: 0x222222,
-        shininess: 100,
-        emissive: 0x003300,
-        transparent: true,
-        opacity: 0.9
-    }),
-    white: new THREE.MeshPhongMaterial({
-        color: 0xffffff,
-        specular: 0x999999,
-        shininess: 100,
-        emissive: 0x002200,
-        transparent: true,
-        opacity: 0.9
-    })
-};
-
-// Stone geometry (created once and reused)
-const stoneGeometry = new THREE.SphereGeometry(STONE_RADIUS, 32, 32);
-
-// Store stone meshes for easy access
-const stoneMeshes = new Map();
-
-// Raycaster for mouse interaction
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-
-// Helper function to get board coordinates from 3D position
-function getBoardCoordinates(position) {
-    const x = Math.floor(position.x + BOARD_SIZE/2);
-    const y = Math.floor(position.y + BOARD_SIZE/2);
-    return { x, y };
-}
-
-// Check if a move is valid
-function isValidMove(x, y, color) {
-    if (x < 0 || x >= BOARD_SIZE || y < 0 || y >= BOARD_SIZE) return false;
-    if (gameState.board[y][x] !== null) return false;
-
-    // Place stone temporarily
-    gameState.board[y][x] = color;
-    
-    // Check for captures and liberties
-    const hasLiberties = checkLiberties(x, y);
-    const captures = getCapturedStones(color === 'black' ? 'white' : 'black');
-    
-    // Undo temporary placement
-    gameState.board[y][x] = null;
-
-    // Move is valid if it either has liberties or captures opponent stones
-    return hasLiberties || captures.length > 0;
-}
-
-// Check if a group has liberties
-function checkLiberties(x, y, visited = new Set()) {
-    const key = `${x},${y}`;
-    if (visited.has(key)) return false;
-    visited.add(key);
-
-    const color = gameState.board[y][x];
-    if (!color) return true;
-
-    const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    
-    for (const [dx, dy] of directions) {
-        const newX = x + dx;
-        const newY = y + dy;
-        
-        if (newX < 0 || newX >= BOARD_SIZE || newY < 0 || newY >= BOARD_SIZE) continue;
-        
-        if (gameState.board[newY][newX] === null) return true;
-        if (gameState.board[newY][newX] === color && 
-            checkLiberties(newX, newY, visited)) return true;
-    }
-
-    return false;
-}
-
-// Get all stones that would be captured by a move
-function getCapturedStones(targetColor) {
-    const captured = [];
-    const visited = new Set();
-
-    for (let y = 0; y < BOARD_SIZE; y++) {
-        for (let x = 0; x < BOARD_SIZE; x++) {
-            if (gameState.board[y][x] === targetColor && !visited.has(`${x},${y}`)) {
-                const group = getGroup(x, y, targetColor);
-                if (!hasGroupLiberties(group)) {
-                    captured.push(...group);
-                }
-                group.forEach(pos => visited.add(`${pos.x},${pos.y}`));
-            }
+            composer.setSize(window.innerWidth, window.innerHeight);
+            bloomPass.setSize(window.innerWidth, window.innerHeight);
         }
-    }
-
-    return captured;
-}
-
-// Get all stones in a group
-function getGroup(x, y, color, group = []) {
-    const key = `${x},${y}`;
-    if (group.some(pos => pos.x === x && pos.y === y)) return group;
-    
-    group.push({x, y});
-    
-    const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-    for (const [dx, dy] of directions) {
-        const newX = x + dx;
-        const newY = y + dy;
-        
-        if (newX < 0 || newX >= BOARD_SIZE || newY < 0 || newY >= BOARD_SIZE) continue;
-        if (gameState.board[newY][newX] === color) {
-            getGroup(newX, newY, color, group);
-        }
-    }
-    
-    return group;
-}
-
-// Check if a group has any liberties
-function hasGroupLiberties(group) {
-    return group.some(({x, y}) => {
-        const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-        return directions.some(([dx, dy]) => {
-            const newX = x + dx;
-            const newY = y + dy;
-            return newX >= 0 && newX < BOARD_SIZE && 
-                   newY >= 0 && newY < BOARD_SIZE && 
-                   gameState.board[newY][newX] === null;
-        });
-    });
-}
-
-// Place a stone on the board
-function placeStone(x, y, color) {
-    if (!isValidMove(x, y, color)) return false;
-
-    // Create and place the stone mesh
-    const stone = new THREE.Mesh(stoneGeometry, stoneMaterials[color].clone());
-    stone.position.set(
-        x - BOARD_SIZE/2 + 0.5, 
-        y - BOARD_SIZE/2 + 0.5, 
-        0.2 // Adjust this value to make stones sit on the board
-    );
-    
-    // Add placement animation
-    stone.scale.set(0.1, 0.1, 0.1);
-    board.add(stone); // Change this from scene.add to board.add
-    
-    // Animate stone placement
-    new TWEEN.Tween(stone.scale)
-        .to({x: 1, y: 1, z: 1}, 200)
-        .easing(TWEEN.Easing.Bounce.Out)
-        .start();
-
-    // Update game state
-    gameState.board[y][x] = color;
-    stoneMeshes.set(`${x},${y}`, stone);
-
-    // Handle captures
-    const captures = getCapturedStones(color === 'black' ? 'white' : 'black');
-    captures.forEach(({x, y}) => {
-        const stone = stoneMeshes.get(`${x},${y}`);
-        if (stone) {
-            // Animate stone removal
-            new TWEEN.Tween(stone.position)
-                .to({z: 5}, 500)
-                .easing(TWEEN.Easing.Quadratic.In)
-                .onComplete(() => {
-                    board.remove(stone);
-                })
-                .start();
-            
-            stoneMeshes.delete(`${x},${y}`);
-            gameState.board[y][x] = null;
-            gameState.captures[color]++;
-        }
-    });
-
-    updateScoreDisplay();
-    return true;
-}
-
-// Handle mouse interaction
-function onMouseMove(event) {
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-}
-
-function onMouseClick(event) {
-    if (gameState.gameOver || gameState.currentPlayer === 'white') return;
-
-    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-    raycaster.setFromCamera(mouse, camera);
-    const intersects = raycaster.intersectObject(board, true);
-
-    if (intersects.length > 0) {
-        const point = intersects[0].point;
-        const boardPos = getBoardCoordinates(point);
-        
-        if (boardPos.x >= 0 && boardPos.x < BOARD_SIZE && 
-            boardPos.y >= 0 && boardPos.y < BOARD_SIZE) {
-            if (placeStone(boardPos.x, boardPos.y, gameState.currentPlayer)) {
-                gameState.lastMove = boardPos;
-                gameState.passed = false;
-                gameState.currentPlayer = gameState.currentPlayer === 'black' ? 'white' : 'black';
-                updateStatusDisplay();
-                
-                // Trigger AI move
-                if (gameState.currentPlayer === 'white') {
-                    setTimeout(makeAIMove, 500);
-                }
-            }
-        }
-    }
-}
-
-// Update UI displays
-function updateStatusDisplay() {
-    document.getElementById('status').textContent = 
-        `${gameState.currentPlayer.charAt(0).toUpperCase() + gameState.currentPlayer.slice(1)}'s Turn`;
-}
-
-function updateScoreDisplay() {
-    document.getElementById('score').textContent = 
-        `Black: ${gameState.captures.black} | White: ${gameState.captures.white}`;
-}
-
-// Event listeners
-window.addEventListener('mousemove', onMouseMove, false);
-window.addEventListener('click', onMouseClick, false);
-
-// Pass button handler
-document.getElementById('pass-button').addEventListener('click', () => {
-    if (gameState.gameOver) return;
-    
-    if (gameState.passed) {
-        gameState.gameOver = true;
-        const winner = calculateWinner();
-        document.getElementById('status').textContent = 
-            `Game Over - ${winner.charAt(0).toUpperCase() + winner.slice(1)} wins!`;
-    } else {
-        gameState.passed = true;
-        gameState.currentPlayer = gameState.currentPlayer === 'black' ? 'white' : 'black';
-        updateStatusDisplay();
-        
-        if (gameState.currentPlayer === 'white') {
-            setTimeout(makeAIMove, 500);
-        }
-    }
-});
-
-// Reset button handler
-document.getElementById('reset-button').addEventListener('click', () => {
-    // Clear the board
-    stoneMeshes.forEach(stone => scene.remove(stone));
-    stoneMeshes.clear();
-    
-    // Reset game state
-    gameState.board = Array(BOARD_SIZE).fill().map(() => Array(BOARD_SIZE).fill(null));
-    gameState.currentPlayer = 'black';
-    gameState.lastMove = null;
-    gameState.passed = false;
-    gameState.gameOver = false;
-    gameState.captures = { black: 0, white: 0 };
-    
-    updateStatusDisplay();
-    updateScoreDisplay();
-});
-
-// Add TWEEN.js animation update to the animation loop
-function animate() {
-    requestAnimationFrame(animate);
-    TWEEN.update();
-    matrixBg.update();
-    renderer.render(scene, camera);
-}
-
-// Add this code after the previous sections
-
-// AI Implementation using Monte Carlo Tree Search (MCTS)
-class MCTSNode {
-    constructor(state, parent = null, move = null) {
-        this.state = JSON.parse(JSON.stringify(state));
-        this.parent = parent;
-        this.move = move;
-        this.children = [];
-        this.wins = 0;
-        this.visits = 0;
-        this.untriedMoves = this.getValidMoves();
-    }
-
-    getValidMoves() {
-        const moves = [];
-        for (let y = 0; y < BOARD_SIZE; y++) {
-            for (let x = 0; x < BOARD_SIZE; x++) {
-                if (isValidMove(x, y, this.state.currentPlayer)) {
-                    moves.push({x, y});
-                }
-            }
-        }
-        // Add pass move
-        moves.push(null);
-        return moves;
-    }
-
-    UCTSelectChild() {
-        const C = 1.41; // UCT constant
-        return this.children.reduce((selected, child) => {
-            const uctValue = (child.wins / child.visits) + 
-                C * Math.sqrt(Math.log(this.visits) / child.visits);
-            if (uctValue > selected.uctValue) {
-                return { node: child, uctValue };
-            }
-            return selected;
-        }, { node: null, uctValue: -Infinity }).node;
-    }
-
-    addChild(move) {
-        const childState = JSON.parse(JSON.stringify(this.state));
-        if (move) {
-            childState.board[move.y][move.x] = childState.currentPlayer;
-            // Handle captures
-            const captures = getCapturedStones(
-                childState.currentPlayer === 'black' ? 'white' : 'black'
-            );
-            captures.forEach(({x, y}) => {
-                childState.board[y][x] = null;
-                childState.captures[childState.currentPlayer]++;
-            });
-        }
-        childState.currentPlayer = childState.currentPlayer === 'black' ? 'white' : 'black';
-        
-        const child = new MCTSNode(childState, this, move);
-        this.untriedMoves = this.untriedMoves.filter(m => 
-            !m || m.x !== move?.x || m.y !== move?.y
-        );
-        this.children.push(child);
-        return child;
-    }
-
-    update(result) {
-        this.visits++;
-        this.wins += result;
-    }
-}
-
-// MCTS algorithm
-class MCTS {
-    constructor(iterations = 1000) {
-        this.iterations = iterations;
-    }
-
-    getMove(gameState) {
-        const root = new MCTSNode(gameState);
-        
-        for (let i = 0; i < this.iterations; i++) {
-            let node = root;
-            let state = JSON.parse(JSON.stringify(gameState));
-
-            // Selection
-            while (node.untriedMoves.length === 0 && node.children.length > 0) {
-                node = node.UCTSelectChild();
-                if (node.move) {
-                    this.applyMove(state, node.move);
-                }
-            }
-
-            // Expansion
-            if (node.untriedMoves.length > 0) {
-                const move = node.untriedMoves[
-                    Math.floor(Math.random() * node.untriedMoves.length)
-                ];
-                if (move) {
-                    this.applyMove(state, move);
-                }
-                node = node.addChild(move);
-            }
-
-            // Simulation
-            const result = this.rollout(state);
-
-            // Backpropagation
-            while (node !== null) {
-                node.update(result);
-                node = node.parent;
-            }
-        }
-
-        // Select best move
-        return root.children.reduce((best, child) => {
-            if (child.visits > best.visits) {
-                return { move: child.move, visits: child.visits };
-            }
-            return best;
-        }, { move: null, visits: -1 }).move;
-    }
-
-    applyMove(state, move) {
-        if (!move) return; // Pass move
-        state.board[move.y][move.x] = state.currentPlayer;
-        const captures = getCapturedStones(
-            state.currentPlayer === 'black' ? 'white' : 'black'
-        );
-        captures.forEach(({x, y}) => {
-            state.board[y][x] = null;
-            state.captures[state.currentPlayer]++;
-        });
-        state.currentPlayer = state.currentPlayer === 'black' ? 'white' : 'black';
-    }
-
-    rollout(state) {
-        const tempState = JSON.parse(JSON.stringify(state));
-        let moves = 0;
-        const maxMoves = BOARD_SIZE * BOARD_SIZE * 2;
-
-        while (moves < maxMoves) {
-            const validMoves = [];
-            for (let y = 0; y < BOARD_SIZE; y++) {
-                for (let x = 0; x < BOARD_SIZE; x++) {
-                    if (isValidMove(x, y, tempState.currentPlayer)) {
-                        validMoves.push({x, y});
-                    }
-                }
-            }
-
-            if (validMoves.length === 0 || Math.random() < 0.1) {
-                // Pass or no valid moves
-                tempState.currentPlayer = tempState.currentPlayer === 'black' ? 'white' : 'black';
-                moves++;
-                continue;
-            }
-
-            const move = validMoves[Math.floor(Math.random() * validMoves.length)];
-            this.applyMove(tempState, move);
-            moves++;
-        }
-
-        // Evaluate final position
-        return this.evaluatePosition(tempState);
-    }
-
-    evaluatePosition(state) {
-        const blackScore = state.captures.black + this.countTerritory(state, 'black');
-        const whiteScore = state.captures.white + this.countTerritory(state, 'white');
-        return state.currentPlayer === 'black' ? 
-            blackScore > whiteScore ? 1 : 0 :
-            whiteScore > blackScore ? 1 : 0;
-    }
-
-    countTerritory(state, color) {
-        let territory = 0;
-        const visited = new Set();
-
-        for (let y = 0; y < BOARD_SIZE; y++) {
-            for (let x = 0; x < BOARD_SIZE; x++) {
-                if (!state.board[y][x] && !visited.has(`${x},${y}`)) {
-                    const region = this.floodFill(state, x, y, visited);
-                    if (this.isSurroundedBy(state, region, color)) {
-                        territory += region.size;
-                    }
-                }
-            }
-        }
-
-        return territory;
-    }
-
-    floodFill(state, x, y, visited) {
-        const region = new Set();
-        const queue = [{x, y}];
-        
-        while (queue.length > 0) {
-            const {x: cx, y: cy} = queue.shift();
-            const key = `${cx},${cy}`;
-            
-            if (visited.has(key)) continue;
-            visited.add(key);
-            region.add(key);
-
-            const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-            for (const [dx, dy] of directions) {
-                const nx = cx + dx;
-                const ny = cy + dy;
-                if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE &&
-                    !state.board[ny][nx] && !visited.has(`${nx},${ny}`)) {
-                    queue.push({x: nx, y: ny});
-                }
-            }
-        }
-
-        return region;
-    }
-
-    isSurroundedBy(state, region, color) {
-        const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-        
-        for (const pos of region) {
-            const [x, y] = pos.split(',').map(Number);
-            
-            for (const [dx, dy] of directions) {
-                const nx = x + dx;
-                const ny = y + dy;
-                if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE) {
-                    const stone = state.board[ny][nx];
-                    if (stone && (
-                        (color === 'black' && stone === '白') ||
-                        (color === 'white' && stone === '黒')
-                    )) {
-                        return false;
-                    }
-                }
-            }
-        }
-        
-        return true;
-    }
-}
-
-// Initialize AI
-const ai = new MCTS(AI_SIMULATIONS);
-
-// AI move function
-function makeAIMove() {
-    if (gameState.gameOver) return;
-
-    const move = ai.getMove(gameState);
-    
-    if (move) {
-        placeStone(move.x, move.y, 'white');
-        gameState.lastMove = move;
-        gameState.passed = false;
-    } else {
-        // AI decides to pass
-        gameState.passed = true;
-        if (gameState.passed) {
-            gameState.gameOver = true;
-            const winner = calculateWinner();
-            document.getElementById('status').textContent = 
-                `Game Over - ${winner.charAt(0).toUpperCase() + winner.slice(1)} wins!`;
-            return;
-        }
-    }
-    
-    gameState.currentPlayer = 'black';
-    updateStatusDisplay();
-}
-
-// Helper function to calculate winner
-function calculateWinner() {
-    const blackScore = gameState.captures.black + countTerritory('black');
-    const whiteScore = gameState.captures.white + countTerritory('white');
-    return blackScore > whiteScore ? 'black' : 'white';
-}
-
-// Helper function to count territory (simplified version)
-function countTerritory(color) {
-    let territory = 0;
-    const visited = new Set();
-
-    for (let y = 0; y < BOARD_SIZE; y++) {
-        for (let x = 0; x < BOARD_SIZE; x++) {
-            if (!gameState.board[y][x] && !visited.has(`${x},${y}`)) {
-                const region = new Set();
-                const queue = [{x, y}];
-                let isSurrounded = true;
-
-                while (queue.length > 0) {
-                    const {x: cx, y: cy} = queue.shift();
-                    const key = `${cx},${cy}`;
-                    
-                    if (visited.has(key)) continue;
-                    visited.add(key);
-                    region.add(key);
-
-                    const directions = [[1, 0], [-1, 0], [0, 1], [0, -1]];
-                    for (const [dx, dy] of directions) {
-                        const nx = cx + dx;
-                        const ny = cy + dy;
-                        if (nx >= 0 && nx < BOARD_SIZE && ny >= 0 && ny < BOARD_SIZE) {
-                            if (!gameState.board[ny][nx] && !visited.has(`${nx},${ny}`)) {
-                                queue.push({x: nx, y: ny});
-                            } else if (gameState.board[ny][nx]) {
-                                if ((color === 'black' && gameState.board[ny][nx] === 'white') ||
-                                    (color === 'white' && gameState.board[ny][nx] === 'black')) {
-                                    isSurrounded = false;
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if (isSurrounded) {
-                    territory += region.size;
-                }
-            }
-        }
-    }
-
-    return territory;
-}
-
     </script>
 </body>
 </html>

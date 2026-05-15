@@ -1,702 +1,1883 @@
-<!DOCTYPE html>
-<!--
-
-AI prompts used to write this solution:
-
-System:
-You are the best software engineer in the world.
-
-User:
-Construct a beautifully rendered 2D game of Asteroids.
-
-Render it in WebGL using ThreeJS.
-
-Allow the player's spaceship to have 3 powerups:
-1. guns
-2. missiles
-3. shields
-
-Have 3 sizes of asteroids, large, medium and small.
-
-Large asteroids break into several medium ones when destroyed.
-
-Medium ones break into several small ones when destroyed.
-
-Have an animated star map in the background.
-
-Control the ship with W, A, S and D.
-
-When the player has picked up both guns and missiles, guns will auto-fire at close asteroid targets.
-
-Space bar fires current weapon.
-
-Missiles have some rudimentary tracking capability after launched, where they will thrust vector towards the closest target to their current position and vector of motion.
-
-Start with 3 player lives.
-
-Add indicators for elapsed time, number of asteroids destroyed, and remaining lives.
-
-Add indicators for weapons and shield status.
-
-Make this look as professional as possible, with a retro-modern look.
-
-Construct the result as an HTML web page, using JavaScript and Three.js.
-
-The solution should be written in a single file.
-
--->
-<html>
+<!doctype html>
+<html lang="en">
 <head>
-    <title>Modern Asteroids</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Vesper Belt</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: black; }
-        #hud {
+        :root {
+            --bg: #030509;
+            --ink: #f5f7ff;
+            --muted: rgba(245, 247, 255, 0.62);
+            --line: rgba(245, 247, 255, 0.15);
+            --panel: rgba(8, 12, 18, 0.74);
+            --cyan: #74e8ff;
+            --green: #80ffbd;
+            --gold: #ffd36a;
+            --red: #ff6485;
+            --violet: #bca6ff;
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            letter-spacing: 0;
+        }
+
+        button {
+            font: inherit;
+        }
+
+        #stage {
             position: fixed;
-            top: 20px;
-            left: 20px;
-            color: #0ff;
-            font-family: 'Courier New', monospace;
-            font-size: 16px;
-            text-shadow: 0 0 5px #0ff;
+            inset: 0;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 18% 18%, rgba(116, 232, 255, 0.12), transparent 30%),
+                radial-gradient(circle at 82% 74%, rgba(255, 211, 106, 0.11), transparent 32%),
+                linear-gradient(180deg, #101620 0%, #030509 66%, #020305 100%);
         }
-        .powerup {
-            display: inline-block;
-            margin-right: 20px;
-            padding: 5px 10px;
-            border: 1px solid #0ff;
+
+        #stage canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .grain,
+        .vignette {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .grain {
+            opacity: 0.065;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 58px 58px;
+            mask-image: radial-gradient(circle at 50% 52%, #000 0%, #000 58%, transparent 84%);
+        }
+
+        .vignette {
+            background:
+                linear-gradient(to right, rgba(0, 0, 0, 0.54), transparent 18%, transparent 82%, rgba(0, 0, 0, 0.54)),
+                linear-gradient(to bottom, rgba(0, 0, 0, 0.34), transparent 24%, transparent 72%, rgba(0, 0, 0, 0.72));
+        }
+
+        .hud {
+            position: fixed;
+            top: 18px;
+            left: 18px;
+            z-index: 20;
+            max-width: 470px;
+            pointer-events: none;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 11px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .mark {
+            position: relative;
+            width: 31px;
+            height: 31px;
+            border: 1px solid rgba(116, 232, 255, 0.84);
+            border-radius: 50%;
+            box-shadow: 0 0 22px rgba(116, 232, 255, 0.18), inset 0 0 18px rgba(116, 232, 255, 0.11);
+        }
+
+        .mark::before,
+        .mark::after {
+            content: "";
+            position: absolute;
+            inset: 7px;
+            border: 1px solid rgba(255, 211, 106, 0.72);
+            transform: rotate(45deg);
+        }
+
+        .mark::after {
+            inset: 12px;
+            border-color: rgba(255, 100, 133, 0.72);
+            border-radius: 50%;
+            transform: none;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 39px;
+            line-height: 0.95;
+            text-transform: uppercase;
+            text-shadow: 0 0 28px rgba(116, 232, 255, 0.2);
+        }
+
+        .readout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 820;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+        }
+
+        .readout strong {
+            color: var(--ink);
+        }
+
+        .side-panel {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            z-index: 22;
+            display: grid;
+            gap: 12px;
+            width: 350px;
+            pointer-events: none;
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.38);
+            pointer-events: auto;
+        }
+
+        .panel-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 13px 14px 0;
+        }
+
+        .panel h2 {
+            margin: 0;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        .panel-body {
+            padding: 12px 14px 14px;
+        }
+
+        #mission-copy {
+            min-height: 42px;
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .meter {
+            display: grid;
+            grid-template-columns: 72px 1fr 48px;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 850;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+        }
+
+        .track {
+            height: 5px;
+            overflow: hidden;
             border-radius: 5px;
-            opacity: 0.5;
+            background: rgba(255, 255, 255, 0.08);
         }
-        .active { opacity: 1; background-color: rgba(0, 255, 255, 0.2); }
+
+        .fill {
+            display: block;
+            width: 50%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--red), var(--gold), var(--green), var(--cyan));
+            transition: width 130ms ease;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1px;
+            overflow: hidden;
+            border: 1px solid rgba(245, 247, 255, 0.08);
+            border-radius: 6px;
+            background: rgba(245, 247, 255, 0.08);
+        }
+
+        .stat-cell {
+            min-width: 0;
+            padding: 10px;
+            background: rgba(5, 8, 13, 0.72);
+        }
+
+        .stat-cell span,
+        .stat-cell strong {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .stat-cell span {
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .stat-cell strong {
+            margin-top: 5px;
+            font-size: 15px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .arsenal {
+            display: grid;
+            gap: 8px;
+        }
+
+        .chip {
+            display: grid;
+            grid-template-columns: 76px 1fr 42px;
+            align-items: center;
+            gap: 8px;
+            min-height: 32px;
+            padding: 7px 9px;
+            border: 1px solid rgba(245, 247, 255, 0.1);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.04);
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .chip strong {
+            color: var(--ink);
+            text-align: right;
+        }
+
+        .chip.active {
+            border-color: rgba(116, 232, 255, 0.52);
+            background: rgba(116, 232, 255, 0.1);
+            color: var(--ink);
+        }
+
+        .controls {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            left: 18px;
+            z-index: 25;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 11px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.38);
+        }
+
+        .control-btn {
+            min-width: 92px;
+            min-height: 40px;
+            padding: 0 12px;
+            border: 1px solid rgba(245, 247, 255, 0.15);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--ink);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 840;
+            text-transform: uppercase;
+            transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+        }
+
+        .control-btn:hover,
+        .control-btn.active {
+            border-color: rgba(116, 232, 255, 0.64);
+            background: rgba(116, 232, 255, 0.12);
+        }
+
+        .control-btn:disabled {
+            border-color: rgba(245, 247, 255, 0.08);
+            background: rgba(255, 255, 255, 0.025);
+            color: rgba(245, 247, 255, 0.32);
+            cursor: not-allowed;
+        }
+
+        .pause-banner {
+            position: fixed;
+            left: 50%;
+            top: 50%;
+            z-index: 30;
+            display: none;
+            min-width: min(420px, calc(100vw - 40px));
+            padding: 18px 20px;
+            border: 1px solid rgba(116, 232, 255, 0.34);
+            border-radius: var(--radius);
+            background: rgba(5, 8, 13, 0.82);
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+            text-align: center;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        .pause-banner.visible {
+            display: grid;
+            gap: 5px;
+        }
+
+        .pause-banner strong {
+            font-size: 16px;
+            text-transform: uppercase;
+        }
+
+        .pause-banner span {
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .debug-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 40;
+            display: none;
+            place-items: center;
+            padding: 18px;
+            background: rgba(0, 0, 0, 0.42);
+            backdrop-filter: blur(8px);
+        }
+
+        .debug-modal.visible {
+            display: grid;
+        }
+
+        .debug-panel {
+            width: min(620px, 100%);
+            border: 1px solid rgba(116, 232, 255, 0.32);
+            border-radius: var(--radius);
+            background: rgba(7, 10, 15, 0.92);
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.56);
+        }
+
+        .debug-head,
+        .debug-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 14px;
+        }
+
+        .debug-actions {
+            border-top: 1px solid rgba(245, 247, 255, 0.08);
+            justify-content: flex-start;
+        }
+
+        .debug-head h2 {
+            margin: 0;
+            font-size: 15px;
+            text-transform: uppercase;
+        }
+
+        .debug-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1px;
+            padding: 0 14px 14px;
+        }
+
+        .debug-stat {
+            min-width: 0;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.045);
+        }
+
+        .debug-stat span,
+        .debug-stat strong {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .debug-stat span {
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .debug-stat strong {
+            margin-top: 5px;
+            font-size: 14px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .debug-btn {
+            min-height: 36px;
+            padding: 0 11px;
+            border: 1px solid rgba(245, 247, 255, 0.15);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.055);
+            color: var(--ink);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 820;
+            text-transform: uppercase;
+        }
+
+        .debug-btn:hover {
+            border-color: rgba(116, 232, 255, 0.62);
+            background: rgba(116, 232, 255, 0.11);
+        }
+
+        #fallback {
+            position: fixed;
+            inset: 18px;
+            z-index: 100;
+            display: none;
+            place-items: center;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: rgba(6, 7, 10, 0.94);
+            text-align: center;
+        }
+
+        #fallback.visible {
+            display: grid;
+        }
+
+        @media (max-width: 940px) {
+            .side-panel {
+                top: auto;
+                right: 12px;
+                bottom: 86px;
+                left: 12px;
+                width: auto;
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .side-panel .panel:first-child {
+                grid-column: 1 / -1;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .hud {
+                top: 12px;
+                left: 12px;
+                max-width: 310px;
+            }
+
+            h1 {
+                font-size: 28px;
+            }
+
+            .side-panel {
+                display: none;
+            }
+
+            .controls {
+                right: 10px;
+                bottom: 10px;
+                left: 10px;
+                padding: 9px;
+            }
+
+            .control-btn {
+                flex: 1 1 92px;
+                min-width: 0;
+            }
+
+            .debug-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
     </style>
 </head>
 <body>
-    <div id="hud">
-        <div>TIME: <span id="time">0</span></div>
-        <div>SCORE: <span id="score">0</span></div>
-        <div>LIVES: <span id="lives">3</span></div>
-        <div id="powerups">
-            <span class="powerup" id="guns">GUNS</span>
-            <span class="powerup" id="missiles">MISSILES</span>
-            <span class="powerup" id="shields">SHIELDS</span>
+    <div id="stage"></div>
+    <div class="grain"></div>
+    <div class="vignette"></div>
+
+    <section class="hud" aria-label="Run status">
+        <div class="brand"><span class="mark"></span><span>Deep Belt Intercept</span></div>
+        <h1>Vesper Belt</h1>
+        <div class="readout">
+            <span>Score <strong id="score">0</strong></span>
+            <span>Wave <strong id="wave">1</strong></span>
+            <span>Lives <strong id="lives">3</strong></span>
+            <span>Velocity <strong id="velocity">0</strong></span>
         </div>
+    </section>
+
+    <aside class="side-panel">
+        <section class="panel" aria-label="Mission state">
+            <div class="panel-head">
+                <h2 id="mission-title">Belt Entry</h2>
+            </div>
+            <div class="panel-body">
+                <p id="mission-copy">The field is cold, fractured, and moving. Clear the corridor before the larger rocks split the lane apart.</p>
+                <div class="meter">
+                    <span>Shield</span>
+                    <span class="track"><span id="shield-fill" class="fill"></span></span>
+                    <strong id="shield">100</strong>
+                </div>
+                <div class="meter">
+                    <span>Heat</span>
+                    <span class="track"><span id="heat-fill" class="fill"></span></span>
+                    <strong id="heat">0</strong>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Field state">
+            <div class="panel-head">
+                <h2>Field</h2>
+            </div>
+            <div class="panel-body">
+                <div class="stat-grid">
+                    <div class="stat-cell"><span>Asteroids</span><strong id="asteroid-count">0</strong></div>
+                    <div class="stat-cell"><span>Destroyed</span><strong id="kills">0</strong></div>
+                    <div class="stat-cell"><span>Elapsed</span><strong id="elapsed">0:00</strong></div>
+                    <div class="stat-cell"><span>State</span><strong id="state-label">Running</strong></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Arsenal">
+            <div class="panel-head">
+                <h2>Arsenal</h2>
+            </div>
+            <div class="panel-body">
+                <div class="arsenal">
+                    <div id="guns-chip" class="chip active"><span>Guns</span><span id="guns-label">single vector</span><strong id="guns">1</strong></div>
+                    <div id="missile-chip" class="chip active"><span>Missiles</span><span id="missile-label">tracking</span><strong id="missiles">4</strong></div>
+                    <div id="drive-chip" class="chip"><span>Drive</span><span id="drive-label">standard</span><strong id="drive">0.0</strong></div>
+                </div>
+            </div>
+        </section>
+    </aside>
+
+    <nav class="controls" aria-label="Game controls">
+        <button id="new-run" class="control-btn" type="button">New Run</button>
+        <button id="fire" class="control-btn" type="button">Fire</button>
+        <button id="missile" class="control-btn" type="button">Missile</button>
+        <button id="pause" class="control-btn" type="button">Pause</button>
+        <button id="debug" class="control-btn" type="button">Debug</button>
+    </nav>
+
+    <div id="pause-banner" class="pause-banner" aria-live="polite">
+        <strong id="pause-title">Paused</strong>
+        <span id="pause-copy">The belt simulation is suspended.</span>
     </div>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script>
-        class Game {
-            constructor() {
-                this.scene = new THREE.Scene();
-                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-                this.renderer = new THREE.WebGLRenderer();
-                this.renderer.setSize(window.innerWidth, window.innerHeight);
-                document.body.appendChild(this.renderer.domElement);
 
-                this.camera.position.z = 100;
-                
-                this.player = new Player(this);
-                this.asteroids = [];
-                this.projectiles = [];
-                this.powerups = [];
-                this.stars = [];
-                
-                this.score = 0;
-                this.lives = 3;
-                this.startTime = Date.now();
-                
-                this.createStarfield();
-                this.spawnAsteroids(5);
-                
-                this.setupControls();
-                this.animate();
+    <div id="debug-modal" class="debug-modal" aria-hidden="true">
+        <section class="debug-panel" role="dialog" aria-modal="true" aria-labelledby="debug-title">
+            <header class="debug-head">
+                <h2 id="debug-title">Debug Console</h2>
+                <button id="debug-close" class="debug-btn" type="button">Close</button>
+            </header>
+            <div class="debug-grid">
+                <div class="debug-stat"><span>State</span><strong id="debug-state">Running</strong></div>
+                <div class="debug-stat"><span>Asteroids</span><strong id="debug-asteroids">0</strong></div>
+                <div class="debug-stat"><span>Projectiles</span><strong id="debug-projectiles">0</strong></div>
+                <div class="debug-stat"><span>Pickups</span><strong id="debug-pickups">0</strong></div>
+                <div class="debug-stat"><span>Shield</span><strong id="debug-shield">100</strong></div>
+                <div class="debug-stat"><span>Heat</span><strong id="debug-heat">0</strong></div>
+            </div>
+            <div class="debug-actions">
+                <button id="debug-resume" class="debug-btn" type="button">Resume</button>
+                <button class="debug-btn" type="button" data-action="shield">Shield</button>
+                <button class="debug-btn" type="button" data-action="guns">Guns</button>
+                <button class="debug-btn" type="button" data-action="missiles">Missiles</button>
+                <button class="debug-btn" type="button" data-action="overdrive">Overdrive</button>
+                <button class="debug-btn" type="button" data-action="wave">Spawn Wave</button>
+                <button class="debug-btn" type="button" data-action="clear">Clear Field</button>
+            </div>
+        </section>
+    </div>
+
+    <div id="fallback">
+        <p>WebGL initialization failed.</p>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.174.0/examples/jsm/"
             }
+        }
+    </script>
 
-            createStarfield() {
-                const starGeometry = new THREE.BufferGeometry();
-                const starMaterial = new THREE.PointsMaterial({
-                    color: 0xFFFFFF,
-                    size: 0.5,
-                    transparent: true
-                });
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-                const starVertices = [];
-                for(let i = 0; i < 1000; i++) {
-                    const x = (Math.random() - 0.5) * 2000;
-                    const y = (Math.random() - 0.5) * 2000;
-                    const z = (Math.random() - 0.5) * 2000;
-                    starVertices.push(x, y, z);
-                }
+        const FIELD_HALF = 43;
+        const FIELD_SIZE = FIELD_HALF * 2;
+        const PLAYER_RADIUS = 1.35;
+        const FIRE_KEY_CODES = new Set(['KeyF', 'Enter']);
+        const MISSILE_KEY_CODES = new Set(['KeyM']);
 
-                starGeometry.setAttribute('position', 
-                    new THREE.Float32BufferAttribute(starVertices, 3));
-                this.starfield = new THREE.Points(starGeometry, starMaterial);
-                this.scene.add(this.starfield);
+        const ui = {
+            stage: document.getElementById('stage'),
+            fallback: document.getElementById('fallback'),
+            score: document.getElementById('score'),
+            wave: document.getElementById('wave'),
+            lives: document.getElementById('lives'),
+            velocity: document.getElementById('velocity'),
+            missionTitle: document.getElementById('mission-title'),
+            missionCopy: document.getElementById('mission-copy'),
+            shield: document.getElementById('shield'),
+            shieldFill: document.getElementById('shield-fill'),
+            heat: document.getElementById('heat'),
+            heatFill: document.getElementById('heat-fill'),
+            asteroidCount: document.getElementById('asteroid-count'),
+            kills: document.getElementById('kills'),
+            elapsed: document.getElementById('elapsed'),
+            stateLabel: document.getElementById('state-label'),
+            gunsChip: document.getElementById('guns-chip'),
+            gunsLabel: document.getElementById('guns-label'),
+            guns: document.getElementById('guns'),
+            missileChip: document.getElementById('missile-chip'),
+            missileLabel: document.getElementById('missile-label'),
+            missiles: document.getElementById('missiles'),
+            driveChip: document.getElementById('drive-chip'),
+            driveLabel: document.getElementById('drive-label'),
+            drive: document.getElementById('drive'),
+            newRun: document.getElementById('new-run'),
+            fire: document.getElementById('fire'),
+            missile: document.getElementById('missile'),
+            pause: document.getElementById('pause'),
+            debug: document.getElementById('debug'),
+            pauseBanner: document.getElementById('pause-banner'),
+            pauseTitle: document.getElementById('pause-title'),
+            pauseCopy: document.getElementById('pause-copy'),
+            debugModal: document.getElementById('debug-modal'),
+            debugClose: document.getElementById('debug-close'),
+            debugResume: document.getElementById('debug-resume'),
+            debugState: document.getElementById('debug-state'),
+            debugAsteroids: document.getElementById('debug-asteroids'),
+            debugProjectiles: document.getElementById('debug-projectiles'),
+            debugPickups: document.getElementById('debug-pickups'),
+            debugShield: document.getElementById('debug-shield'),
+            debugHeat: document.getElementById('debug-heat')
+        };
+
+        const state = {
+            elapsed: 0,
+            score: 0,
+            wave: 1,
+            lives: 3,
+            kills: 0,
+            shield: 100,
+            heat: 0,
+            gunsLevel: 1,
+            missileAmmo: 4,
+            overdriveTimer: 0,
+            gunTimer: 0,
+            missileTimer: 0,
+            autoTimer: 0,
+            invulnerable: 2.4,
+            shake: 0,
+            paused: false,
+            debugOpen: false,
+            controlsActive: true,
+            gameOver: false,
+            missionIndex: 0
+        };
+
+        const input = {
+            keys: Object.create(null),
+            thrusting: false
+        };
+
+        const missions = [
+            {
+                title: 'Belt Entry',
+                copy: 'The field is cold, fractured, and moving. Clear the corridor before the larger rocks split the lane apart.'
+            },
+            {
+                title: 'Glass Wake',
+                copy: 'The belt has started reflecting telemetry back through the ship. Smaller fragments are faster and harder to read.'
+            },
+            {
+                title: 'Iron Choir',
+                copy: 'Dense ore signatures are clustering in waves. Use missile locks and shield timing to keep the center open.'
+            },
+            {
+                title: 'Vesper Storm',
+                copy: 'The debris field is now self-feeding. Every clear lane becomes a fresh angle of attack.'
             }
+        ];
 
-            spawnAsteroids(count) {
-                for(let i = 0; i < count; i++) {
-                    const asteroid = new Asteroid(this, 'large');
-                    this.asteroids.push(asteroid);
-				}
-            }
+        let scene;
+        let camera;
+        let renderer;
+        let composer;
+        let bloomPass;
+        let clock;
+        let player;
+        let fieldGroup;
+        let effectRoot;
+        let starField;
+        let thrustLight;
 
-            setupControls() {
-                this.keys = {};
-                document.addEventListener('keydown', (e) => this.keys[e.key.toLowerCase()] = true);
-                document.addEventListener('keyup', (e) => this.keys[e.key.toLowerCase()] = false);
-            }
+        const asteroids = [];
+        const shots = [];
+        const missiles = [];
+        const pickups = [];
+        const particles = [];
+        const rings = [];
+        const geometries = {};
+        const materials = {};
+        const tempVec = new THREE.Vector3();
+        const tempVecB = new THREE.Vector3();
+        const tempColor = new THREE.Color();
 
-            animate() {
-                requestAnimationFrame(() => this.animate());
+        const pickupSpecs = {
+            shield: { color: new THREE.Color(0x74e8ff), label: 'Shield' },
+            guns: { color: new THREE.Color(0x80ffbd), label: 'Guns' },
+            missiles: { color: new THREE.Color(0xffd36a), label: 'Missiles' },
+            overdrive: { color: new THREE.Color(0xbca6ff), label: 'Drive' }
+        };
 
-                // Update game time
-                document.getElementById('time').textContent = 
-                    Math.floor((Date.now() - this.startTime) / 1000);
+        try {
+            init();
+            animate();
+        } catch (error) {
+            console.error(error);
+            ui.fallback.classList.add('visible');
+        }
 
-                // Update player
-                if (this.keys['w']) this.player.thrust();
-                if (this.keys['a']) this.player.rotate(-0.05);
-                if (this.keys['d']) this.player.rotate(0.05);
-                if (this.keys[' ']) this.player.fire();
+        function init() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x030509, 0.0062);
 
-                // Update game objects
-                this.player.update();
-                this.asteroids.forEach(asteroid => asteroid.update());
-                this.projectiles.forEach((projectile, index) => {
-                    projectile.update();
-                    if (projectile.isExpired()) {
-                        this.scene.remove(projectile.mesh);
-                        this.projectiles.splice(index, 1);
-                    }
-                });
+            camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 900);
+            camera.position.set(0, 58, 66);
+            camera.lookAt(0, 0, 0);
 
-                // Auto-fire if player has both guns and missiles
-                if (this.player.hasGuns && this.player.hasMissiles) {
-                    this.player.autoFire();
-                }
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 0.88;
+            ui.stage.appendChild(renderer.domElement);
 
-                // Check collisions
-                this.checkCollisions();
+            composer = new EffectComposer(renderer);
+            composer.addPass(new RenderPass(scene, camera));
+            bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.16, 0.28, 0.78);
+            composer.addPass(bloomPass);
+            composer.addPass(new OutputPass());
 
-                // Rotate starfield
-                this.starfield.rotation.z += 0.0001;
+            clock = new THREE.Clock();
+            fieldGroup = new THREE.Group();
+            effectRoot = new THREE.Group();
+            scene.add(fieldGroup, effectRoot);
 
-                this.renderer.render(this.scene, this.camera);
-            }
+            buildGeometries();
+            buildMaterials();
+            buildLights();
+            buildField();
+            buildStarfield();
+            player = createPlayer();
+            resetRun();
+            bindEvents();
+            window.__vesperBeltReady = true;
+        }
 
-            checkCollisions() {
-                // Projectiles vs Asteroids
-                this.projectiles.forEach((projectile, pIndex) => {
-                    this.asteroids.forEach((asteroid, aIndex) => {
-                        if (this.detectCollision(projectile, asteroid)) {
-                            this.handleAsteroidHit(asteroid, aIndex);
-                            this.scene.remove(projectile.mesh);
-                            this.projectiles.splice(pIndex, 1);
-                        }
-                    });
-                });
+        function buildGeometries() {
+            geometries.spark = new THREE.SphereGeometry(0.07, 12, 8);
+            geometries.shot = new THREE.CylinderGeometry(0.055, 0.055, 1.2, 10);
+            geometries.missileBody = new THREE.ConeGeometry(0.19, 0.82, 12);
+            geometries.pickupCore = new THREE.IcosahedronGeometry(0.86, 1);
+            geometries.pickupRing = new THREE.TorusGeometry(1.24, 0.035, 8, 36);
+            geometries.playerBody = new THREE.ConeGeometry(0.76, 2.7, 4);
+            geometries.playerWing = new THREE.BufferGeometry();
+            geometries.playerWing.setAttribute('position', new THREE.Float32BufferAttribute([
+                0, 0.07, 0.95,
+                -1.25, 0, -0.68,
+                -0.18, 0.03, -0.34,
+                0, 0.07, 0.95,
+                0.18, 0.03, -0.34,
+                1.25, 0, -0.68
+            ], 3));
+            geometries.playerWing.computeVertexNormals();
+            geometries.shield = new THREE.SphereGeometry(1.72, 32, 18);
+            geometries.ring = new THREE.TorusGeometry(1, 0.028, 8, 52);
+        }
 
-                // Player vs Asteroids
-                if (!this.player.isInvulnerable) {
-                    this.asteroids.forEach(asteroid => {
-                        if (this.detectCollision(this.player, asteroid)) {
-                            this.handlePlayerHit();
-                        }
-                    });
-                }
-            }
+        function buildMaterials() {
+            materials.player = new THREE.MeshStandardMaterial({
+                color: 0xdceeff,
+                roughness: 0.32,
+                metalness: 0.45,
+                emissive: 0x153344,
+                emissiveIntensity: 0.32
+            });
+            materials.playerWing = new THREE.MeshStandardMaterial({
+                color: 0x122032,
+                roughness: 0.42,
+                metalness: 0.5,
+                emissive: 0x062333,
+                emissiveIntensity: 0.28
+            });
+            materials.engine = new THREE.MeshBasicMaterial({
+                color: 0x74e8ff,
+                transparent: true,
+                opacity: 0.78,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            materials.shield = new THREE.MeshBasicMaterial({
+                color: 0x74e8ff,
+                transparent: true,
+                opacity: 0.12,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            materials.shot = new THREE.MeshBasicMaterial({
+                color: 0x80ffbd,
+                transparent: true,
+                opacity: 0.88,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            materials.missile = new THREE.MeshBasicMaterial({
+                color: 0xffd36a,
+                transparent: true,
+                opacity: 0.9,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            materials.asteroidEdge = new THREE.LineBasicMaterial({
+                color: 0xd7e4ef,
+                transparent: true,
+                opacity: 0.22
+            });
+        }
 
-            detectCollision(obj1, obj2) {
-                const distance = obj1.mesh.position.distanceTo(obj2.mesh.position);
-                return distance < (obj1.radius + obj2.radius);
-            }
+        function buildLights() {
+            scene.add(new THREE.AmbientLight(0xb4d8ff, 0.52));
+            const key = new THREE.DirectionalLight(0xffffff, 2.1);
+            key.position.set(-20, 42, 28);
+            scene.add(key);
 
-            handleAsteroidHit(asteroid, index) {
-                if (asteroid.size === 'large') {
-                    this.spawnAsteroidPieces(asteroid, 'medium', 2);
-                } else if (asteroid.size === 'medium') {
-                    this.spawnAsteroidPieces(asteroid, 'small', 3);
-                }
+            const rim = new THREE.PointLight(0x74e8ff, 3.2, 86);
+            rim.position.set(18, 14, -22);
+            scene.add(rim);
 
-                this.scene.remove(asteroid.mesh);
-                this.asteroids.splice(index, 1);
-                this.score += 100;
-                document.getElementById('score').textContent = this.score;
+            const ember = new THREE.PointLight(0xffd36a, 2.4, 80);
+            ember.position.set(-24, 10, 24);
+            scene.add(ember);
 
-                // Randomly spawn powerup
-                if (Math.random() < 0.1) {
-                    this.spawnPowerup(asteroid.mesh.position);
-                }
-            }
+            thrustLight = new THREE.PointLight(0x74e8ff, 2.4, 12);
+            scene.add(thrustLight);
+        }
 
-            setupControls() {
-                this.keys = {};
-                document.addEventListener('keydown', (e) => this.keys[e.key.toLowerCase()] = true);
-                document.addEventListener('keyup', (e) => this.keys[e.key.toLowerCase()] = false);
-            }
+        function buildField() {
+            const grid = new THREE.GridHelper(FIELD_SIZE, 18, 0x74e8ff, 0x35506a);
+            grid.material.transparent = true;
+            grid.material.opacity = 0.13;
+            grid.position.y = -0.08;
+            fieldGroup.add(grid);
 
-            animate() {
-                requestAnimationFrame(() => this.animate());
+            const boundary = new THREE.Mesh(geometries.ring, new THREE.MeshBasicMaterial({
+                color: 0x74e8ff,
+                transparent: true,
+                opacity: 0.14,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            }));
+            boundary.scale.setScalar(FIELD_HALF);
+            boundary.rotation.x = Math.PI / 2;
+            fieldGroup.add(boundary);
 
-                // Update game time
-                document.getElementById('time').textContent = 
-                    Math.floor((Date.now() - this.startTime) / 1000);
-
-                // Update player
-                if (this.keys['w']) this.player.thrust();
-                if (this.keys['a']) this.player.rotate(-0.05);
-                if (this.keys['d']) this.player.rotate(0.05);
-                if (this.keys[' ']) this.player.fire();
-
-                // Update game objects
-                this.player.update();
-                this.asteroids.forEach(asteroid => asteroid.update());
-                this.projectiles.forEach((projectile, index) => {
-                    projectile.update();
-                    if (projectile.isExpired()) {
-                        this.scene.remove(projectile.mesh);
-                        this.projectiles.splice(index, 1);
-                    }
-                });
-
-                // Auto-fire if player has both guns and missiles
-                if (this.player.hasGuns && this.player.hasMissiles) {
-                    this.player.autoFire();
-                }
-
-                // Check collisions
-                this.checkCollisions();
-
-                // Rotate starfield
-                this.starfield.rotation.z += 0.0001;
-
-                this.renderer.render(this.scene, this.camera);
-            }
-
-            checkCollisions() {
-                // Projectiles vs Asteroids
-                this.projectiles.forEach((projectile, pIndex) => {
-                    this.asteroids.forEach((asteroid, aIndex) => {
-                        if (this.detectCollision(projectile, asteroid)) {
-                            this.handleAsteroidHit(asteroid, aIndex);
-                            this.scene.remove(projectile.mesh);
-                            this.projectiles.splice(pIndex, 1);
-                        }
-                    });
-                });
-
-                // Player vs Asteroids
-                if (!this.player.isInvulnerable) {
-                    this.asteroids.forEach(asteroid => {
-                        if (this.detectCollision(this.player, asteroid)) {
-                            this.handlePlayerHit();
-                        }
-                    });
-                }
-            }
-
-            detectCollision(obj1, obj2) {
-                const distance = obj1.mesh.position.distanceTo(obj2.mesh.position);
-                return distance < (obj1.radius + obj2.radius);
-            }
-
-            handleAsteroidHit(asteroid, index) {
-                if (asteroid.size === 'large') {
-                    this.spawnAsteroidPieces(asteroid, 'medium', 2);
-                } else if (asteroid.size === 'medium') {
-                    this.spawnAsteroidPieces(asteroid, 'small', 3);
-                }
-
-                this.scene.remove(asteroid.mesh);
-                this.asteroids.splice(index, 1);
-                this.score += 100;
-                document.getElementById('score').textContent = this.score;
-
-                // Randomly spawn powerup
-                if (Math.random() < 0.1) {
-                    this.spawnPowerup(asteroid.mesh.position);
-                }
-            }
-
-            spawnAsteroidPieces(parentAsteroid, size, count) {
-                for (let i = 0; i < count; i++) {
-                    const asteroid = new Asteroid(this, size, parentAsteroid.mesh.position);
-                    this.asteroids.push(asteroid);
-                }
-            }
-
-            handlePlayerHit() {
-                if (this.player.shields > 0) {
-                    this.player.shields--;
-                    document.getElementById('shields').style.opacity = 
-                        this.player.shields > 0 ? "1" : "0.5";
-                    return;
-                }
-
-                this.lives--;
-                document.getElementById('lives').textContent = this.lives;
-
-                if (this.lives <= 0) {
-                    this.gameOver();
-                    return;
-                }
-
-                this.player.respawn();
-            }
-
-            spawnPowerup(position) {
-                const types = ['guns', 'missiles', 'shields'];
-                const type = types[Math.floor(Math.random() * types.length)];
-                const powerup = new Powerup(this, type, position);
-                this.powerups.push(powerup);
-            }
-
-            gameOver() {
-                alert(`Game Over! Score: ${this.score}`);
-                location.reload();
+            for (let i = 0; i < 5; i++) {
+                const band = new THREE.Mesh(geometries.ring, new THREE.MeshBasicMaterial({
+                    color: i % 2 ? 0xffd36a : 0x74e8ff,
+                    transparent: true,
+                    opacity: 0.025 + i * 0.008,
+                    depthWrite: false
+                }));
+                band.scale.setScalar(10 + i * 6.4);
+                band.rotation.x = Math.PI / 2;
+                fieldGroup.add(band);
             }
         }
 
-        class Player {
-            constructor(game) {
-                this.game = game;
-                this.radius = 2;
-                this.velocity = new THREE.Vector3();
-                this.rotation = 0;
-                this.hasGuns = false;
-                this.hasMissiles = false;
-                this.shields = 0;
-                this.isInvulnerable = false;
-
-                // Create ship geometry
-                const geometry = new THREE.BufferGeometry();
-                const vertices = new Float32Array([
-                    0, 2, 0,    // tip
-                    -1, -1, 0,  // left
-                    1, -1, 0    // right
-                ]);
-                geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-                
-                const material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
-                this.mesh = new THREE.Line(geometry, material);
-                this.game.scene.add(this.mesh);
-
-                this.respawn();
-            }
-
-            thrust() {
-                const thrust = new THREE.Vector3(0, 0.1, 0);
-                thrust.applyAxisAngle(new THREE.Vector3(0, 0, 1), -this.rotation);
-                this.velocity.add(thrust);
-            }
-
-            rotate(angle) {
-                this.rotation += angle;
-                this.mesh.rotation.z = this.rotation;
-            }
-
-            update() {
-                this.mesh.position.add(this.velocity);
-                this.velocity.multiplyScalar(0.99); // friction
-
-                // Screen wrapping
-                if (this.mesh.position.x > 50) this.mesh.position.x = -50;
-                if (this.mesh.position.x < -50) this.mesh.position.x = 50;
-                if (this.mesh.position.y > 50) this.mesh.position.y = -50;
-                if (this.mesh.position.y < -50) this.mesh.position.y = 50;
-            }
-
-            fire() {
-                if (this.hasMissiles) {
-                    const missile = new Missile(this.game, this.mesh.position, this.rotation);
-                    this.game.projectiles.push(missile);
-                } else {
-                    const bullet = new Bullet(this.game, this.mesh.position, this.rotation);
-                    this.game.projectiles.push(bullet);
-                }
-            }
-
-            autoFire() {
-                const closestAsteroid = this.findClosestAsteroid();
-                if (closestAsteroid && 
-                    closestAsteroid.mesh.position.distanceTo(this.mesh.position) < 20) {
-					this.fire();
-                }
-            }
-
-            findClosestAsteroid() {
-                let closest = null;
-                let minDistance = Infinity;
-                
-                this.game.asteroids.forEach(asteroid => {
-                    const distance = asteroid.mesh.position.distanceTo(this.mesh.position);
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                        closest = asteroid;
-                    }
-                });
-                
-                return closest;
-            }
-
-            respawn() {
-                this.mesh.position.set(0, 0, 0);
-                this.velocity.set(0, 0, 0);
-                this.rotation = 0;
-                this.mesh.rotation.z = 0;
-                this.isInvulnerable = true;
-                
-                setTimeout(() => {
-                    this.isInvulnerable = false;
-                }, 3000);
-            }
-        }
-
-        class Asteroid {
-            constructor(game, size, position) {
-                this.game = game;
-                this.size = size;
-                
-                // Set size-specific properties
-                switch(size) {
-                    case 'large':
-                        this.radius = 6;
-                        this.vertices = 12;
-                        break;
-                    case 'medium':
-                        this.radius = 4;
-                        this.vertices = 8;
-                        break;
-                    case 'small':
-                        this.radius = 2;
-                        this.vertices = 6;
-                        break;
-                }
-
-                // Create irregular asteroid shape
-                const geometry = new THREE.BufferGeometry();
-                const vertices = [];
-                for (let i = 0; i < this.vertices; i++) {
-                    const angle = (i / this.vertices) * Math.PI * 2;
-                    const variance = Math.random() * 0.4 + 0.8;
-                    const x = Math.cos(angle) * this.radius * variance;
-                    const y = Math.sin(angle) * this.radius * variance;
-                    vertices.push(x, y, 0);
-                }
-                vertices.push(vertices[0], vertices[1], vertices[2]); // Close the shape
-                
-                geometry.setAttribute('position', 
-                    new THREE.Float32BufferAttribute(vertices, 3));
-                
-                const material = new THREE.LineBasicMaterial({ 
-                    color: 0xaaaaaa 
-                });
-                
-                this.mesh = new THREE.Line(geometry, material);
-                
-                // Set initial position and velocity
-                if (position) {
-                    this.mesh.position.copy(position);
-                } else {
-                    // Spawn at edge of screen
-                    const angle = Math.random() * Math.PI * 2;
-                    this.mesh.position.x = Math.cos(angle) * 60;
-                    this.mesh.position.y = Math.sin(angle) * 60;
-                }
-                
-                this.velocity = new THREE.Vector3(
-                    (Math.random() - 0.5) * 0.5,
-                    (Math.random() - 0.5) * 0.5,
-                    0
+        function buildStarfield() {
+            const positions = [];
+            const colors = [];
+            const color = new THREE.Color();
+            for (let i = 0; i < 1600; i++) {
+                positions.push(
+                    randomRange(-260, 260),
+                    randomRange(-28, 124),
+                    randomRange(-260, 260)
                 );
-                
-                this.rotationSpeed = (Math.random() - 0.5) * 0.05;
-                
-                game.scene.add(this.mesh);
+                color.setHSL(randomRange(0.53, 0.66), randomRange(0.16, 0.56), randomRange(0.52, 0.92));
+                colors.push(color.r, color.g, color.b);
+            }
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            starField = new THREE.Points(geometry, new THREE.PointsMaterial({
+                size: 0.72,
+                map: createSoftDotTexture(),
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending,
+                sizeAttenuation: true,
+                depthWrite: false
+            }));
+            scene.add(starField);
+        }
+
+        function createSoftDotTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            gradient.addColorStop(0, 'rgba(255,255,255,1)');
+            gradient.addColorStop(0.32, 'rgba(255,255,255,0.82)');
+            gradient.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 64, 64);
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.colorSpace = THREE.SRGBColorSpace;
+            return texture;
+        }
+
+        function createPlayer() {
+            const group = new THREE.Group();
+            group.position.y = 0.82;
+
+            const body = new THREE.Mesh(geometries.playerBody, materials.player);
+            body.rotation.x = Math.PI / 2;
+            body.scale.set(0.9, 1.0, 1.18);
+            group.add(body);
+
+            const wing = new THREE.Mesh(geometries.playerWing, materials.playerWing);
+            group.add(wing);
+
+            const engine = new THREE.Mesh(new THREE.SphereGeometry(0.26, 14, 8), materials.engine);
+            engine.position.set(0, 0, -1.14);
+            engine.scale.set(1, 0.72, 1.45);
+            group.add(engine);
+
+            const shield = new THREE.Mesh(geometries.shield, materials.shield);
+            shield.visible = true;
+            group.add(shield);
+
+            scene.add(group);
+            return {
+                group,
+                shield,
+                engine,
+                position: new THREE.Vector3(0, 0.82, 0),
+                velocity: new THREE.Vector3(),
+                rotation: 0,
+                radius: PLAYER_RADIUS
+            };
+        }
+
+        function bindEvents() {
+            window.addEventListener('resize', onResize);
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', (event) => { input.keys[event.code] = false; });
+            ui.stage.addEventListener('pointerdown', (event) => {
+                if (event.button !== 0 || state.debugOpen) return;
+                state.controlsActive = true;
+                refreshPauseBanner();
+                if (!state.paused && !state.gameOver) fireGuns();
+            });
+            ui.newRun.addEventListener('click', resetRun);
+            ui.fire.addEventListener('click', fireGuns);
+            ui.missile.addEventListener('click', fireMissile);
+            ui.pause.addEventListener('click', () => setPaused(!state.paused, 'Paused'));
+            ui.debug.addEventListener('click', toggleDebug);
+            ui.debugClose.addEventListener('click', () => closeDebug(false));
+            ui.debugResume.addEventListener('click', () => closeDebug(true));
+            document.querySelectorAll('[data-action]').forEach((button) => {
+                button.addEventListener('click', () => runDebugAction(button.dataset.action));
+            });
+        }
+
+        function resetRun() {
+            clearCollection(asteroids);
+            clearCollection(shots);
+            clearCollection(missiles);
+            clearCollection(pickups);
+            clearCollection(particles);
+            clearCollection(rings);
+
+            Object.assign(state, {
+                elapsed: 0,
+                score: 0,
+                wave: 1,
+                lives: 3,
+                kills: 0,
+                shield: 100,
+                heat: 0,
+                gunsLevel: 1,
+                missileAmmo: 4,
+                overdriveTimer: 0,
+                gunTimer: 0,
+                missileTimer: 0,
+                autoTimer: 0,
+                invulnerable: 2.4,
+                shake: 0,
+                paused: false,
+                debugOpen: false,
+                controlsActive: true,
+                gameOver: false,
+                missionIndex: 0
+            });
+
+            player.position.set(0, 0.82, 0);
+            player.velocity.set(0, 0, 0);
+            player.rotation = 0;
+            player.group.position.copy(player.position);
+            player.group.rotation.set(0, 0, 0);
+            spawnWave(1);
+            ui.debugModal.classList.remove('visible');
+            refreshPauseBanner();
+            updateUi();
+        }
+
+        function spawnWave(wave) {
+            state.wave = wave;
+            state.missionIndex = Math.min(missions.length - 1, Math.floor((wave - 1) / 2));
+            const count = Math.min(22, 5 + wave * 2);
+            for (let i = 0; i < count; i++) {
+                createAsteroid('large', randomEdgePosition(), null, 0.86 + wave * 0.035);
+            }
+            spawnRing(new THREE.Vector3(0, 0.14, 0), new THREE.Color(0x74e8ff), 12, 0.55);
+        }
+
+        function createAsteroid(size, position, inheritedVelocity, speedScale = 1) {
+            const spec = {
+                large: { radius: randomRange(4.1, 5.4), score: 55 },
+                medium: { radius: randomRange(2.35, 3.15), score: 95 },
+                small: { radius: randomRange(1.15, 1.72), score: 145 }
+            }[size];
+            const geometry = createAsteroidGeometry(spec.radius);
+            const material = new THREE.MeshStandardMaterial({
+                color: new THREE.Color(0x6f7c86).lerp(new THREE.Color(0xb48f66), Math.random() * 0.28),
+                roughness: 0.82,
+                metalness: 0.1,
+                emissive: 0x101720,
+                emissiveIntensity: 0.12,
+                flatShading: true
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geometry, 18), materials.asteroidEdge);
+            const group = new THREE.Group();
+            group.add(mesh, edges);
+            group.position.copy(position);
+            group.position.y = 0.1;
+            scene.add(group);
+
+            const velocity = inheritedVelocity
+                ? inheritedVelocity.clone().add(new THREE.Vector3(randomRange(-2.2, 2.2), 0, randomRange(-2.2, 2.2)))
+                : new THREE.Vector3(randomRange(-1, 1), 0, randomRange(-1, 1));
+            if (velocity.lengthSq() < 0.01) velocity.set(1, 0, 0);
+            velocity.normalize().multiplyScalar(randomRange(4.5, 8.4) * speedScale / Math.sqrt(spec.radius));
+
+            const asteroid = {
+                group,
+                mesh,
+                edges,
+                geometry,
+                material,
+                size,
+                radius: spec.radius,
+                score: spec.score,
+                velocity,
+                spin: new THREE.Vector3(randomRange(-0.6, 0.6), randomRange(-0.85, 0.85), randomRange(-0.55, 0.55))
+            };
+            asteroids.push(asteroid);
+            return asteroid;
+        }
+
+        function createAsteroidGeometry(radius) {
+            const geometry = new THREE.IcosahedronGeometry(radius, 2);
+            const position = geometry.attributes.position;
+            for (let i = 0; i < position.count; i++) {
+                tempVec.fromBufferAttribute(position, i);
+                const length = tempVec.length() || 1;
+                const ridge = 0.78 + Math.random() * 0.36 + Math.sin(i * 5.17) * 0.045;
+                tempVec.normalize().multiplyScalar(length * ridge);
+                position.setXYZ(i, tempVec.x, tempVec.y * randomRange(0.82, 1.16), tempVec.z);
+            }
+            position.needsUpdate = true;
+            geometry.computeVertexNormals();
+            return geometry;
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.033);
+            if (!state.paused && !state.debugOpen && !state.gameOver) {
+                updateGame(dt);
+            } else {
+                updateParticles(dt * 0.35);
+                updateRings(dt * 0.35);
+            }
+            updateCamera(dt);
+            updateUi();
+            updateDebugReadout();
+            composer.render();
+        }
+
+        function updateGame(dt) {
+            state.elapsed += dt;
+            state.gunTimer = Math.max(0, state.gunTimer - dt);
+            state.missileTimer = Math.max(0, state.missileTimer - dt);
+            state.autoTimer = Math.max(0, state.autoTimer - dt);
+            state.invulnerable = Math.max(0, state.invulnerable - dt);
+            state.overdriveTimer = Math.max(0, state.overdriveTimer - dt);
+            state.heat = Math.max(0, state.heat - dt * (state.overdriveTimer > 0 ? 32 : 21));
+            state.shake = Math.max(0, state.shake - dt * 3.2);
+
+            updatePlayer(dt);
+            updateAsteroids(dt);
+            updateShots(dt);
+            updateMissiles(dt);
+            updatePickups(dt);
+            updateParticles(dt);
+            updateRings(dt);
+            updateField(dt);
+            checkCollisions();
+
+            if (state.gunsLevel >= 3 && state.missileAmmo > 0 && state.autoTimer <= 0) {
+                const target = findClosestAsteroid(player.position, 18);
+                if (target) {
+                    fireGuns(true);
+                    state.autoTimer = 0.42;
+                }
             }
 
-            update() {
-                this.mesh.position.add(this.velocity);
-                this.mesh.rotation.z += this.rotationSpeed;
-
-                // Screen wrapping
-				if (this.mesh.position.y > 50) this.mesh.position.y = -50;
-                if (this.mesh.position.y < -50) this.mesh.position.y = 50;
+            if (!asteroids.length) {
+                state.wave += 1;
+                spawnWave(state.wave);
             }
         }
 
-        class Bullet {
-            constructor(game, position, rotation) {
-                this.game = game;
-                this.radius = 0.5;
-                
-                const geometry = new THREE.BufferGeometry();
-                geometry.setAttribute('position', 
-                    new THREE.Float32BufferAttribute([0, 0, 0, 0, 1, 0], 3));
-                
-                const material = new THREE.LineBasicMaterial({ 
-                    color: 0xff0000 
-                });
-                
-                this.mesh = new THREE.Line(geometry, material);
-                this.mesh.position.copy(position);
-                
-                this.velocity = new THREE.Vector3(0, 2, 0);
-                this.velocity.applyAxisAngle(new THREE.Vector3(0, 0, 1), -rotation);
-                
-                this.created = Date.now();
-                game.scene.add(this.mesh);
+        function updatePlayer(dt) {
+            const boost = state.overdriveTimer > 0 ? 1.42 : 1;
+            const rotate = (input.keys.KeyA || input.keys.ArrowLeft ? 1 : 0) - (input.keys.KeyD || input.keys.ArrowRight ? 1 : 0);
+            player.rotation += rotate * dt * 3.9;
+
+            const forward = getForward(player.rotation);
+            input.thrusting = Boolean(input.keys.KeyW || input.keys.ArrowUp);
+            if (input.thrusting) {
+                player.velocity.addScaledVector(forward, dt * 17.8 * boost);
+                spawnEngineTrail(forward);
+            }
+            if (input.keys.KeyS || input.keys.ArrowDown) {
+                player.velocity.multiplyScalar(Math.pow(0.04, dt));
             }
 
-            update() {
-                this.mesh.position.add(this.velocity);
-            }
+            player.velocity.multiplyScalar(Math.pow(0.68, dt));
+            player.velocity.clampLength(0, state.overdriveTimer > 0 ? 22 : 16);
+            player.position.addScaledVector(player.velocity, dt);
+            wrapPosition(player.position);
+            player.group.position.copy(player.position);
+            player.group.rotation.y = player.rotation;
+            player.group.rotation.z = -rotate * 0.28 - player.velocity.x * 0.006;
+            player.group.rotation.x = player.velocity.z * 0.004;
+            player.engine.scale.setScalar(1 + (input.thrusting ? Math.sin(state.elapsed * 30) * 0.18 + 0.32 : 0));
+            player.shield.visible = state.shield > 0 || state.invulnerable > 0;
+            player.shield.material.opacity = (state.invulnerable > 0 ? 0.2 : 0.08) + clamp(state.shield / 100, 0, 1) * 0.08;
+            player.shield.scale.setScalar(1 + Math.sin(state.elapsed * 7.8) * 0.035);
+            thrustLight.position.copy(player.position).addScaledVector(forward, -2.2);
+            thrustLight.intensity = input.thrusting ? 3.1 : 1.2;
+        }
 
-            isExpired() {
-                return Date.now() - this.created > 1000;
+        function updateAsteroids(dt) {
+            for (const asteroid of asteroids) {
+                asteroid.group.position.addScaledVector(asteroid.velocity, dt);
+                wrapPosition(asteroid.group.position);
+                asteroid.group.rotation.x += asteroid.spin.x * dt;
+                asteroid.group.rotation.y += asteroid.spin.y * dt;
+                asteroid.group.rotation.z += asteroid.spin.z * dt;
             }
         }
 
-        class Missile extends Bullet {
-            constructor(game, position, rotation) {
-                super(game, position, rotation);
-                this.mesh.material.color.setHex(0xff8800);
-                this.radius = 1;
-                this.tracking = true;
-                this.turnRate = 0.1;
+        function updateShots(dt) {
+            for (let i = shots.length - 1; i >= 0; i--) {
+                const shot = shots[i];
+                shot.life -= dt;
+                shot.group.position.addScaledVector(shot.velocity, dt);
+                wrapPosition(shot.group.position);
+                if (shot.life <= 0) {
+                    scene.remove(shot.group);
+                    shots.splice(i, 1);
+                }
+            }
+        }
+
+        function updateMissiles(dt) {
+            for (let i = missiles.length - 1; i >= 0; i--) {
+                const missile = missiles[i];
+                missile.life -= dt;
+                const target = findClosestAsteroid(missile.group.position, 34);
+                if (target) {
+                    tempVec.subVectors(target.group.position, missile.group.position).normalize().multiplyScalar(24);
+                    missile.velocity.lerp(tempVec, 1 - Math.pow(0.02, dt));
+                }
+                missile.group.position.addScaledVector(missile.velocity, dt);
+                wrapPosition(missile.group.position);
+                missile.group.rotation.y = Math.atan2(missile.velocity.x, missile.velocity.z);
+                missile.group.rotation.x = Math.sin(state.elapsed * 18) * 0.08;
+                spawnParticles(missile.group.position, new THREE.Color(0xffd36a), 1, 0.18, 0.24);
+                if (missile.life <= 0) {
+                    scene.remove(missile.group);
+                    missiles.splice(i, 1);
+                }
+            }
+        }
+
+        function updatePickups(dt) {
+            for (let i = pickups.length - 1; i >= 0; i--) {
+                const pickup = pickups[i];
+                pickup.life -= dt;
+                pickup.group.position.addScaledVector(pickup.velocity, dt);
+                wrapPosition(pickup.group.position);
+                pickup.group.rotation.y += dt * 1.4;
+                pickup.group.rotation.z -= dt * 0.92;
+                pickup.group.scale.setScalar(1 + Math.sin(state.elapsed * 5.4 + pickup.phase) * 0.09);
+                if (pickup.group.position.distanceTo(player.position) < pickup.radius + player.radius) {
+                    applyPickup(pickup.type, pickup.group.position);
+                    removePickup(i);
+                    continue;
+                }
+                if (pickup.life <= 0) {
+                    removePickup(i);
+                }
+            }
+        }
+
+        function updateParticles(dt) {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const particle = particles[i];
+                particle.life -= dt;
+                particle.velocity.multiplyScalar(Math.pow(0.54, dt));
+                particle.group.position.addScaledVector(particle.velocity, dt);
+                const alpha = clamp(particle.life / particle.maxLife, 0, 1);
+                particle.material.opacity = alpha * particle.opacity;
+                particle.group.scale.setScalar(particle.size * (0.75 + (1 - alpha) * 0.5));
+                if (particle.life <= 0) {
+                    effectRoot.remove(particle.group);
+                    particle.material.dispose();
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        function updateRings(dt) {
+            for (let i = rings.length - 1; i >= 0; i--) {
+                const ring = rings[i];
+                ring.life -= dt;
+                const progress = 1 - clamp(ring.life / ring.maxLife, 0, 1);
+                ring.group.scale.setScalar(ring.start + progress * ring.expansion);
+                ring.material.opacity = (1 - progress) * ring.opacity;
+                if (ring.life <= 0) {
+                    effectRoot.remove(ring.group);
+                    ring.material.dispose();
+                    rings.splice(i, 1);
+                }
+            }
+        }
+
+        function updateField(dt) {
+            fieldGroup.rotation.y += dt * 0.018;
+            starField.rotation.y += dt * 0.006;
+            starField.rotation.z -= dt * 0.003;
+        }
+
+        function updateCamera(dt) {
+            const speed = player.velocity.length();
+            tempVec.set(player.position.x * 0.12, 58 + speed * 0.08, 66 + player.position.z * 0.1);
+            if (state.shake > 0) {
+                tempVec.x += randomRange(-1, 1) * state.shake;
+                tempVec.y += randomRange(-0.4, 0.4) * state.shake;
+            }
+            camera.position.lerp(tempVec, 1 - Math.pow(0.002, dt));
+            tempVecB.set(player.position.x * 0.2, 0, player.position.z * 0.18);
+            camera.lookAt(tempVecB);
+        }
+
+        function checkCollisions() {
+            for (let i = shots.length - 1; i >= 0; i--) {
+                const shot = shots[i];
+                const asteroidIndex = findProjectileHit(shot.group.position, shot.radius);
+                if (asteroidIndex !== -1) {
+                    const asteroid = asteroids[asteroidIndex];
+                    destroyAsteroid(asteroidIndex, shot.group.position, shot.damage, false);
+                    scene.remove(shot.group);
+                    shots.splice(i, 1);
+                }
             }
 
-            update() {
-                if (this.tracking) {
-                    const target = this.findClosestTarget();
-                    if (target) {
-                        const targetDir = new THREE.Vector3()
-                            .subVectors(target.mesh.position, this.mesh.position)
-                            .normalize();
-                        
-                        this.velocity.lerp(targetDir.multiplyScalar(2), this.turnRate);
+            for (let i = missiles.length - 1; i >= 0; i--) {
+                const missile = missiles[i];
+                const asteroidIndex = findProjectileHit(missile.group.position, missile.radius);
+                if (asteroidIndex !== -1) {
+                    destroyAsteroid(asteroidIndex, missile.group.position, missile.damage, true);
+                    scene.remove(missile.group);
+                    missiles.splice(i, 1);
+                }
+            }
+
+            if (state.invulnerable <= 0) {
+                for (let i = asteroids.length - 1; i >= 0; i--) {
+                    const asteroid = asteroids[i];
+                    if (asteroid.group.position.distanceTo(player.position) < asteroid.radius + player.radius) {
+                        handlePlayerImpact(i);
+                        break;
                     }
                 }
-                
-                this.mesh.position.add(this.velocity);
-                
-                // Point missile in direction of travel
-                this.mesh.rotation.z = Math.atan2(
-                    this.velocity.y, 
-                    this.velocity.x
-                ) - Math.PI / 2;
-            }
-
-            findClosestTarget() {
-                let closest = null;
-                let minDistance = Infinity;
-                
-                this.game.asteroids.forEach(asteroid => {
-                    const distance = asteroid.mesh.position
-                        .distanceTo(this.mesh.position);
-                    if (distance < minDistance) {
-                        minDistance = distance;
-                        closest = asteroid;
-                    }
-                });
-                
-                return closest;
             }
         }
 
-        class Powerup {
-            constructor(game, type, position) {
-                this.game = game;
-                this.type = type;
-                this.radius = 2;
-
-                const geometry = new THREE.BufferGeometry();
-                const vertices = [];
-                const sides = 4;
-                
-                for (let i = 0; i <= sides; i++) {
-                    const angle = (i / sides) * Math.PI * 2;
-                    vertices.push(
-                        Math.cos(angle) * this.radius,
-                        Math.sin(angle) * this.radius,
-                        0
-                    );
+        function findProjectileHit(position, radius) {
+            for (let i = asteroids.length - 1; i >= 0; i--) {
+                const asteroid = asteroids[i];
+                if (asteroid.group.position.distanceTo(position) < asteroid.radius + radius) {
+                    return i;
                 }
-
-                geometry.setAttribute('position', 
-                    new THREE.Float32BufferAttribute(vertices, 3));
-                
-                const material = new THREE.LineBasicMaterial({ 
-                    color: this.getColorForType(type) 
-                });
-                
-                this.mesh = new THREE.Line(geometry, material);
-                this.mesh.position.copy(position);
-                
-                this.rotationSpeed = 0.02;
-                this.created = Date.now();
-                
-                game.scene.add(this.mesh);
             }
+            return -1;
+        }
 
-            getColorForType(type) {
-                switch(type) {
-                    case 'guns': return 0xff0000;
-                    case 'missiles': return 0xff8800;
-                    case 'shields': return 0x00ffff;
-                    default: return 0xffffff;
+        function destroyAsteroid(index, impactPosition, damage, explosive) {
+            const asteroid = asteroids[index];
+            if (!asteroid) return;
+
+            const position = asteroid.group.position.clone();
+            const velocity = asteroid.velocity.clone();
+            const color = asteroid.size === 'large' ? new THREE.Color(0x9fb7c8) : asteroid.size === 'medium' ? new THREE.Color(0xffd36a) : new THREE.Color(0x80ffbd);
+            spawnParticles(impactPosition || position, color, explosive ? 26 : 12, asteroid.radius * 0.34, explosive ? 1.0 : 0.62);
+            spawnRing(position, color, asteroid.radius * 1.1, explosive ? 0.72 : 0.42);
+            state.score += asteroid.score + Math.floor(state.wave * 7);
+            state.kills += 1;
+            state.shake = Math.max(state.shake, explosive ? 1.1 : 0.42);
+
+            if (asteroid.size === 'large') {
+                for (let i = 0; i < 2; i++) {
+                    createAsteroid('medium', position.clone().add(randomPlanarVector(1.2)), velocity, 1.08);
+                }
+            } else if (asteroid.size === 'medium') {
+                for (let i = 0; i < 3; i++) {
+                    createAsteroid('small', position.clone().add(randomPlanarVector(0.9)), velocity, 1.18);
                 }
             }
 
-            update() {
-                this.mesh.rotation.z += this.rotationSpeed;
-                
-                // Make powerup pulse
-                const scale = 1 + Math.sin(Date.now() * 0.005) * 0.2;
-                this.mesh.scale.set(scale, scale, 1);
-                
-                // Check if expired (15 seconds)
-                if (Date.now() - this.created > 15000) {
-                    this.game.scene.remove(this.mesh);
-                    const index = this.game.powerups.indexOf(this);
-                    if (index > -1) {
-                        this.game.powerups.splice(index, 1);
+            if (explosive) {
+                for (let i = asteroids.length - 1; i >= 0; i--) {
+                    if (i === index) continue;
+                    const other = asteroids[i];
+                    if (other.group.position.distanceTo(position) < asteroid.radius + other.radius + 4.5) {
+                        other.velocity.add(randomPlanarVector(4.5));
                     }
                 }
             }
 
-            collect(player) {
-                switch(this.type) {
-                    case 'guns':
-                        player.hasGuns = true;
-                        document.getElementById('guns').classList.add('active');
-                        break;
-                    case 'missiles':
-                        player.hasMissiles = true;
-                        document.getElementById('missiles').classList.add('active');
-                        break;
-                    case 'shields':
-                        player.shields = 2;
-                        document.getElementById('shields').classList.add('active');
-                        break;
-                }
-                
-                this.game.scene.remove(this.mesh);
-                const index = this.game.powerups.indexOf(this);
-                if (index > -1) {
-                    this.game.powerups.splice(index, 1);
-                }
+            if (Math.random() < pickupChance()) {
+                spawnPickup(position);
+            }
+
+            scene.remove(asteroid.group);
+            asteroid.geometry.dispose();
+            asteroid.edges.geometry.dispose();
+            asteroid.material.dispose();
+            asteroids.splice(index, 1);
+        }
+
+        function handlePlayerImpact(index) {
+            const asteroid = asteroids[index];
+            if (!asteroid) return;
+
+            if (state.shield > 0) {
+                state.shield = Math.max(0, state.shield - Math.ceil(asteroid.radius * 9));
+                state.invulnerable = 0.72;
+                state.shake = 1.35;
+                spawnParticles(player.position, new THREE.Color(0x74e8ff), 24, 1.4, 0.9);
+                spawnRing(player.position, new THREE.Color(0x74e8ff), 2.8, 0.5);
+                destroyAsteroid(index, asteroid.group.position, 1, false);
+                return;
+            }
+
+            state.lives -= 1;
+            state.invulnerable = 2.6;
+            state.shake = 1.6;
+            spawnParticles(player.position, new THREE.Color(0xff6485), 42, 2.2, 1.0);
+            spawnRing(player.position, new THREE.Color(0xff6485), 4.2, 0.75);
+
+            if (state.lives <= 0) {
+                state.gameOver = true;
+                setPaused(true, 'Run Complete', 'Start a new run to re-enter the belt.');
+                return;
+            }
+
+            player.position.set(0, 0.82, 0);
+            player.velocity.set(0, 0, 0);
+            player.rotation = 0;
+            state.shield = Math.max(state.shield, 34);
+        }
+
+        function fireGuns(auto = false) {
+            if (state.paused || state.debugOpen || state.gameOver) return;
+            if (state.gunTimer > 0 || state.heat > 96) return;
+
+            const level = state.gunsLevel;
+            const spread = level === 1 ? [0] : level === 2 ? [-0.1, 0.1] : level === 3 ? [-0.18, 0, 0.18] : [-0.22, -0.08, 0.08, 0.22];
+            for (const offset of spread) {
+                createShot(player.rotation + offset);
+            }
+            state.heat = Math.min(100, state.heat + (auto ? 5 : 8 + level * 2));
+            state.gunTimer = Math.max(0.11, 0.23 - level * 0.032);
+            spawnParticles(player.position.clone().addScaledVector(getForward(player.rotation), 1.9), new THREE.Color(0x80ffbd), 4, 0.38, 0.34);
+        }
+
+        function createShot(rotation) {
+            const group = new THREE.Group();
+            const mesh = new THREE.Mesh(geometries.shot, materials.shot);
+            mesh.rotation.x = Math.PI / 2;
+            group.add(mesh);
+            const forward = getForward(rotation);
+            group.position.copy(player.position).addScaledVector(forward, 1.65);
+            group.rotation.y = rotation;
+            scene.add(group);
+            shots.push({
+                group,
+                velocity: forward.multiplyScalar(36).add(player.velocity.clone().multiplyScalar(0.32)),
+                life: 0.96,
+                radius: 0.58,
+                damage: 1
+            });
+        }
+
+        function fireMissile() {
+            if (state.paused || state.debugOpen || state.gameOver) return;
+            if (state.missileTimer > 0 || state.missileAmmo <= 0) return;
+
+            const forward = getForward(player.rotation);
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(geometries.missileBody, materials.missile);
+            body.rotation.x = Math.PI / 2;
+            const glow = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 8), materials.missile);
+            glow.position.z = -0.42;
+            group.add(body, glow);
+            group.position.copy(player.position).addScaledVector(forward, 1.8);
+            group.rotation.y = player.rotation;
+            scene.add(group);
+            missiles.push({
+                group,
+                velocity: forward.multiplyScalar(24).add(player.velocity.clone().multiplyScalar(0.25)),
+                life: 3.8,
+                radius: 0.9,
+                damage: 2
+            });
+            state.missileAmmo -= 1;
+            state.missileTimer = 0.52;
+            state.heat = Math.min(100, state.heat + 5);
+            spawnParticles(group.position, new THREE.Color(0xffd36a), 8, 0.55, 0.45);
+        }
+
+        function spawnPickup(position) {
+            const types = ['shield', 'guns', 'missiles', 'overdrive'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            const spec = pickupSpecs[type];
+            const group = new THREE.Group();
+            const core = new THREE.Mesh(geometries.pickupCore, new THREE.MeshBasicMaterial({
+                color: spec.color,
+                transparent: true,
+                opacity: 0.7,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            }));
+            const ringA = new THREE.Mesh(geometries.pickupRing, new THREE.MeshBasicMaterial({
+                color: spec.color,
+                transparent: true,
+                opacity: 0.38,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            }));
+            const ringB = new THREE.Mesh(geometries.pickupRing, ringA.material.clone());
+            ringA.rotation.x = Math.PI / 2;
+            ringB.rotation.y = Math.PI / 2;
+            group.add(core, ringA, ringB);
+            group.position.copy(position);
+            group.position.y = 1.05;
+            scene.add(group);
+            pickups.push({
+                group,
+                type,
+                radius: 1.5,
+                velocity: randomPlanarVector(randomRange(0.8, 1.8)),
+                life: 15,
+                phase: Math.random() * Math.PI * 2
+            });
+        }
+
+        function applyPickup(type, position) {
+            const spec = pickupSpecs[type] || pickupSpecs.shield;
+            if (type === 'shield') state.shield = Math.min(100, state.shield + 48);
+            if (type === 'guns') state.gunsLevel = Math.min(4, state.gunsLevel + 1);
+            if (type === 'missiles') state.missileAmmo = Math.min(18, state.missileAmmo + 5);
+            if (type === 'overdrive') state.overdriveTimer = Math.max(state.overdriveTimer, 9.5);
+            spawnParticles(position, spec.color, 20, 1.0, 0.7);
+            spawnRing(position, spec.color, 2.6, 0.5);
+        }
+
+        function spawnEngineTrail(forward) {
+            if (Math.random() > 0.7) return;
+            const position = player.position.clone().addScaledVector(forward, -1.55);
+            spawnParticles(position, new THREE.Color(0x74e8ff), 1, 0.18, 0.22);
+        }
+
+        function spawnParticles(position, color, count, spread, power) {
+            const limit = Math.min(count, 42);
+            for (let i = 0; i < limit; i++) {
+                const material = new THREE.MeshBasicMaterial({
+                    color: color.clone().lerp(new THREE.Color(0xffffff), Math.random() * 0.24),
+                    transparent: true,
+                    opacity: 0.5,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                const group = new THREE.Mesh(geometries.spark, material);
+                const size = randomRange(0.65, 1.35) * power;
+                group.position.copy(position).add(randomPlanarVector(randomRange(0, spread || 0.5)));
+                group.position.y += randomRange(-0.12, 0.44);
+                group.scale.setScalar(size);
+                effectRoot.add(group);
+                const life = randomRange(0.38, 0.78);
+                particles.push({
+                    group,
+                    material,
+                    velocity: randomPlanarVector(randomRange(1.8, 8.5) * power).add(new THREE.Vector3(0, randomRange(-0.4, 1.3) * power, 0)),
+                    life,
+                    maxLife: life,
+                    size,
+                    opacity: randomRange(0.28, 0.54)
+                });
+            }
+            while (particles.length > 320) {
+                const old = particles.shift();
+                effectRoot.remove(old.group);
+                old.material.dispose();
             }
         }
 
-        // Handle window resize
-        window.addEventListener('resize', () => {
-            game.camera.aspect = window.innerWidth / window.innerHeight;
-            game.camera.updateProjectionMatrix();
-            game.renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+        function spawnRing(position, color, expansion, opacity) {
+            const material = new THREE.MeshBasicMaterial({
+                color,
+                transparent: true,
+                opacity,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            const group = new THREE.Mesh(geometries.ring, material);
+            group.position.copy(position);
+            group.position.y = Math.max(0.16, position.y);
+            group.rotation.x = Math.PI / 2;
+            group.scale.setScalar(0.1);
+            effectRoot.add(group);
+            rings.push({
+                group,
+                material,
+                life: 0.72,
+                maxLife: 0.72,
+                start: 0.1,
+                expansion,
+                opacity
+            });
+        }
 
-        // Start the game
-        const game = new Game();
+        function removePickup(index) {
+            const pickup = pickups[index];
+            if (!pickup) return;
+            scene.remove(pickup.group);
+            pickup.group.traverse((child) => {
+                if (child.material) child.material.dispose();
+            });
+            pickups.splice(index, 1);
+        }
+
+        function clearCollection(collection) {
+            while (collection.length) {
+                const item = collection.pop();
+                const root = item.group || item;
+                if (root?.parent) root.parent.remove(root);
+                if (item.material) item.material.dispose();
+                if (item.geometry) item.geometry.dispose();
+                if (item.edges?.geometry) item.edges.geometry.dispose();
+            }
+        }
+
+        function runDebugAction(action) {
+            if (action === 'shield') applyPickup('shield', player.position.clone());
+            if (action === 'guns') applyPickup('guns', player.position.clone());
+            if (action === 'missiles') applyPickup('missiles', player.position.clone());
+            if (action === 'overdrive') applyPickup('overdrive', player.position.clone());
+            if (action === 'wave') spawnWave(state.wave + 1);
+            if (action === 'clear') {
+                clearCollection(asteroids);
+                spawnParticles(player.position, new THREE.Color(0x74e8ff), 34, 4, 0.8);
+            }
+            updateDebugReadout();
+        }
+
+        function onKeyDown(event) {
+            if (event.code === 'Escape') {
+                event.preventDefault();
+                if (state.debugOpen) closeDebug(false);
+                state.controlsActive = false;
+                input.keys = Object.create(null);
+                refreshPauseBanner('Controls Released', 'Click the flight window to re-engage.');
+                return;
+            }
+
+            if (event.code === 'Space') {
+                event.preventDefault();
+                if (!event.repeat && !state.debugOpen) setPaused(!state.paused, 'Paused');
+                return;
+            }
+
+            if (event.code === 'Backquote') {
+                event.preventDefault();
+                if (!event.repeat) toggleDebug();
+                return;
+            }
+
+            if (FIRE_KEY_CODES.has(event.code)) {
+                event.preventDefault();
+                if (!event.repeat) fireGuns();
+                return;
+            }
+
+            if (MISSILE_KEY_CODES.has(event.code)) {
+                event.preventDefault();
+                if (!event.repeat) fireMissile();
+                return;
+            }
+
+            state.controlsActive = true;
+            input.keys[event.code] = true;
+            refreshPauseBanner();
+        }
+
+        function setPaused(paused, reason = 'Paused') {
+            state.paused = paused;
+            if (paused) {
+                input.keys = Object.create(null);
+            }
+            refreshPauseBanner(reason, paused ? 'The belt simulation is suspended.' : '');
+        }
+
+        function toggleDebug() {
+            if (state.debugOpen) {
+                closeDebug(true);
+            } else {
+                openDebug();
+            }
+        }
+
+        function openDebug() {
+            state.debugOpen = true;
+            state.paused = true;
+            input.keys = Object.create(null);
+            ui.debugModal.classList.add('visible');
+            ui.debugModal.setAttribute('aria-hidden', 'false');
+            updateDebugReadout();
+            refreshPauseBanner();
+        }
+
+        function closeDebug(resume) {
+            state.debugOpen = false;
+            ui.debugModal.classList.remove('visible');
+            ui.debugModal.setAttribute('aria-hidden', 'true');
+            if (resume && !state.gameOver) state.paused = false;
+            refreshPauseBanner();
+        }
+
+        function refreshPauseBanner(title, copy) {
+            if (state.debugOpen) {
+                ui.pauseBanner.classList.remove('visible');
+                return;
+            }
+
+            if (state.paused) {
+                ui.pauseTitle.textContent = title || (state.gameOver ? 'Run Complete' : 'Paused');
+                ui.pauseCopy.textContent = copy || (state.gameOver ? 'Start a new run to re-enter the belt.' : 'The belt simulation is suspended.');
+                ui.pauseBanner.classList.add('visible');
+                return;
+            }
+
+            if (!state.controlsActive) {
+                ui.pauseTitle.textContent = title || 'Controls Released';
+                ui.pauseCopy.textContent = copy || 'Click the flight window to re-engage.';
+                ui.pauseBanner.classList.add('visible');
+                return;
+            }
+
+            ui.pauseBanner.classList.remove('visible');
+        }
+
+        function updateUi() {
+            const mission = missions[state.missionIndex] || missions[0];
+            const speed = Math.round(player.velocity.length() * 8.2);
+            ui.score.textContent = String(state.score);
+            ui.wave.textContent = String(state.wave);
+            ui.lives.textContent = String(state.lives);
+            ui.velocity.textContent = String(speed);
+            ui.missionTitle.textContent = state.gameOver ? 'Run Complete' : mission.title;
+            ui.missionCopy.textContent = state.gameOver ? `Final score ${state.score}. The next belt run is ready.` : mission.copy;
+            ui.shield.textContent = String(Math.round(state.shield));
+            ui.heat.textContent = String(Math.round(state.heat));
+            ui.shieldFill.style.width = `${clamp(state.shield, 0, 100)}%`;
+            ui.heatFill.style.width = `${clamp(state.heat, 0, 100)}%`;
+            ui.asteroidCount.textContent = String(asteroids.length);
+            ui.kills.textContent = String(state.kills);
+            ui.elapsed.textContent = formatTime(state.elapsed);
+            ui.stateLabel.textContent = state.debugOpen ? 'Debug' : state.paused ? 'Paused' : state.controlsActive ? 'Running' : 'Idle';
+            ui.guns.textContent = String(state.gunsLevel);
+            ui.gunsLabel.textContent = state.gunsLevel >= 3 ? 'auto vector' : state.gunsLevel === 2 ? 'dual vector' : 'single vector';
+            ui.gunsChip.classList.toggle('active', state.gunsLevel > 1);
+            ui.missiles.textContent = String(state.missileAmmo);
+            ui.missileLabel.textContent = state.missileAmmo > 0 ? 'tracking' : 'empty';
+            ui.missileChip.classList.toggle('active', state.missileAmmo > 0);
+            ui.drive.textContent = state.overdriveTimer.toFixed(1);
+            ui.driveLabel.textContent = state.overdriveTimer > 0 ? 'overdrive' : 'standard';
+            ui.driveChip.classList.toggle('active', state.overdriveTimer > 0);
+            ui.pause.textContent = state.paused ? 'Resume' : 'Pause';
+            ui.fire.disabled = state.gameOver || state.paused || state.debugOpen || state.heat > 96;
+            ui.missile.disabled = state.gameOver || state.paused || state.debugOpen || state.missileAmmo <= 0;
+        }
+
+        function updateDebugReadout() {
+            ui.debugState.textContent = state.debugOpen ? 'Debug' : state.paused ? 'Paused' : 'Running';
+            ui.debugAsteroids.textContent = String(asteroids.length);
+            ui.debugProjectiles.textContent = String(shots.length + missiles.length);
+            ui.debugPickups.textContent = String(pickups.length);
+            ui.debugShield.textContent = String(Math.round(state.shield));
+            ui.debugHeat.textContent = String(Math.round(state.heat));
+        }
+
+        function randomEdgePosition() {
+            const side = Math.floor(Math.random() * 4);
+            const margin = FIELD_HALF + randomRange(2, 7);
+            if (side === 0) return new THREE.Vector3(randomRange(-FIELD_HALF, FIELD_HALF), 0.1, -margin);
+            if (side === 1) return new THREE.Vector3(margin, 0.1, randomRange(-FIELD_HALF, FIELD_HALF));
+            if (side === 2) return new THREE.Vector3(randomRange(-FIELD_HALF, FIELD_HALF), 0.1, margin);
+            return new THREE.Vector3(-margin, 0.1, randomRange(-FIELD_HALF, FIELD_HALF));
+        }
+
+        function randomPlanarVector(scale) {
+            const angle = Math.random() * Math.PI * 2;
+            return new THREE.Vector3(Math.sin(angle) * scale, 0, Math.cos(angle) * scale);
+        }
+
+        function getForward(rotation) {
+            return new THREE.Vector3(Math.sin(rotation), 0, Math.cos(rotation));
+        }
+
+        function wrapPosition(position) {
+            if (position.x > FIELD_HALF) position.x -= FIELD_SIZE;
+            if (position.x < -FIELD_HALF) position.x += FIELD_SIZE;
+            if (position.z > FIELD_HALF) position.z -= FIELD_SIZE;
+            if (position.z < -FIELD_HALF) position.z += FIELD_SIZE;
+        }
+
+        function findClosestAsteroid(position, maxDistance = Infinity) {
+            let best = null;
+            let bestDistance = maxDistance;
+            for (const asteroid of asteroids) {
+                const distance = asteroid.group.position.distanceTo(position);
+                if (distance < bestDistance) {
+                    bestDistance = distance;
+                    best = asteroid;
+                }
+            }
+            return best;
+        }
+
+        function pickupChance() {
+            return clamp(0.12 + state.wave * 0.012, 0.12, 0.28);
+        }
+
+        function randomRange(min, max) {
+            return min + Math.random() * (max - min);
+        }
+
+        function clamp(value, min, max) {
+            return Math.max(min, Math.min(max, value));
+        }
+
+        function formatTime(seconds) {
+            const total = Math.floor(seconds);
+            const mins = Math.floor(total / 60);
+            const secs = total % 60;
+            return `${mins}:${String(secs).padStart(2, '0')}`;
+        }
+
+        function onResize() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(width, height);
+            composer.setSize(width, height);
+            bloomPass.setSize(width, height);
+        }
     </script>
 </body>
 </html>
