@@ -1,0 +1,1444 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Crownline Checkers</title>
+    <style>
+        :root {
+            --bg: #050608;
+            --ink: #f7f1e8;
+            --muted: rgba(247, 241, 232, 0.62);
+            --line: rgba(247, 241, 232, 0.15);
+            --panel: rgba(8, 10, 13, 0.74);
+            --red: #ff6a7d;
+            --ivory: #ffe9c4;
+            --cyan: #72e9ff;
+            --gold: #ffd36a;
+            --green: #83f0ba;
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            letter-spacing: 0;
+        }
+
+        button {
+            font: inherit;
+        }
+
+        #stage {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 18% 18%, rgba(255, 106, 125, 0.12), transparent 30%),
+                radial-gradient(circle at 82% 76%, rgba(114, 233, 255, 0.11), transparent 32%),
+                linear-gradient(180deg, #131922 0%, #050608 64%, #020304 100%);
+        }
+
+        #stage canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .grain,
+        .vignette {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .grain {
+            opacity: 0.065;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 54px 54px;
+            mask-image: radial-gradient(circle at 50% 52%, #000 0%, #000 58%, transparent 84%);
+        }
+
+        .vignette {
+            background:
+                linear-gradient(to right, rgba(0, 0, 0, 0.54), transparent 18%, transparent 82%, rgba(0, 0, 0, 0.54)),
+                linear-gradient(to bottom, rgba(0, 0, 0, 0.32), transparent 24%, transparent 72%, rgba(0, 0, 0, 0.72));
+        }
+
+        .hud {
+            position: fixed;
+            top: 18px;
+            left: 18px;
+            z-index: 20;
+            max-width: 460px;
+            pointer-events: none;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 11px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .mark {
+            position: relative;
+            width: 31px;
+            height: 31px;
+            border: 1px solid rgba(255, 211, 106, 0.82);
+            border-radius: 50%;
+            box-shadow: 0 0 24px rgba(255, 211, 106, 0.16), inset 0 0 16px rgba(255, 211, 106, 0.1);
+        }
+
+        .mark::before,
+        .mark::after {
+            content: "";
+            position: absolute;
+            inset: 7px;
+            border: 1px solid rgba(255, 106, 125, 0.74);
+            transform: rotate(45deg);
+        }
+
+        .mark::after {
+            inset: 12px;
+            border-color: rgba(114, 233, 255, 0.74);
+            border-radius: 50%;
+            transform: none;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 38px;
+            line-height: 0.95;
+            text-transform: uppercase;
+            text-shadow: 0 0 28px rgba(255, 211, 106, 0.18);
+        }
+
+        .readout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 820;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+        }
+
+        .readout strong {
+            color: var(--ink);
+        }
+
+        .side-panel {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            z-index: 22;
+            display: grid;
+            gap: 12px;
+            width: 350px;
+            pointer-events: none;
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.38);
+            pointer-events: auto;
+        }
+
+        .panel-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 13px 14px 0;
+        }
+
+        .panel h2 {
+            margin: 0;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        .panel-body {
+            padding: 12px 14px 14px;
+        }
+
+        #status-copy {
+            min-height: 42px;
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .meter {
+            display: grid;
+            grid-template-columns: 76px 1fr 54px;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 850;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+        }
+
+        .track {
+            height: 5px;
+            overflow: hidden;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .fill {
+            display: block;
+            width: 50%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--red), var(--gold), var(--cyan));
+            transition: width 150ms ease;
+        }
+
+        .score-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1px;
+            overflow: hidden;
+            border: 1px solid rgba(247, 241, 232, 0.08);
+            border-radius: 6px;
+            background: rgba(247, 241, 232, 0.08);
+        }
+
+        .score-cell {
+            min-width: 0;
+            padding: 10px;
+            background: rgba(5, 6, 8, 0.72);
+        }
+
+        .score-cell span,
+        .score-cell strong {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .score-cell span {
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .score-cell strong {
+            margin-top: 5px;
+            font-size: 15px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .move-list {
+            max-height: 208px;
+            overflow: auto;
+            display: grid;
+            grid-template-columns: 38px 1fr 1fr;
+            gap: 1px;
+            border: 1px solid rgba(247, 241, 232, 0.08);
+            border-radius: 6px;
+            background: rgba(247, 241, 232, 0.08);
+        }
+
+        .move-list span {
+            min-width: 0;
+            padding: 7px 8px;
+            overflow: hidden;
+            background: rgba(5, 6, 8, 0.72);
+            color: var(--muted);
+            font-size: 12px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .move-list .coord {
+            color: var(--ink);
+            font-weight: 760;
+        }
+
+        .controls {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            left: 18px;
+            z-index: 25;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 11px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.38);
+        }
+
+        .control-btn {
+            min-width: 92px;
+            min-height: 40px;
+            padding: 0 12px;
+            border: 1px solid rgba(247, 241, 232, 0.15);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--ink);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 840;
+            text-transform: uppercase;
+            transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+        }
+
+        .control-btn:hover,
+        .control-btn.active {
+            border-color: rgba(255, 211, 106, 0.62);
+            background: rgba(255, 211, 106, 0.12);
+        }
+
+        .control-btn:disabled {
+            border-color: rgba(247, 241, 232, 0.08);
+            background: rgba(255, 255, 255, 0.025);
+            color: rgba(247, 241, 232, 0.32);
+            cursor: not-allowed;
+        }
+
+        #fallback {
+            position: fixed;
+            inset: 18px;
+            z-index: 100;
+            display: none;
+            place-items: center;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: rgba(6, 7, 10, 0.94);
+            text-align: center;
+        }
+
+        #fallback.visible {
+            display: grid;
+        }
+
+        @media (max-width: 940px) {
+            .side-panel {
+                top: auto;
+                right: 12px;
+                bottom: 84px;
+                left: 12px;
+                width: auto;
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .move-list {
+                max-height: 122px;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .hud {
+                top: 12px;
+                left: 12px;
+                max-width: 310px;
+            }
+
+            h1 {
+                font-size: 27px;
+            }
+
+            .side-panel {
+                display: none;
+            }
+
+            .controls {
+                right: 10px;
+                bottom: 10px;
+                left: 10px;
+                padding: 9px;
+            }
+
+            .control-btn {
+                flex: 1 1 92px;
+                min-width: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="stage"></div>
+    <div class="grain"></div>
+    <div class="vignette"></div>
+
+    <section class="hud" aria-label="Game status">
+        <div class="brand"><span class="mark"></span><span>Forced Capture Engine</span></div>
+        <h1>Crownline</h1>
+        <div class="readout">
+            <span>Turn <strong id="turn">Red</strong></span>
+            <span>Move <strong id="move-number">1</strong></span>
+            <span>Mode <strong id="mode">Engine</strong></span>
+            <span>Chain <strong id="chain">Open</strong></span>
+        </div>
+    </section>
+
+    <aside class="side-panel">
+        <section class="panel" aria-label="Position analysis">
+            <div class="panel-head">
+                <h2 id="status-title">Opening Position</h2>
+            </div>
+            <div class="panel-body">
+                <p id="status-copy">Red to play. Captures are mandatory; build diagonal pressure and crown before the center closes.</p>
+                <div class="meter">
+                    <span>Balance</span>
+                    <span class="track"><span id="balance-fill" class="fill"></span></span>
+                    <strong id="balance-label">0</strong>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Material">
+            <div class="panel-head">
+                <h2>Material</h2>
+            </div>
+            <div class="panel-body">
+                <div class="score-grid">
+                    <div class="score-cell"><span>Red men</span><strong id="red-men">12</strong></div>
+                    <div class="score-cell"><span>Ivory men</span><strong id="ivory-men">12</strong></div>
+                    <div class="score-cell"><span>Red kings</span><strong id="red-kings">0</strong></div>
+                    <div class="score-cell"><span>Ivory kings</span><strong id="ivory-kings">0</strong></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Move history">
+            <div class="panel-head">
+                <h2>Record</h2>
+            </div>
+            <div class="panel-body">
+                <div id="move-list" class="move-list"></div>
+            </div>
+        </section>
+    </aside>
+
+    <nav class="controls" aria-label="Game controls">
+        <button id="new-game" class="control-btn" type="button">New</button>
+        <button id="undo" class="control-btn" type="button">Undo</button>
+        <button id="engine" class="control-btn active" type="button">Engine On</button>
+        <button id="hint" class="control-btn" type="button">Hint</button>
+        <button id="focus" class="control-btn" type="button">Focus</button>
+    </nav>
+
+    <div id="fallback">
+        <p>WebGL initialization failed.</p>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.174.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+        const SIZE = 8;
+        const FILES = 'ABCDEFGH';
+        const ui = {
+            stage: document.getElementById('stage'),
+            fallback: document.getElementById('fallback'),
+            turn: document.getElementById('turn'),
+            moveNumber: document.getElementById('move-number'),
+            mode: document.getElementById('mode'),
+            chain: document.getElementById('chain'),
+            statusTitle: document.getElementById('status-title'),
+            statusCopy: document.getElementById('status-copy'),
+            balanceFill: document.getElementById('balance-fill'),
+            balanceLabel: document.getElementById('balance-label'),
+            redMen: document.getElementById('red-men'),
+            ivoryMen: document.getElementById('ivory-men'),
+            redKings: document.getElementById('red-kings'),
+            ivoryKings: document.getElementById('ivory-kings'),
+            moveList: document.getElementById('move-list'),
+            newGame: document.getElementById('new-game'),
+            undo: document.getElementById('undo'),
+            engine: document.getElementById('engine'),
+            hint: document.getElementById('hint'),
+            focus: document.getElementById('focus')
+        };
+
+        const state = {
+            board: [],
+            current: 'red',
+            selected: null,
+            forcedPiece: null,
+            legalMoves: [],
+            moveHistory: [],
+            snapshots: [],
+            engine: true,
+            thinking: false,
+            gameOver: false,
+            winner: null,
+            focused: false,
+            status: 'Red to play. Captures are mandatory; build diagonal pressure and crown before the center closes.',
+            time: 0,
+            engineJob: 0
+        };
+
+        let scene;
+        let camera;
+        let renderer;
+        let controls;
+        let composer;
+        let bloomPass;
+        let boardGroup;
+        let squareGroup;
+        let pieceGroup;
+        let markerGroup;
+        let effectRoot;
+        let raycaster;
+        let pointer;
+        let clock;
+
+        const squareMeshes = [];
+        const pieceMeshes = new Map();
+        const effectParticles = [];
+        const materials = {};
+        const geometries = {};
+        init();
+
+        function init() {
+            try {
+                scene = new THREE.Scene();
+                scene.fog = new THREE.FogExp2(0x050608, 0.022);
+
+                camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 800);
+                camera.position.set(0, 11.5, 12.8);
+
+                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.outputColorSpace = THREE.SRGBColorSpace;
+                renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                renderer.toneMappingExposure = 0.86;
+                ui.stage.appendChild(renderer.domElement);
+
+                controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.07;
+                controls.enablePan = false;
+                controls.minDistance = 8;
+                controls.maxDistance = 32;
+                controls.maxPolarAngle = Math.PI * 0.48;
+                controls.target.set(0, 0, 0);
+
+                composer = new EffectComposer(renderer);
+                composer.addPass(new RenderPass(scene, camera));
+                bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.12, 0.28, 0.76);
+                composer.addPass(bloomPass);
+                composer.addPass(new OutputPass());
+
+                raycaster = new THREE.Raycaster();
+                pointer = new THREE.Vector2();
+                clock = new THREE.Clock();
+                buildGeometries();
+                buildMaterials();
+                buildLights();
+                buildRoom();
+                resetGame();
+                bindEvents();
+                renderer.setAnimationLoop(animate);
+                window.__crownlineCheckersReady = true;
+            } catch (error) {
+                console.error(error);
+                ui.fallback.classList.add('visible');
+            }
+        }
+
+        function buildGeometries() {
+            geometries.square = new THREE.BoxGeometry(0.98, 0.16, 0.98);
+            geometries.boardBase = new THREE.BoxGeometry(9.2, 0.34, 9.2);
+            geometries.piece = new THREE.CylinderGeometry(0.39, 0.43, 0.24, 48, 1, false);
+            geometries.pieceTop = new THREE.CylinderGeometry(0.31, 0.35, 0.08, 48, 1, false);
+            geometries.crownRing = new THREE.TorusGeometry(0.28, 0.025, 8, 42);
+            geometries.marker = new THREE.TorusGeometry(0.39, 0.022, 8, 52);
+            geometries.captureMarker = new THREE.TorusGeometry(0.47, 0.026, 8, 52);
+            geometries.spark = new THREE.SphereGeometry(0.055, 12, 8);
+        }
+
+        function buildMaterials() {
+            materials.base = new THREE.MeshStandardMaterial({
+                color: 0x20150f,
+                roughness: 0.58,
+                metalness: 0.09,
+                emissive: 0x0e0704,
+                emissiveIntensity: 0.12
+            });
+            materials.lightSquare = new THREE.MeshStandardMaterial({
+                color: 0xb9875f,
+                roughness: 0.52,
+                metalness: 0.04,
+                emissive: 0x1a0e08,
+                emissiveIntensity: 0.08
+            });
+            materials.darkSquare = new THREE.MeshStandardMaterial({
+                color: 0x332018,
+                roughness: 0.55,
+                metalness: 0.06,
+                emissive: 0x0f0907,
+                emissiveIntensity: 0.1
+            });
+            materials.redPiece = new THREE.MeshPhysicalMaterial({
+                color: 0x7f1622,
+                roughness: 0.32,
+                metalness: 0.14,
+                clearcoat: 0.75,
+                clearcoatRoughness: 0.26,
+                emissive: 0x220609,
+                emissiveIntensity: 0.22
+            });
+            materials.ivoryPiece = new THREE.MeshPhysicalMaterial({
+                color: 0xf4dfbd,
+                roughness: 0.28,
+                metalness: 0.05,
+                clearcoat: 0.64,
+                clearcoatRoughness: 0.2,
+                emissive: 0x221809,
+                emissiveIntensity: 0.14
+            });
+            materials.redTop = new THREE.MeshPhysicalMaterial({
+                color: 0xff6a7d,
+                roughness: 0.38,
+                metalness: 0.08,
+                clearcoat: 0.58,
+                emissive: 0x2e0b10,
+                emissiveIntensity: 0.18
+            });
+            materials.ivoryTop = new THREE.MeshPhysicalMaterial({
+                color: 0xffeed0,
+                roughness: 0.34,
+                metalness: 0.04,
+                clearcoat: 0.5,
+                emissive: 0x241707,
+                emissiveIntensity: 0.12
+            });
+            materials.select = new THREE.MeshBasicMaterial({
+                color: 0xffd36a,
+                transparent: true,
+                opacity: 0.76,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            materials.move = new THREE.MeshBasicMaterial({
+                color: 0x83f0ba,
+                transparent: true,
+                opacity: 0.58,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            materials.capture = new THREE.MeshBasicMaterial({
+                color: 0xff6a7d,
+                transparent: true,
+                opacity: 0.72,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+        }
+
+        function buildLights() {
+            scene.add(new THREE.AmbientLight(0xf7e6cf, 0.6));
+
+            const key = new THREE.DirectionalLight(0xffffff, 2.3);
+            key.position.set(-8, 16, 10);
+            scene.add(key);
+
+            const rim = new THREE.PointLight(0x72e9ff, 3.2, 40);
+            rim.position.set(7, 5.5, -8);
+            scene.add(rim);
+
+            const warm = new THREE.PointLight(0xffd36a, 2.2, 36);
+            warm.position.set(-7, 4, 6);
+            scene.add(warm);
+        }
+
+        function buildRoom() {
+            boardGroup = new THREE.Group();
+            squareGroup = new THREE.Group();
+            pieceGroup = new THREE.Group();
+            markerGroup = new THREE.Group();
+            effectRoot = new THREE.Group();
+            scene.add(boardGroup, pieceGroup, markerGroup, effectRoot);
+
+            const base = new THREE.Mesh(geometries.boardBase, materials.base);
+            base.position.y = -0.18;
+            boardGroup.add(base);
+
+            for (let y = 0; y < SIZE; y++) {
+                for (let x = 0; x < SIZE; x++) {
+                    const dark = isDarkSquare(x, y);
+                    const square = new THREE.Mesh(geometries.square, dark ? materials.darkSquare : materials.lightSquare);
+                    square.position.set(toWorld(x), 0, toWorld(y));
+                    square.userData.coord = { x, y };
+                    square.userData.dark = dark;
+                    squareMeshes.push(square);
+                    squareGroup.add(square);
+                }
+            }
+            boardGroup.add(squareGroup);
+
+            const grid = new THREE.GridHelper(22, 22, 0xffd36a, 0x3b2a1d);
+            grid.position.y = -0.34;
+            grid.material.transparent = true;
+            grid.material.opacity = 0.07;
+            scene.add(grid);
+        }
+
+        function bindEvents() {
+            window.addEventListener('resize', onResize);
+            renderer.domElement.addEventListener('pointerdown', onPointerDown);
+            renderer.domElement.addEventListener('pointermove', onPointerMove);
+            renderer.domElement.addEventListener('pointerleave', () => {
+                document.body.style.cursor = 'default';
+            });
+            ui.newGame.addEventListener('click', resetGame);
+            ui.undo.addEventListener('click', undoMove);
+            ui.engine.addEventListener('click', () => {
+                state.engine = !state.engine;
+                state.engineJob += 1;
+                if (!state.engine) state.thinking = false;
+                state.status = state.engine ? 'Engine enabled. Ivory will answer Red automatically.' : 'Engine disabled. Both sides are local.';
+                updateUi();
+                maybeScheduleEngine();
+            });
+            ui.hint.addEventListener('click', showHint);
+            ui.focus.addEventListener('click', () => {
+                state.focused = !state.focused;
+                focusCamera();
+                updateUi();
+            });
+        }
+
+        function resetGame() {
+            state.engineJob += 1;
+            clearPiecesAndEffects();
+            state.board = createInitialBoard();
+            state.current = 'red';
+            state.selected = null;
+            state.forcedPiece = null;
+            state.legalMoves = [];
+            state.moveHistory = [];
+            state.snapshots = [];
+            state.thinking = false;
+            state.gameOver = false;
+            state.winner = null;
+            state.status = 'Red to play. Captures are mandatory; build diagonal pressure and crown before the center closes.';
+            syncPieces(true);
+            refreshMarkers();
+            updateUi();
+        }
+
+        function createInitialBoard() {
+            let nextId = 1;
+            const board = emptyBoard();
+            for (let y = 0; y < SIZE; y++) {
+                for (let x = 0; x < SIZE; x++) {
+                    if (!isDarkSquare(x, y)) continue;
+                    if (y <= 2) board[y][x] = { color: 'ivory', king: false, id: nextId++ };
+                    if (y >= 5) board[y][x] = { color: 'red', king: false, id: nextId++ };
+                }
+            }
+            return board;
+        }
+
+        function syncPieces(immediate = false) {
+            const seen = new Set();
+            for (let y = 0; y < SIZE; y++) {
+                for (let x = 0; x < SIZE; x++) {
+                    const piece = state.board[y][x];
+                    if (!piece) continue;
+                    const key = String(piece.id);
+                    seen.add(key);
+                    let mesh = pieceMeshes.get(key);
+                    if (!mesh) {
+                        mesh = createPieceMesh(piece);
+                        pieceMeshes.set(key, mesh);
+                        pieceGroup.add(mesh);
+                        mesh.position.set(toWorld(x), 0.34, toWorld(y));
+                    }
+                    mesh.userData.coord = { x, y };
+                    mesh.userData.piece = piece;
+                    mesh.userData.target = new THREE.Vector3(toWorld(x), 0.34, toWorld(y));
+                    delete mesh.userData.captured;
+                    delete mesh.userData.velocity;
+                    delete mesh.userData.spin;
+                    mesh.userData.kingRing.visible = piece.king;
+                    mesh.userData.base.material = piece.color === 'red' ? materials.redPiece : materials.ivoryPiece;
+                    mesh.userData.top.material = piece.color === 'red' ? materials.redTop : materials.ivoryTop;
+                    mesh.scale.setScalar(1);
+                    if (immediate) mesh.position.copy(mesh.userData.target);
+                }
+            }
+
+            for (const [key, mesh] of pieceMeshes) {
+                if (seen.has(key)) continue;
+                if (mesh.userData.captured && !immediate) continue;
+                removePieceMesh(mesh);
+                pieceMeshes.delete(key);
+            }
+        }
+
+        function createPieceMesh(piece) {
+            const group = new THREE.Group();
+            const base = new THREE.Mesh(geometries.piece, piece.color === 'red' ? materials.redPiece : materials.ivoryPiece);
+            const top = new THREE.Mesh(geometries.pieceTop, piece.color === 'red' ? materials.redTop : materials.ivoryTop);
+            const kingRing = new THREE.Mesh(geometries.crownRing, new THREE.MeshBasicMaterial({
+                color: piece.color === 'red' ? 0xffd36a : 0x72e9ff,
+                transparent: true,
+                opacity: 0.74,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            }));
+            top.position.y = 0.16;
+            kingRing.position.y = 0.28;
+            kingRing.rotation.x = Math.PI / 2;
+            kingRing.visible = piece.king;
+            group.add(base, top, kingRing);
+            group.userData.base = base;
+            group.userData.top = top;
+            group.userData.kingRing = kingRing;
+            group.userData.piece = piece;
+            group.userData.radius = 0.44;
+            return group;
+        }
+
+        function selectPiece(x, y) {
+            const piece = state.board[y]?.[x];
+            if (!piece || piece.color !== state.current || state.thinking || state.gameOver) return false;
+            if (state.forcedPiece && (state.forcedPiece.x !== x || state.forcedPiece.y !== y)) {
+                state.status = `${labelColor(state.current)} must continue the capture from ${formatCoord(state.forcedPiece.x, state.forcedPiece.y)}.`;
+                updateUi();
+                return false;
+            }
+            const pieceMoves = selectableMovesFrom(x, y);
+            if (!pieceMoves.length) {
+                const forced = legalMovesFor(state.current, state.board).some((move) => move.captures.length);
+                state.status = forced
+                    ? `${labelColor(state.current)} has a mandatory capture. Select a capturing piece.`
+                    : `${formatCoord(x, y)} has no legal move.`;
+                updateUi();
+                return false;
+            }
+            state.selected = { x, y };
+            state.legalMoves = pieceMoves;
+            state.status = state.legalMoves.some((move) => move.captures.length)
+                ? `${labelColor(state.current)} has a forced capture from ${formatCoord(x, y)}.`
+                : `${labelColor(state.current)} selected ${formatCoord(x, y)}.`;
+            refreshMarkers();
+            updateUi();
+            return true;
+        }
+
+        function tryMove(x, y) {
+            if (!state.selected) return false;
+            const move = state.legalMoves.find((candidate) => candidate.to.x === x && candidate.to.y === y);
+            if (!move) return false;
+            playMove(move, 'human');
+            return true;
+        }
+
+        function playMove(move, source) {
+            if (state.gameOver) return;
+            state.snapshots.push(snapshotState());
+            const piece = state.board[move.from.y][move.from.x];
+            if (!piece) return;
+
+            state.board[move.from.y][move.from.x] = null;
+            state.board[move.to.y][move.to.x] = piece;
+
+            for (const captured of move.captures) {
+                const victim = state.board[captured.y][captured.x];
+                if (victim) animateCapturedPiece(victim.id, piece.color);
+                state.board[captured.y][captured.x] = null;
+            }
+
+            const promoted = !piece.king && shouldPromote(piece.color, move.to.y);
+            if (promoted) piece.king = true;
+
+            spawnMoveBurst(move.to.x, move.to.y, piece.color, move.captures.length ? 14 : 7);
+            syncPieces();
+
+            const furtherCaptures = move.captures.length && !promoted
+                ? captureMovesFrom(move.to.x, move.to.y, state.board)
+                : [];
+            recordMove(move, piece, promoted, source, Boolean(furtherCaptures.length));
+
+            if (furtherCaptures.length) {
+                state.current = piece.color;
+                state.forcedPiece = { x: move.to.x, y: move.to.y };
+                state.selected = { x: move.to.x, y: move.to.y };
+                state.legalMoves = furtherCaptures;
+                state.status = `${labelColor(piece.color)} must continue the capture from ${formatCoord(move.to.x, move.to.y)}.`;
+                refreshMarkers();
+                updateUi();
+                maybeScheduleEngine();
+                return;
+            }
+
+            state.current = opposite(piece.color);
+            state.selected = null;
+            state.forcedPiece = null;
+            state.legalMoves = [];
+            const nextMoves = legalMovesFor(state.current, state.board);
+            if (!nextMoves.length) {
+                state.gameOver = true;
+                state.winner = piece.color;
+                state.status = `${labelColor(piece.color)} wins. ${labelColor(state.current)} has no legal move.`;
+            } else {
+                const forced = nextMoves.some((candidate) => candidate.captures.length);
+                state.status = forced
+                    ? `${labelColor(state.current)} to move with a mandatory capture.`
+                    : `${labelColor(state.current)} to move.`;
+            }
+            refreshMarkers();
+            updateUi();
+            maybeScheduleEngine();
+        }
+
+        function undoMove() {
+            if (!state.snapshots.length || state.thinking) return;
+            state.engineJob += 1;
+            restoreSnapshot(state.snapshots.pop());
+            syncPieces(true);
+            refreshMarkers();
+            updateUi();
+        }
+
+        function maybeScheduleEngine() {
+            if (!state.engine || state.current !== 'ivory' || state.gameOver || state.thinking) return;
+            const job = ++state.engineJob;
+            state.thinking = true;
+            updateUi();
+            window.setTimeout(() => {
+                if (job !== state.engineJob || !state.engine || state.gameOver || state.current !== 'ivory') {
+                    state.thinking = false;
+                    updateUi();
+                    return;
+                }
+                const moves = state.forcedPiece
+                    ? captureMovesFrom(state.forcedPiece.x, state.forcedPiece.y, state.board)
+                    : legalMovesFor('ivory', state.board);
+                const move = chooseEngineMove(moves);
+                state.thinking = false;
+                if (move) playMove(move, 'engine');
+                updateUi();
+            }, 460);
+        }
+
+        function chooseEngineMove(moves) {
+            let best = null;
+            let bestScore = -Infinity;
+            for (const move of moves) {
+                const piece = state.board[move.from.y][move.from.x];
+                let score = Math.random() * 8;
+                score += move.captures.length * 120;
+                score += move.captures.reduce((sum, capture) => sum + (capture.piece?.king ? 85 : 38), 0);
+                const promotionProgress = piece.color === 'red' ? (7 - move.to.y) : move.to.y;
+                score += piece.king ? 16 : promotionProgress * 5;
+                score += (3.5 - Math.abs(move.to.x - 3.5)) * 4;
+                if (!piece.king && shouldPromote(piece.color, move.to.y)) score += 95;
+                if (isEdge(move.to.x, move.to.y)) score += 10;
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = move;
+                }
+            }
+            return best;
+        }
+
+        function showHint() {
+            if (state.thinking || state.gameOver) return;
+            const moves = state.forcedPiece
+                ? captureMovesFrom(state.forcedPiece.x, state.forcedPiece.y, state.board)
+                : legalMovesFor(state.current, state.board);
+            const move = chooseEngineMove(moves);
+            if (!move) return;
+            state.selected = { x: move.from.x, y: move.from.y };
+            state.legalMoves = moves.filter((candidate) => candidate.from.x === move.from.x && candidate.from.y === move.from.y);
+            state.status = `Suggested line: ${formatMove(move)}.`;
+            refreshMarkers();
+            updateUi();
+        }
+
+        function clearPiecesAndEffects() {
+            for (const mesh of pieceMeshes.values()) {
+                removePieceMesh(mesh);
+            }
+            pieceMeshes.clear();
+            for (const particle of effectParticles) {
+                effectRoot.remove(particle);
+                particle.material.dispose();
+            }
+            effectParticles.length = 0;
+            markerGroup.clear();
+        }
+
+        function removePieceMesh(mesh) {
+            pieceGroup.remove(mesh);
+            if (mesh.userData.kingRing?.material) {
+                mesh.userData.kingRing.material.dispose();
+            }
+        }
+
+        function recordMove(move, piece, promoted, source, continuing) {
+            const last = state.moveHistory[state.moveHistory.length - 1];
+            const canExtend = last
+                && last.color === piece.color
+                && last.continuing
+                && last.path[last.path.length - 1].x === move.from.x
+                && last.path[last.path.length - 1].y === move.from.y;
+
+            if (canExtend) {
+                last.path.push({ ...move.to });
+                last.to = { ...move.to };
+                last.captures += move.captures.length;
+                last.king = promoted || last.king;
+                last.continuing = continuing;
+                return;
+            }
+
+            state.moveHistory.push({
+                color: piece.color,
+                from: { ...move.from },
+                to: { ...move.to },
+                path: [{ ...move.from }, { ...move.to }],
+                captures: move.captures.length,
+                king: promoted,
+                source,
+                continuing
+            });
+        }
+
+        function legalMovesFor(color, board, onlyFrom = null) {
+            const quiet = [];
+            const captures = [];
+            for (let y = 0; y < SIZE; y++) {
+                for (let x = 0; x < SIZE; x++) {
+                    if (onlyFrom && (onlyFrom.x !== x || onlyFrom.y !== y)) continue;
+                    const piece = board[y][x];
+                    if (!piece || piece.color !== color) continue;
+                    quiet.push(...quietMovesFrom(x, y, board));
+                    captures.push(...captureMovesFrom(x, y, board));
+                }
+            }
+            return captures.length ? captures : quiet;
+        }
+
+        function selectableMovesFrom(x, y) {
+            const moves = state.forcedPiece
+                ? captureMovesFrom(state.forcedPiece.x, state.forcedPiece.y, state.board)
+                : legalMovesFor(state.current, state.board);
+            return moves.filter((move) => move.from.x === x && move.from.y === y);
+        }
+
+        function quietMovesFrom(x, y, board) {
+            const piece = board[y][x];
+            if (!piece) return [];
+            return moveDirections(piece)
+                .map(([dx, dy]) => ({ x: x + dx, y: y + dy }))
+                .filter((target) => inside(target.x, target.y) && isDarkSquare(target.x, target.y) && !board[target.y][target.x])
+                .map((target) => ({
+                    from: { x, y },
+                    to: target,
+                    captures: []
+                }));
+        }
+
+        function captureMovesFrom(x, y, board) {
+            const piece = board[y][x];
+            if (!piece) return [];
+            const moves = [];
+            for (const [dx, dy] of moveDirections(piece)) {
+                const middle = { x: x + dx, y: y + dy };
+                const target = { x: x + dx * 2, y: y + dy * 2 };
+                if (!inside(middle.x, middle.y) || !inside(target.x, target.y)) continue;
+                const victim = board[middle.y][middle.x];
+                if (!victim || victim.color === piece.color || board[target.y][target.x]) continue;
+                moves.push({
+                    from: { x, y },
+                    to: target,
+                    captures: [{ x: middle.x, y: middle.y, piece: { ...victim } }]
+                });
+            }
+            return moves;
+        }
+
+        function animateCapturedPiece(id, captorColor) {
+            const mesh = pieceMeshes.get(String(id));
+            if (!mesh) return;
+            mesh.userData.captured = state.time;
+            mesh.userData.velocity = new THREE.Vector3((Math.random() - 0.5) * 0.035, 0.055, (Math.random() - 0.5) * 0.035);
+            mesh.userData.spin = randomRange(-0.08, 0.08);
+            spawnWorldBurst(mesh.position, captorColor, 18);
+        }
+
+        function spawnMoveBurst(x, y, color, count) {
+            spawnWorldBurst(new THREE.Vector3(toWorld(x), 0.52, toWorld(y)), color, count);
+        }
+
+        function spawnWorldBurst(position, color, count) {
+            const base = new THREE.Color(color === 'red' ? 0xff6a7d : 0x72e9ff);
+            const burstCount = Math.min(count, 18);
+            for (let i = 0; i < burstCount; i++) {
+                const material = new THREE.MeshBasicMaterial({
+                    color: base.clone().lerp(new THREE.Color(0xfff2d6), Math.random() * 0.28),
+                    transparent: true,
+                    opacity: 0.48,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                const particle = new THREE.Mesh(geometries.spark, material);
+                const size = 0.7 + Math.random() * 0.6;
+                particle.position.copy(position).add(new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.22,
+                    Math.random() * 0.2,
+                    (Math.random() - 0.5) * 0.22
+                ));
+                particle.scale.setScalar(size);
+                particle.userData.velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 1.25,
+                    Math.random() * 1.1 + 0.34,
+                    (Math.random() - 0.5) * 1.25
+                );
+                particle.userData.life = 0.42 + Math.random() * 0.36;
+                particle.userData.maxLife = particle.userData.life;
+                particle.userData.size = size;
+                effectRoot.add(particle);
+                effectParticles.push(particle);
+            }
+            while (effectParticles.length > 180) {
+                const old = effectParticles.shift();
+                effectRoot.remove(old);
+                old.material.dispose();
+            }
+        }
+
+        function refreshMarkers() {
+            markerGroup.clear();
+            if (state.selected) {
+                addMarker(state.selected.x, state.selected.y, materials.select, geometries.marker, 0.052);
+            }
+            for (const move of state.legalMoves) {
+                const material = move.captures.length ? materials.capture : materials.move;
+                const geometry = move.captures.length ? geometries.captureMarker : geometries.marker;
+                addMarker(move.to.x, move.to.y, material, geometry, 0.058);
+            }
+        }
+
+        function addMarker(x, y, material, geometry, height) {
+            const marker = new THREE.Mesh(geometry, material);
+            marker.position.set(toWorld(x), height, toWorld(y));
+            marker.rotation.x = Math.PI / 2;
+            marker.userData.phase = Math.random() * Math.PI * 2;
+            markerGroup.add(marker);
+        }
+
+        function updatePieces(dt) {
+            for (const mesh of pieceMeshes.values()) {
+                if (mesh.userData.captured) {
+                    mesh.position.add(mesh.userData.velocity);
+                    mesh.userData.velocity.y -= dt * 0.12;
+                    mesh.rotation.y += mesh.userData.spin;
+                    mesh.scale.multiplyScalar(0.962);
+                    if (state.time - mesh.userData.captured > 0.65) {
+                        removePieceMesh(mesh);
+                        pieceMeshes.delete(String(mesh.userData.piece.id));
+                    }
+                    continue;
+                }
+                if (mesh.userData.target) {
+                    mesh.position.lerp(mesh.userData.target, 1 - Math.pow(0.002, dt));
+                }
+                const selected = state.selected && mesh.userData.coord?.x === state.selected.x && mesh.userData.coord?.y === state.selected.y;
+                const bob = selected ? Math.sin(state.time * 7) * 0.045 : 0;
+                mesh.position.y = 0.34 + bob;
+                mesh.rotation.y += (mesh.userData.piece.king ? 0.55 : 0.22) * dt;
+            }
+        }
+
+        function updateParticles(dt) {
+            for (let i = effectParticles.length - 1; i >= 0; i--) {
+                const particle = effectParticles[i];
+                particle.userData.life -= dt;
+                particle.userData.velocity.y -= dt * 2.45;
+                particle.position.addScaledVector(particle.userData.velocity, dt);
+                const alpha = Math.max(0, particle.userData.life / particle.userData.maxLife);
+                particle.material.opacity = alpha * 0.44;
+                particle.scale.setScalar(particle.userData.size * (0.78 + (1 - alpha) * 0.36));
+                if (particle.userData.life <= 0) {
+                    effectRoot.remove(particle);
+                    particle.material.dispose();
+                    effectParticles.splice(i, 1);
+                }
+            }
+        }
+
+        function updateMarkers() {
+            markerGroup.children.forEach((marker) => {
+                const pulse = 1 + Math.sin(state.time * 5 + marker.userData.phase) * 0.055;
+                marker.scale.setScalar(pulse);
+            });
+        }
+
+        function updateUi() {
+            const material = countMaterial();
+            const balance = evaluateBoard();
+            const balancePct = clamp((balance + 12) / 24 * 100, 4, 96);
+            const moveNumber = Math.floor(state.moveHistory.length / 2) + 1;
+            const moves = state.forcedPiece
+                ? captureMovesFrom(state.forcedPiece.x, state.forcedPiece.y, state.board)
+                : legalMovesFor(state.current, state.board);
+            const forced = moves.some((move) => move.captures.length);
+
+            ui.turn.textContent = state.thinking ? 'Ivory thinking' : labelColor(state.current);
+            ui.moveNumber.textContent = String(Math.max(1, moveNumber));
+            ui.mode.textContent = state.engine ? 'Engine' : 'Local';
+            ui.chain.textContent = state.forcedPiece ? 'Capture' : forced ? 'Forced' : 'Open';
+            ui.statusTitle.textContent = state.gameOver ? 'Game Complete' : state.thinking ? 'Engine Reading' : `${labelColor(state.current)} to Move`;
+            ui.statusCopy.textContent = state.thinking ? 'Ivory is reading captures, promotion lanes, and edge safety.' : state.status;
+            ui.balanceFill.style.width = `${balancePct}%`;
+            ui.balanceLabel.textContent = `${balance >= 0 ? 'R+' : 'I+'}${Math.abs(balance).toFixed(1)}`;
+            ui.redMen.textContent = String(material.redMen);
+            ui.ivoryMen.textContent = String(material.ivoryMen);
+            ui.redKings.textContent = String(material.redKings);
+            ui.ivoryKings.textContent = String(material.ivoryKings);
+            ui.undo.disabled = !state.snapshots.length || state.thinking;
+            ui.hint.disabled = state.thinking || state.gameOver;
+            ui.engine.textContent = state.engine ? 'Engine On' : 'Engine Off';
+            ui.engine.classList.toggle('active', state.engine);
+            ui.focus.classList.toggle('active', state.focused);
+            renderMoveList();
+        }
+
+        function renderMoveList() {
+            const rows = [];
+            const moves = state.moveHistory;
+            for (let i = 0; i < moves.length; i += 2) {
+                const red = moves[i];
+                const ivory = moves[i + 1];
+                rows.push(`<span>${Math.floor(i / 2) + 1}</span>`);
+                rows.push(`<span class="coord">${red ? formatMove(red) : ''}</span>`);
+                rows.push(`<span class="coord">${ivory ? formatMove(ivory) : ''}</span>`);
+            }
+            ui.moveList.innerHTML = rows.join('');
+        }
+
+        function onPointerMove(event) {
+            const coord = pickBoardCoord(event);
+            document.body.style.cursor = coord ? 'pointer' : 'default';
+        }
+
+        function onPointerDown(event) {
+            if (event.button !== 0 || state.thinking || state.gameOver) return;
+            const coord = pickBoardCoord(event);
+            if (!coord) return;
+            if (tryMove(coord.x, coord.y)) return;
+            selectPiece(coord.x, coord.y);
+        }
+
+        function pickBoardCoord(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            pointer.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
+            raycaster.setFromCamera(pointer, camera);
+            const hits = raycaster.intersectObjects(squareMeshes, false);
+            return hits[0]?.object.userData.coord || null;
+        }
+
+        function animate() {
+            const dt = Math.min(clock.getDelta(), 0.033);
+            state.time += dt;
+            updatePieces(dt);
+            updateParticles(dt);
+            updateMarkers();
+            controls.update();
+            bloomPass.strength = 0.1 + Math.min(0.05, effectParticles.length * 0.0014) + (state.selected ? 0.02 : 0);
+            composer.render();
+        }
+
+        function snapshotState() {
+            return {
+                board: cloneBoard(state.board),
+                current: state.current,
+                selected: state.selected ? { ...state.selected } : null,
+                forcedPiece: state.forcedPiece ? { ...state.forcedPiece } : null,
+                moveHistory: state.moveHistory.map((move) => ({
+                    ...move,
+                    from: { ...move.from },
+                    to: { ...move.to },
+                    path: move.path.map((step) => ({ ...step }))
+                })),
+                status: state.status,
+                gameOver: state.gameOver,
+                winner: state.winner
+            };
+        }
+
+        function restoreSnapshot(snapshot) {
+            state.board = cloneBoard(snapshot.board);
+            state.current = snapshot.current;
+            state.selected = snapshot.selected;
+            state.forcedPiece = snapshot.forcedPiece;
+            state.moveHistory = snapshot.moveHistory;
+            state.status = snapshot.status;
+            state.gameOver = snapshot.gameOver;
+            state.winner = snapshot.winner;
+            state.legalMoves = state.selected
+                ? selectableMovesFrom(state.selected.x, state.selected.y)
+                : [];
+        }
+
+        function evaluateBoard() {
+            let score = 0;
+            for (let y = 0; y < SIZE; y++) {
+                for (let x = 0; x < SIZE; x++) {
+                    const piece = state.board[y][x];
+                    if (!piece) continue;
+                    const value = piece.king ? 1.65 : 1;
+                    const advance = piece.color === 'red' ? (7 - y) * 0.05 : y * 0.05;
+                    score += (piece.color === 'red' ? 1 : -1) * (value + advance);
+                }
+            }
+            return score;
+        }
+
+        function countMaterial() {
+            const material = { redMen: 0, ivoryMen: 0, redKings: 0, ivoryKings: 0 };
+            for (const row of state.board) {
+                for (const piece of row) {
+                    if (!piece) continue;
+                    const key = `${piece.color}${piece.king ? 'Kings' : 'Men'}`;
+                    material[key] += 1;
+                }
+            }
+            return material;
+        }
+
+        function focusCamera() {
+            if (state.focused) {
+                camera.position.set(0, 16.4, 0.2);
+            } else {
+                camera.position.set(0, 11.5, 12.8);
+            }
+            controls.target.set(0, 0, 0);
+            controls.update();
+        }
+
+        function moveDirections(piece) {
+            if (piece.king) return [[1, 1], [-1, 1], [1, -1], [-1, -1]];
+            return piece.color === 'red' ? [[1, -1], [-1, -1]] : [[1, 1], [-1, 1]];
+        }
+
+        function shouldPromote(color, y) {
+            return color === 'red' ? y === 0 : y === SIZE - 1;
+        }
+
+        function formatMove(move) {
+            const crown = move.king ? '+' : '';
+            if (move.path?.length > 2) {
+                const sep = move.captures ? 'x' : '-';
+                const captures = move.captures > 1 ? ` x${move.captures}` : '';
+                return `${move.path.map((step) => formatCoord(step.x, step.y)).join(sep)}${crown}${captures}`;
+            }
+            const sep = move.captures ? 'x' : '-';
+            const captures = move.captures > 1 ? ` x${move.captures}` : '';
+            return `${formatCoord(move.from.x, move.from.y)}${sep}${formatCoord(move.to.x, move.to.y)}${crown}${captures}`;
+        }
+
+        function formatCoord(x, y) {
+            return `${FILES[x]}${SIZE - y}`;
+        }
+
+        function labelColor(color) {
+            return color === 'red' ? 'Red' : 'Ivory';
+        }
+
+        function opposite(color) {
+            return color === 'red' ? 'ivory' : 'red';
+        }
+
+        function emptyBoard() {
+            return Array.from({ length: SIZE }, () => Array.from({ length: SIZE }, () => null));
+        }
+
+        function cloneBoard(board) {
+            return board.map((row) => row.map((piece) => piece ? { ...piece } : null));
+        }
+
+        function inside(x, y) {
+            return x >= 0 && x < SIZE && y >= 0 && y < SIZE;
+        }
+
+        function isDarkSquare(x, y) {
+            return (x + y) % 2 === 1;
+        }
+
+        function isEdge(x, y) {
+            return x === 0 || x === SIZE - 1 || y === 0 || y === SIZE - 1;
+        }
+
+        function toWorld(index) {
+            return index - (SIZE - 1) / 2;
+        }
+
+        function randomRange(min, max) {
+            return min + Math.random() * (max - min);
+        }
+
+        function clamp(value, min, max) {
+            return Math.max(min, Math.min(max, value));
+        }
+
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+            bloomPass.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+</body>
+</html>
