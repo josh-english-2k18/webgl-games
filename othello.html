@@ -1,0 +1,1538 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Umbra Meridian Othello</title>
+    <style>
+        :root {
+            --bg: #04070a;
+            --ink: #f5f4ec;
+            --muted: rgba(245, 244, 236, 0.62);
+            --line: rgba(245, 244, 236, 0.15);
+            --panel: rgba(7, 10, 12, 0.74);
+            --green: #83f0ba;
+            --cyan: #72e9ff;
+            --gold: #ffd36a;
+            --red: #ff6a7d;
+            --ivory: #f8ead2;
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            letter-spacing: 0;
+        }
+
+        button {
+            font: inherit;
+        }
+
+        #stage {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 16% 18%, rgba(131, 240, 186, 0.12), transparent 30%),
+                radial-gradient(circle at 84% 76%, rgba(114, 233, 255, 0.11), transparent 32%),
+                linear-gradient(180deg, #101821 0%, #04070a 64%, #020304 100%);
+        }
+
+        #stage canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .grain,
+        .vignette {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .grain {
+            opacity: 0.06;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 56px 56px;
+            mask-image: radial-gradient(circle at 50% 52%, #000 0%, #000 58%, transparent 84%);
+        }
+
+        .vignette {
+            background:
+                linear-gradient(to right, rgba(0, 0, 0, 0.54), transparent 18%, transparent 82%, rgba(0, 0, 0, 0.54)),
+                linear-gradient(to bottom, rgba(0, 0, 0, 0.32), transparent 24%, transparent 72%, rgba(0, 0, 0, 0.72));
+        }
+
+        .hud {
+            position: fixed;
+            top: 18px;
+            left: 18px;
+            z-index: 20;
+            max-width: 470px;
+            pointer-events: none;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 11px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .mark {
+            position: relative;
+            width: 31px;
+            height: 31px;
+            border: 1px solid rgba(131, 240, 186, 0.82);
+            border-radius: 50%;
+            box-shadow: 0 0 24px rgba(131, 240, 186, 0.16), inset 0 0 16px rgba(131, 240, 186, 0.1);
+        }
+
+        .mark::before,
+        .mark::after {
+            content: "";
+            position: absolute;
+            inset: 6px;
+            border: 1px solid rgba(248, 234, 210, 0.72);
+            border-radius: 50%;
+        }
+
+        .mark::after {
+            inset: 12px;
+            border-color: rgba(114, 233, 255, 0.72);
+            border-radius: 50%;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 38px;
+            line-height: 0.95;
+            text-transform: uppercase;
+            text-shadow: 0 0 28px rgba(131, 240, 186, 0.18);
+        }
+
+        .readout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 820;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+        }
+
+        .readout strong {
+            color: var(--ink);
+        }
+
+        .side-panel {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            z-index: 22;
+            display: grid;
+            gap: 12px;
+            width: 350px;
+            pointer-events: none;
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.38);
+            pointer-events: auto;
+        }
+
+        .panel-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 13px 14px 0;
+        }
+
+        .panel h2 {
+            margin: 0;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        .panel-body {
+            padding: 12px 14px 14px;
+        }
+
+        #status-copy {
+            min-height: 42px;
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .meter {
+            display: grid;
+            grid-template-columns: 76px 1fr 54px;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 850;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+        }
+
+        .track {
+            height: 5px;
+            overflow: hidden;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .fill {
+            display: block;
+            width: 50%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--cyan), var(--green), var(--gold), var(--ivory));
+            transition: width 150ms ease;
+        }
+
+        .score-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1px;
+            overflow: hidden;
+            border: 1px solid rgba(245, 244, 236, 0.08);
+            border-radius: 6px;
+            background: rgba(245, 244, 236, 0.08);
+        }
+
+        .score-cell {
+            min-width: 0;
+            padding: 10px;
+            background: rgba(4, 7, 10, 0.72);
+        }
+
+        .score-cell span,
+        .score-cell strong {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .score-cell span {
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .score-cell strong {
+            margin-top: 5px;
+            font-size: 15px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .move-list {
+            max-height: 208px;
+            overflow: auto;
+            display: grid;
+            grid-template-columns: 38px 1fr 1fr;
+            gap: 1px;
+            border: 1px solid rgba(245, 244, 236, 0.08);
+            border-radius: 6px;
+            background: rgba(245, 244, 236, 0.08);
+        }
+
+        .move-list span {
+            min-width: 0;
+            padding: 7px 8px;
+            overflow: hidden;
+            background: rgba(4, 7, 10, 0.72);
+            color: var(--muted);
+            font-size: 12px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .move-list .coord {
+            color: var(--ink);
+            font-weight: 760;
+        }
+
+        .controls {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            left: 18px;
+            z-index: 25;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 11px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.38);
+        }
+
+        .control-btn {
+            min-width: 92px;
+            min-height: 40px;
+            padding: 0 12px;
+            border: 1px solid rgba(245, 244, 236, 0.15);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--ink);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 840;
+            text-transform: uppercase;
+            transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+        }
+
+        .control-btn:hover,
+        .control-btn.active {
+            border-color: rgba(131, 240, 186, 0.62);
+            background: rgba(131, 240, 186, 0.12);
+        }
+
+        .control-btn:disabled {
+            border-color: rgba(245, 244, 236, 0.08);
+            background: rgba(255, 255, 255, 0.025);
+            color: rgba(245, 244, 236, 0.32);
+            cursor: not-allowed;
+        }
+
+        #fallback {
+            position: fixed;
+            inset: 18px;
+            z-index: 100;
+            display: none;
+            place-items: center;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: rgba(6, 7, 10, 0.94);
+            text-align: center;
+        }
+
+        #fallback.visible {
+            display: grid;
+        }
+
+        @media (max-width: 940px) {
+            .side-panel {
+                top: auto;
+                right: 12px;
+                bottom: 84px;
+                left: 12px;
+                width: auto;
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .move-list {
+                max-height: 122px;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .hud {
+                top: 12px;
+                left: 12px;
+                max-width: 310px;
+            }
+
+            h1 {
+                font-size: 27px;
+            }
+
+            .side-panel {
+                display: none;
+            }
+
+            .controls {
+                right: 10px;
+                bottom: 10px;
+                left: 10px;
+                padding: 9px;
+            }
+
+            .control-btn {
+                flex: 1 1 92px;
+                min-width: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="stage"></div>
+    <div class="grain"></div>
+    <div class="vignette"></div>
+
+    <section class="hud" aria-label="Game status">
+        <div class="brand"><span class="mark"></span><span>Directional Flip Engine</span></div>
+        <h1>Umbra Meridian</h1>
+        <div class="readout">
+            <span>Turn <strong id="turn">Dark</strong></span>
+            <span>Move <strong id="move-number">1</strong></span>
+            <span>Mode <strong id="mode">Engine</strong></span>
+            <span>Moves <strong id="mobility">4</strong></span>
+        </div>
+    </section>
+
+    <aside class="side-panel">
+        <section class="panel" aria-label="Position analysis">
+            <div class="panel-head">
+                <h2 id="status-title">Opening Position</h2>
+            </div>
+            <div class="panel-body">
+                <p id="status-copy">Dark to move. Claim mobility, keep corners clean, and turn the edge only when it cannot be rolled back.</p>
+                <div class="meter">
+                    <span>Balance</span>
+                    <span class="track"><span id="balance-fill" class="fill"></span></span>
+                    <strong id="balance-label">0</strong>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Disc count">
+            <div class="panel-head">
+                <h2>Board</h2>
+            </div>
+            <div class="panel-body">
+                <div class="score-grid">
+                    <div class="score-cell"><span>Dark discs</span><strong id="dark-count">2</strong></div>
+                    <div class="score-cell"><span>Light discs</span><strong id="light-count">2</strong></div>
+                    <div class="score-cell"><span>Dark corners</span><strong id="dark-corners">0</strong></div>
+                    <div class="score-cell"><span>Light corners</span><strong id="light-corners">0</strong></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Move history">
+            <div class="panel-head">
+                <h2>Record</h2>
+            </div>
+            <div class="panel-body">
+                <div id="move-list" class="move-list"></div>
+            </div>
+        </section>
+    </aside>
+
+    <nav class="controls" aria-label="Game controls">
+        <button id="new-game" class="control-btn" type="button">New</button>
+        <button id="undo" class="control-btn" type="button">Undo</button>
+        <button id="engine" class="control-btn active" type="button">Engine On</button>
+        <button id="hint" class="control-btn" type="button">Hint</button>
+        <button id="focus" class="control-btn" type="button">Focus</button>
+    </nav>
+
+    <div id="fallback">
+        <p>WebGL initialization failed.</p>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.174.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+        const SIZE = 8;
+        const FILES = 'ABCDEFGH';
+        const DIRECTIONS = [
+            [-1, -1], [0, -1], [1, -1],
+            [-1, 0],           [1, 0],
+            [-1, 1],  [0, 1],  [1, 1]
+        ];
+        const POSITION_WEIGHTS = [
+            [120, -28, 24, 8, 8, 24, -28, 120],
+            [-28, -48, -8, -6, -6, -8, -48, -28],
+            [24, -8, 18, 4, 4, 18, -8, 24],
+            [8, -6, 4, 2, 2, 4, -6, 8],
+            [8, -6, 4, 2, 2, 4, -6, 8],
+            [24, -8, 18, 4, 4, 18, -8, 24],
+            [-28, -48, -8, -6, -6, -8, -48, -28],
+            [120, -28, 24, 8, 8, 24, -28, 120]
+        ];
+
+        const ui = {
+            stage: document.getElementById('stage'),
+            fallback: document.getElementById('fallback'),
+            turn: document.getElementById('turn'),
+            moveNumber: document.getElementById('move-number'),
+            mode: document.getElementById('mode'),
+            mobility: document.getElementById('mobility'),
+            statusTitle: document.getElementById('status-title'),
+            statusCopy: document.getElementById('status-copy'),
+            balanceFill: document.getElementById('balance-fill'),
+            balanceLabel: document.getElementById('balance-label'),
+            darkCount: document.getElementById('dark-count'),
+            lightCount: document.getElementById('light-count'),
+            darkCorners: document.getElementById('dark-corners'),
+            lightCorners: document.getElementById('light-corners'),
+            moveList: document.getElementById('move-list'),
+            newGame: document.getElementById('new-game'),
+            undo: document.getElementById('undo'),
+            engine: document.getElementById('engine'),
+            hint: document.getElementById('hint'),
+            focus: document.getElementById('focus')
+        };
+
+        const state = {
+            board: [],
+            current: 'dark',
+            legalMoves: [],
+            hintMove: null,
+            moveHistory: [],
+            snapshots: [],
+            engine: true,
+            thinking: false,
+            gameOver: false,
+            winner: null,
+            focused: false,
+            status: 'Dark to move. Claim mobility, keep corners clean, and turn the edge only when it cannot be rolled back.',
+            time: 0,
+            nextId: 1,
+            engineJob: 0
+        };
+
+        let scene;
+        let camera;
+        let renderer;
+        let controls;
+        let composer;
+        let bloomPass;
+        let boardGroup;
+        let squareGroup;
+        let discGroup;
+        let markerGroup;
+        let effectRoot;
+        let raycaster;
+        let pointer;
+        let clock;
+
+        const squareMeshes = [];
+        const discMeshes = new Map();
+        const effectParticles = [];
+        const materials = {};
+        const geometries = {};
+
+        init();
+
+        function init() {
+            try {
+                scene = new THREE.Scene();
+                scene.fog = new THREE.FogExp2(0x04070a, 0.022);
+
+                camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 800);
+                camera.position.set(0, 11.8, 13.2);
+
+                renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+                renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.outputColorSpace = THREE.SRGBColorSpace;
+                renderer.toneMapping = THREE.ACESFilmicToneMapping;
+                renderer.toneMappingExposure = 0.86;
+                ui.stage.appendChild(renderer.domElement);
+
+                controls = new OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.07;
+                controls.enablePan = false;
+                controls.minDistance = 8;
+                controls.maxDistance = 32;
+                controls.maxPolarAngle = Math.PI * 0.48;
+                controls.target.set(0, 0, 0);
+
+                composer = new EffectComposer(renderer);
+                composer.addPass(new RenderPass(scene, camera));
+                bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.12, 0.28, 0.76);
+                composer.addPass(bloomPass);
+                composer.addPass(new OutputPass());
+
+                raycaster = new THREE.Raycaster();
+                pointer = new THREE.Vector2();
+                clock = new THREE.Clock();
+                buildGeometries();
+                buildMaterials();
+                buildLights();
+                buildRoom();
+                resetGame();
+                bindEvents();
+                renderer.setAnimationLoop(animate);
+                window.__umbraMeridianOthelloReady = true;
+            } catch (error) {
+                console.error(error);
+                ui.fallback.classList.add('visible');
+            }
+        }
+
+        function buildGeometries() {
+            geometries.square = new THREE.BoxGeometry(0.98, 0.16, 0.98);
+            geometries.boardBase = new THREE.BoxGeometry(9.2, 0.34, 9.2);
+            geometries.disc = new THREE.CylinderGeometry(0.38, 0.41, 0.18, 56, 1, false);
+            geometries.discTop = new THREE.CylinderGeometry(0.31, 0.35, 0.035, 56, 1, false);
+            geometries.discRing = new THREE.TorusGeometry(0.33, 0.018, 8, 48);
+            geometries.marker = new THREE.TorusGeometry(0.36, 0.02, 8, 52);
+            geometries.hintMarker = new THREE.TorusGeometry(0.47, 0.026, 8, 52);
+            geometries.spark = new THREE.SphereGeometry(0.055, 12, 8);
+        }
+
+        function buildMaterials() {
+            materials.base = new THREE.MeshStandardMaterial({
+                color: 0x172018,
+                roughness: 0.58,
+                metalness: 0.08,
+                emissive: 0x061009,
+                emissiveIntensity: 0.13
+            });
+            materials.squareA = new THREE.MeshStandardMaterial({
+                color: 0x20513a,
+                roughness: 0.54,
+                metalness: 0.05,
+                emissive: 0x06160d,
+                emissiveIntensity: 0.12
+            });
+            materials.squareB = new THREE.MeshStandardMaterial({
+                color: 0x173b2c,
+                roughness: 0.56,
+                metalness: 0.06,
+                emissive: 0x04110a,
+                emissiveIntensity: 0.11
+            });
+            materials.darkDisc = new THREE.MeshPhysicalMaterial({
+                color: 0x050608,
+                roughness: 0.28,
+                metalness: 0.22,
+                clearcoat: 0.78,
+                clearcoatRoughness: 0.18,
+                emissive: 0x061118,
+                emissiveIntensity: 0.18
+            });
+            materials.lightDisc = new THREE.MeshPhysicalMaterial({
+                color: 0xf8ead2,
+                roughness: 0.26,
+                metalness: 0.05,
+                clearcoat: 0.62,
+                clearcoatRoughness: 0.2,
+                emissive: 0x21170a,
+                emissiveIntensity: 0.12
+            });
+            materials.darkTop = new THREE.MeshPhysicalMaterial({
+                color: 0x111923,
+                roughness: 0.34,
+                metalness: 0.16,
+                clearcoat: 0.58,
+                emissive: 0x04131b,
+                emissiveIntensity: 0.2
+            });
+            materials.lightTop = new THREE.MeshPhysicalMaterial({
+                color: 0xfff1d7,
+                roughness: 0.3,
+                metalness: 0.04,
+                clearcoat: 0.52,
+                emissive: 0x241707,
+                emissiveIntensity: 0.11
+            });
+            materials.move = new THREE.MeshBasicMaterial({
+                color: 0x83f0ba,
+                transparent: true,
+                opacity: 0.58,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            materials.hint = new THREE.MeshBasicMaterial({
+                color: 0xffd36a,
+                transparent: true,
+                opacity: 0.76,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+        }
+
+        function buildLights() {
+            scene.add(new THREE.AmbientLight(0xf5f1df, 0.58));
+
+            const key = new THREE.DirectionalLight(0xffffff, 2.2);
+            key.position.set(-8, 16, 10);
+            scene.add(key);
+
+            const rim = new THREE.PointLight(0x72e9ff, 3.2, 40);
+            rim.position.set(7, 5.5, -8);
+            scene.add(rim);
+
+            const warm = new THREE.PointLight(0x83f0ba, 2.4, 36);
+            warm.position.set(-7, 4, 6);
+            scene.add(warm);
+        }
+
+        function buildRoom() {
+            boardGroup = new THREE.Group();
+            squareGroup = new THREE.Group();
+            discGroup = new THREE.Group();
+            markerGroup = new THREE.Group();
+            effectRoot = new THREE.Group();
+            scene.add(boardGroup, discGroup, markerGroup, effectRoot);
+
+            const base = new THREE.Mesh(geometries.boardBase, materials.base);
+            base.position.y = -0.18;
+            boardGroup.add(base);
+
+            for (let y = 0; y < SIZE; y++) {
+                for (let x = 0; x < SIZE; x++) {
+                    const square = new THREE.Mesh(geometries.square, (x + y) % 2 ? materials.squareA : materials.squareB);
+                    square.position.set(toWorld(x), 0, toWorld(y));
+                    square.userData.coord = { x, y };
+                    squareMeshes.push(square);
+                    squareGroup.add(square);
+                }
+            }
+            boardGroup.add(squareGroup);
+
+            const grid = new THREE.GridHelper(22, 22, 0x83f0ba, 0x254a37);
+            grid.position.y = -0.34;
+            grid.material.transparent = true;
+            grid.material.opacity = 0.07;
+            scene.add(grid);
+        }
+
+        function bindEvents() {
+            window.addEventListener('resize', onResize);
+            renderer.domElement.addEventListener('pointerdown', onPointerDown);
+            renderer.domElement.addEventListener('pointermove', onPointerMove);
+            renderer.domElement.addEventListener('pointerleave', () => {
+                document.body.style.cursor = 'default';
+            });
+            ui.newGame.addEventListener('click', resetGame);
+            ui.undo.addEventListener('click', undoMove);
+            ui.engine.addEventListener('click', () => {
+                state.engine = !state.engine;
+                state.engineJob += 1;
+                if (!state.engine) state.thinking = false;
+                state.status = state.engine ? 'Engine enabled. Light will answer Dark automatically.' : 'Engine disabled. Both sides are local.';
+                refreshLegalMoves();
+                updateUi();
+                maybeScheduleEngine();
+            });
+            ui.hint.addEventListener('click', showHint);
+            ui.focus.addEventListener('click', () => {
+                state.focused = !state.focused;
+                focusCamera();
+                updateUi();
+            });
+        }
+
+        function resetGame() {
+            state.engineJob += 1;
+            clearDiscsAndEffects();
+            state.board = emptyBoard();
+            state.current = 'dark';
+            state.legalMoves = [];
+            state.hintMove = null;
+            state.moveHistory = [];
+            state.snapshots = [];
+            state.thinking = false;
+            state.gameOver = false;
+            state.winner = null;
+            state.status = 'Dark to move. Claim mobility, keep corners clean, and turn the edge only when it cannot be rolled back.';
+            state.nextId = 1;
+            placeInitialDisc(3, 3, 'light');
+            placeInitialDisc(4, 4, 'light');
+            placeInitialDisc(4, 3, 'dark');
+            placeInitialDisc(3, 4, 'dark');
+            syncDiscs(true);
+            refreshLegalMoves();
+            updateUi();
+        }
+
+        function placeInitialDisc(x, y, color) {
+            state.board[y][x] = { color, id: state.nextId++ };
+        }
+
+        function refreshLegalMoves() {
+            state.legalMoves = state.gameOver ? [] : legalMovesFor(state.current, state.board);
+            state.hintMove = state.hintMove && state.legalMoves.some((move) => sameSquare(move.to, state.hintMove.to)) ? state.hintMove : null;
+            refreshMarkers();
+        }
+
+        function syncDiscs(immediate = false) {
+            const seen = new Set();
+            for (let y = 0; y < SIZE; y++) {
+                for (let x = 0; x < SIZE; x++) {
+                    const disc = state.board[y][x];
+                    if (!disc) continue;
+                    const key = keyOf(x, y);
+                    seen.add(key);
+                    let mesh = discMeshes.get(key);
+                    if (!mesh) {
+                        mesh = createDiscMesh(disc);
+                        discMeshes.set(key, mesh);
+                        discGroup.add(mesh);
+                        mesh.position.set(toWorld(x), 0.32, toWorld(y));
+                        mesh.scale.setScalar(immediate ? 1 : 0.22);
+                        mesh.userData.pop = immediate ? 0 : 1;
+                    }
+                    mesh.userData.coord = { x, y };
+                    mesh.userData.target = new THREE.Vector3(toWorld(x), 0.32, toWorld(y));
+                    if (mesh.userData.color !== disc.color) {
+                        mesh.userData.flip = 1;
+                        mesh.userData.color = disc.color;
+                    }
+                    applyDiscColor(mesh, disc.color);
+                    if (immediate) {
+                        mesh.position.copy(mesh.userData.target);
+                        mesh.scale.setScalar(1);
+                        mesh.rotation.x = 0;
+                        mesh.userData.flip = 0;
+                        mesh.userData.pop = 0;
+                    }
+                }
+            }
+
+            for (const [key, mesh] of discMeshes) {
+                if (seen.has(key)) continue;
+                removeDiscMesh(mesh);
+                discMeshes.delete(key);
+            }
+        }
+
+        function createDiscMesh(disc) {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(geometries.disc, disc.color === 'dark' ? materials.darkDisc : materials.lightDisc);
+            const top = new THREE.Mesh(geometries.discTop, disc.color === 'dark' ? materials.darkTop : materials.lightTop);
+            const ring = new THREE.Mesh(geometries.discRing, new THREE.MeshBasicMaterial({
+                color: disc.color === 'dark' ? 0x72e9ff : 0xffd36a,
+                transparent: true,
+                opacity: 0.18,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            }));
+            top.position.y = 0.105;
+            ring.position.y = 0.125;
+            ring.rotation.x = Math.PI / 2;
+            group.add(body, top, ring);
+            group.userData.body = body;
+            group.userData.top = top;
+            group.userData.ring = ring;
+            group.userData.color = disc.color;
+            return group;
+        }
+
+        function applyDiscColor(mesh, color) {
+            mesh.userData.body.material = color === 'dark' ? materials.darkDisc : materials.lightDisc;
+            mesh.userData.top.material = color === 'dark' ? materials.darkTop : materials.lightTop;
+            mesh.userData.ring.material.color.setHex(color === 'dark' ? 0x72e9ff : 0xffd36a);
+        }
+
+        function onPointerDown(event) {
+            if (event.button !== 0 || state.thinking || state.gameOver) return;
+            if (state.engine && state.current === 'light') return;
+            const coord = pickBoardCoord(event);
+            if (!coord) return;
+            const move = state.legalMoves.find((candidate) => sameSquare(candidate.to, coord));
+            if (!move) {
+                state.status = state.legalMoves.length
+                    ? `Choose one of the highlighted ${labelColor(state.current)} moves.`
+                    : `${labelColor(state.current)} has no legal move.`;
+                updateUi();
+                return;
+            }
+            playMove(move, 'human');
+        }
+
+        function playMove(move, source) {
+            if (state.gameOver) return;
+            state.snapshots.push(snapshotState());
+            state.hintMove = null;
+            const disc = { color: state.current, id: state.nextId++ };
+            state.board[move.to.y][move.to.x] = disc;
+
+            for (const flip of move.flips) {
+                state.board[flip.y][flip.x].color = state.current;
+            }
+
+            state.moveHistory.push({
+                color: state.current,
+                to: { ...move.to },
+                flips: move.flips.length,
+                source
+            });
+
+            spawnMoveBurst(move.to, state.current, 10 + Math.min(14, move.flips.length * 2));
+            for (const flip of move.flips) spawnMoveBurst(flip, state.current, 4);
+            syncDiscs();
+            advanceTurnAfterMove(state.current);
+            refreshLegalMoves();
+            updateUi();
+            maybeScheduleEngine();
+        }
+
+        function advanceTurnAfterMove(colorJustMoved) {
+            const next = opposite(colorJustMoved);
+            const nextMoves = legalMovesFor(next, state.board);
+            const sameMoves = legalMovesFor(colorJustMoved, state.board);
+
+            if (nextMoves.length) {
+                state.current = next;
+                state.status = `${labelColor(next)} to move. ${nextMoves.length} legal ${nextMoves.length === 1 ? 'line' : 'lines'} available.`;
+                return;
+            }
+
+            if (sameMoves.length) {
+                state.current = colorJustMoved;
+                state.moveHistory.push({
+                    color: next,
+                    pass: true,
+                    source: 'rules'
+                });
+                state.status = `${labelColor(next)} has no legal move and passes. ${labelColor(colorJustMoved)} continues.`;
+                return;
+            }
+
+            finishGame();
+        }
+
+        function finishGame() {
+            const counts = countBoard();
+            state.gameOver = true;
+            if (counts.dark === counts.light) {
+                state.winner = null;
+                state.status = `Draw game at ${counts.dark}-${counts.light}.`;
+            } else {
+                state.winner = counts.dark > counts.light ? 'dark' : 'light';
+                state.status = `${labelColor(state.winner)} wins ${Math.max(counts.dark, counts.light)}-${Math.min(counts.dark, counts.light)}.`;
+            }
+        }
+
+        function undoMove() {
+            if (!state.snapshots.length || state.thinking) return;
+            state.engineJob += 1;
+            restoreSnapshot(state.snapshots.pop());
+            syncDiscs(true);
+            refreshLegalMoves();
+            updateUi();
+        }
+
+        function maybeScheduleEngine() {
+            if (!state.engine || state.current !== 'light' || state.gameOver || state.thinking) return;
+            const job = ++state.engineJob;
+            state.thinking = true;
+            updateUi();
+            window.setTimeout(() => {
+                if (job !== state.engineJob || !state.engine || state.gameOver || state.current !== 'light') {
+                    state.thinking = false;
+                    updateUi();
+                    return;
+                }
+                const move = chooseEngineMove(state.legalMoves);
+                state.thinking = false;
+                if (move) playMove(move, 'engine');
+                updateUi();
+            }, 520);
+        }
+
+        function chooseEngineMove(moves) {
+            let best = null;
+            let bestScore = -Infinity;
+            const depth = searchDepthForBoard(state.board, moves.length);
+            const ordered = orderMoves(moves, state.board, state.current);
+            for (const move of ordered) {
+                const simulated = applyMoveToClone(state.board, state.current, move);
+                const score = minimax(
+                    simulated,
+                    opposite(state.current),
+                    state.current,
+                    depth - 1,
+                    -Infinity,
+                    Infinity,
+                    0
+                ) + Math.random() * 0.001;
+                if (score > bestScore) {
+                    bestScore = score;
+                    best = {
+                        to: { ...move.to },
+                        flips: move.flips.map((flip) => ({ ...flip })),
+                        score,
+                        analysisDepth: depth
+                    };
+                }
+            }
+            return best;
+        }
+
+        function minimax(board, colorToMove, rootColor, depth, alpha, beta, passCount) {
+            const occupied = countOccupied(board);
+            if (occupied === SIZE * SIZE || passCount >= 2) {
+                return terminalScore(board, rootColor);
+            }
+            if (depth <= 0) {
+                return evaluateBoard(board, rootColor);
+            }
+
+            const moves = legalMovesFor(colorToMove, board);
+            if (!moves.length) {
+                return minimax(board, opposite(colorToMove), rootColor, depth - 1, alpha, beta, passCount + 1);
+            }
+
+            const ordered = orderMoves(moves, board, colorToMove);
+            if (colorToMove === rootColor) {
+                let value = -Infinity;
+                for (const move of ordered) {
+                    const simulated = applyMoveToClone(board, colorToMove, move);
+                    value = Math.max(value, minimax(simulated, opposite(colorToMove), rootColor, depth - 1, alpha, beta, 0));
+                    alpha = Math.max(alpha, value);
+                    if (beta <= alpha) break;
+                }
+                return value;
+            }
+
+            let value = Infinity;
+            for (const move of ordered) {
+                const simulated = applyMoveToClone(board, colorToMove, move);
+                value = Math.min(value, minimax(simulated, opposite(colorToMove), rootColor, depth - 1, alpha, beta, 0));
+                beta = Math.min(beta, value);
+                if (beta <= alpha) break;
+            }
+            return value;
+        }
+
+        function orderMoves(moves, board, color) {
+            return moves.slice().sort((a, b) => moveOrderingScore(b, board, color) - moveOrderingScore(a, board, color));
+        }
+
+        function moveOrderingScore(move, board, color) {
+            const simulated = applyMoveToClone(board, color, move);
+            const rivalReplies = legalMovesFor(opposite(color), simulated).length;
+            let score = move.flips.length * 3 - rivalReplies * 2;
+            if (isCorner(move.to.x, move.to.y)) score += 300;
+            else if (isEdge(move.to.x, move.to.y)) score += 24;
+            if (isXSquare(move.to.x, move.to.y) && openAdjacentCorner(move.to.x, move.to.y, board)) score -= 180;
+            return score + evaluateBoard(simulated, color) * 0.08;
+        }
+
+        function searchDepthForBoard(board, moveCount) {
+            const occupied = countOccupied(board);
+            if (occupied >= 56 && moveCount <= 10) return 7;
+            if (occupied >= 48 && moveCount <= 12) return 6;
+            if (occupied >= 38 || moveCount <= 8) return 5;
+            if (moveCount >= 14) return 3;
+            return 4;
+        }
+
+        function showHint() {
+            if (state.thinking || state.gameOver || !state.legalMoves.length) return;
+            state.hintMove = chooseEngineMove(state.legalMoves);
+            if (!state.hintMove) return;
+            state.status = describeHint(state.hintMove);
+            refreshMarkers();
+            updateUi();
+        }
+
+        function describeHint(move) {
+            const simulated = applyMoveToClone(state.board, state.current, move);
+            const replies = legalMovesFor(opposite(state.current), simulated).length;
+            const traits = [];
+            if (isCorner(move.to.x, move.to.y)) traits.push('takes a corner');
+            else if (isEdge(move.to.x, move.to.y)) traits.push('claims an edge');
+            if (move.flips.length >= 5) traits.push(`flips ${move.flips.length}`);
+            if (replies <= 3) traits.push(`leaves ${replies} replies`);
+            if (isXSquare(move.to.x, move.to.y) && openAdjacentCorner(move.to.x, move.to.y, state.board)) traits.push('accepts corner risk');
+            const reason = traits.length ? traits.join('; ') : `flips ${move.flips.length} and preserves mobility`;
+            return `Suggested move: ${formatCoord(move.to.x, move.to.y)}; ${reason}. Search depth ${move.analysisDepth}.`;
+        }
+
+        function legalMovesFor(color, board) {
+            const moves = [];
+            for (let y = 0; y < SIZE; y++) {
+                for (let x = 0; x < SIZE; x++) {
+                    if (board[y][x]) continue;
+                    const flips = flipsForMove(color, x, y, board);
+                    if (flips.length) {
+                        moves.push({ to: { x, y }, flips });
+                    }
+                }
+            }
+            return moves;
+        }
+
+        function flipsForMove(color, x, y, board) {
+            const flips = [];
+            const rival = opposite(color);
+            for (const [dx, dy] of DIRECTIONS) {
+                const line = [];
+                let cx = x + dx;
+                let cy = y + dy;
+                while (inside(cx, cy) && board[cy][cx]?.color === rival) {
+                    line.push({ x: cx, y: cy });
+                    cx += dx;
+                    cy += dy;
+                }
+                if (line.length && inside(cx, cy) && board[cy][cx]?.color === color) {
+                    flips.push(...line);
+                }
+            }
+            return flips;
+        }
+
+        function applyMoveToClone(board, color, move) {
+            const clone = cloneBoard(board);
+            clone[move.to.y][move.to.x] = { color, id: 0 };
+            for (const flip of move.flips) clone[flip.y][flip.x].color = color;
+            return clone;
+        }
+
+        function refreshMarkers() {
+            markerGroup.clear();
+            for (const move of state.legalMoves) {
+                const hinted = state.hintMove && sameSquare(state.hintMove.to, move.to);
+                const marker = new THREE.Mesh(hinted ? geometries.hintMarker : geometries.marker, hinted ? materials.hint : materials.move);
+                marker.position.set(toWorld(move.to.x), hinted ? 0.066 : 0.052, toWorld(move.to.y));
+                marker.rotation.x = Math.PI / 2;
+                marker.userData.phase = Math.random() * Math.PI * 2;
+                marker.userData.flipCount = move.flips.length;
+                markerGroup.add(marker);
+            }
+        }
+
+        function spawnMoveBurst(coord, color, count) {
+            const position = new THREE.Vector3(toWorld(coord.x), 0.52, toWorld(coord.y));
+            const base = new THREE.Color(color === 'dark' ? 0x72e9ff : 0xffd36a);
+            const burstCount = Math.min(count, 20);
+            for (let i = 0; i < burstCount; i++) {
+                const material = new THREE.MeshBasicMaterial({
+                    color: base.clone().lerp(new THREE.Color(0xf8ead2), Math.random() * 0.28),
+                    transparent: true,
+                    opacity: 0.48,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                const particle = new THREE.Mesh(geometries.spark, material);
+                const size = 0.68 + Math.random() * 0.6;
+                particle.position.copy(position).add(new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.22,
+                    Math.random() * 0.2,
+                    (Math.random() - 0.5) * 0.22
+                ));
+                particle.scale.setScalar(size);
+                particle.userData.velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 1.25,
+                    Math.random() * 1.1 + 0.34,
+                    (Math.random() - 0.5) * 1.25
+                );
+                particle.userData.life = 0.42 + Math.random() * 0.36;
+                particle.userData.maxLife = particle.userData.life;
+                particle.userData.size = size;
+                effectRoot.add(particle);
+                effectParticles.push(particle);
+            }
+            while (effectParticles.length > 220) {
+                const old = effectParticles.shift();
+                effectRoot.remove(old);
+                old.material.dispose();
+            }
+        }
+
+        function updateDiscs(dt) {
+            for (const mesh of discMeshes.values()) {
+                if (mesh.userData.target) {
+                    mesh.position.lerp(mesh.userData.target, 1 - Math.pow(0.002, dt));
+                }
+                if (mesh.userData.pop > 0) {
+                    mesh.userData.pop = Math.max(0, mesh.userData.pop - dt * 4.2);
+                    const progress = 1 - mesh.userData.pop;
+                    mesh.scale.setScalar(0.24 + progress * 0.76);
+                    mesh.position.y = 0.32 + Math.sin(progress * Math.PI) * 0.16;
+                } else {
+                    mesh.scale.setScalar(1);
+                }
+                if (mesh.userData.flip > 0) {
+                    mesh.userData.flip = Math.max(0, mesh.userData.flip - dt * 2.7);
+                    const progress = 1 - mesh.userData.flip;
+                    mesh.rotation.x = Math.sin(progress * Math.PI) * Math.PI;
+                    mesh.position.y = 0.32 + Math.sin(progress * Math.PI) * 0.32;
+                    if (mesh.userData.flip <= 0) {
+                        mesh.rotation.x = 0;
+                        mesh.position.y = 0.32;
+                    }
+                }
+                mesh.rotation.y += dt * 0.18;
+            }
+        }
+
+        function updateParticles(dt) {
+            for (let i = effectParticles.length - 1; i >= 0; i--) {
+                const particle = effectParticles[i];
+                particle.userData.life -= dt;
+                particle.userData.velocity.y -= dt * 2.45;
+                particle.position.addScaledVector(particle.userData.velocity, dt);
+                const alpha = Math.max(0, particle.userData.life / particle.userData.maxLife);
+                particle.material.opacity = alpha * 0.44;
+                particle.scale.setScalar(particle.userData.size * (0.78 + (1 - alpha) * 0.36));
+                if (particle.userData.life <= 0) {
+                    effectRoot.remove(particle);
+                    particle.material.dispose();
+                    effectParticles.splice(i, 1);
+                }
+            }
+        }
+
+        function updateMarkers() {
+            markerGroup.children.forEach((marker) => {
+                const pulse = 1 + Math.sin(state.time * 5 + marker.userData.phase) * 0.055;
+                marker.scale.setScalar(pulse + marker.userData.flipCount * 0.012);
+            });
+        }
+
+        function updateUi() {
+            const counts = countBoard();
+            const darkMoves = legalMovesFor('dark', state.board).length;
+            const lightMoves = legalMovesFor('light', state.board).length;
+            const balance = evaluateBoard(state.board, 'dark');
+            const balancePct = clamp((balance + 24) / 48 * 100, 4, 96);
+            const darkMovesPlayed = state.moveHistory.filter((move) => move.color === 'dark' && !move.pass).length;
+            const moveNumber = darkMovesPlayed + (state.current === 'dark' && !state.gameOver ? 1 : 0);
+
+            ui.turn.textContent = state.thinking ? 'Light thinking' : labelColor(state.current);
+            ui.moveNumber.textContent = String(Math.max(1, moveNumber));
+            ui.mode.textContent = state.engine ? 'Engine' : 'Local';
+            ui.mobility.textContent = String(state.current === 'dark' ? darkMoves : lightMoves);
+            ui.statusTitle.textContent = state.gameOver ? 'Game Complete' : state.thinking ? 'Engine Reading' : `${labelColor(state.current)} to Move`;
+            ui.statusCopy.textContent = state.thinking ? 'Light is reading corners, parity, edge safety, and mobility.' : state.status;
+            ui.balanceFill.style.width = `${balancePct}%`;
+            ui.balanceLabel.textContent = `${balance >= 0 ? 'D+' : 'L+'}${Math.abs(balance).toFixed(1)}`;
+            ui.darkCount.textContent = String(counts.dark);
+            ui.lightCount.textContent = String(counts.light);
+            ui.darkCorners.textContent = String(counts.darkCorners);
+            ui.lightCorners.textContent = String(counts.lightCorners);
+            ui.undo.disabled = !state.snapshots.length || state.thinking;
+            ui.hint.disabled = state.thinking || state.gameOver || !state.legalMoves.length;
+            ui.engine.textContent = state.engine ? 'Engine On' : 'Engine Off';
+            ui.engine.classList.toggle('active', state.engine);
+            ui.focus.classList.toggle('active', state.focused);
+            renderMoveList();
+        }
+
+        function renderMoveList() {
+            const rows = [];
+            const moves = state.moveHistory;
+            for (let i = 0; i < moves.length; i += 2) {
+                const dark = moves[i];
+                const light = moves[i + 1];
+                rows.push(`<span>${Math.floor(i / 2) + 1}</span>`);
+                rows.push(`<span class="coord">${dark ? formatMove(dark) : ''}</span>`);
+                rows.push(`<span class="coord">${light ? formatMove(light) : ''}</span>`);
+            }
+            ui.moveList.innerHTML = rows.join('');
+        }
+
+        function onPointerMove(event) {
+            const coord = pickBoardCoord(event);
+            const legal = coord && state.legalMoves.some((move) => sameSquare(move.to, coord));
+            document.body.style.cursor = legal ? 'pointer' : 'default';
+        }
+
+        function pickBoardCoord(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            pointer.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
+            raycaster.setFromCamera(pointer, camera);
+            const hits = raycaster.intersectObjects(squareMeshes, false);
+            return hits[0]?.object.userData.coord || null;
+        }
+
+        function animate() {
+            const dt = Math.min(clock.getDelta(), 0.033);
+            state.time += dt;
+            updateDiscs(dt);
+            updateParticles(dt);
+            updateMarkers();
+            controls.update();
+            bloomPass.strength = 0.1 + Math.min(0.05, effectParticles.length * 0.0012) + (state.hintMove ? 0.02 : 0);
+            composer.render();
+        }
+
+        function snapshotState() {
+            return {
+                board: cloneBoard(state.board),
+                current: state.current,
+                legalMoves: state.legalMoves.map(cloneMove),
+                hintMove: state.hintMove ? cloneMove(state.hintMove) : null,
+                moveHistory: state.moveHistory.map((move) => ({
+                    ...move,
+                    to: move.to ? { ...move.to } : null
+                })),
+                status: state.status,
+                gameOver: state.gameOver,
+                winner: state.winner,
+                nextId: state.nextId
+            };
+        }
+
+        function restoreSnapshot(snapshot) {
+            state.board = cloneBoard(snapshot.board);
+            state.current = snapshot.current;
+            state.legalMoves = snapshot.legalMoves.map(cloneMove);
+            state.hintMove = snapshot.hintMove ? cloneMove(snapshot.hintMove) : null;
+            state.moveHistory = snapshot.moveHistory;
+            state.status = snapshot.status;
+            state.gameOver = snapshot.gameOver;
+            state.winner = snapshot.winner;
+            state.nextId = snapshot.nextId;
+        }
+
+        function clearDiscsAndEffects() {
+            for (const mesh of discMeshes.values()) removeDiscMesh(mesh);
+            discMeshes.clear();
+            for (const particle of effectParticles) {
+                effectRoot.remove(particle);
+                particle.material.dispose();
+            }
+            effectParticles.length = 0;
+            markerGroup.clear();
+        }
+
+        function removeDiscMesh(mesh) {
+            discGroup.remove(mesh);
+            if (mesh.userData.ring?.material) mesh.userData.ring.material.dispose();
+        }
+
+        function countBoard() {
+            return countBoardFor(state.board);
+        }
+
+        function countBoardFor(board) {
+            const counts = { dark: 0, light: 0, darkCorners: 0, lightCorners: 0 };
+            for (let y = 0; y < SIZE; y++) {
+                for (let x = 0; x < SIZE; x++) {
+                    const disc = board[y][x];
+                    if (!disc) continue;
+                    counts[disc.color] += 1;
+                    if (isCorner(x, y)) counts[`${disc.color}Corners`] += 1;
+                }
+            }
+            return counts;
+        }
+
+        function evaluateBoard(board, color) {
+            const rival = opposite(color);
+            const counts = countBoardFor(board);
+            const occupied = counts.dark + counts.light;
+            const phase = occupied / (SIZE * SIZE);
+            const discDiff = counts[color] - counts[rival];
+            const cornerDiff = counts[`${color}Corners`] - counts[`${rival}Corners`];
+            const mobilityDiff = legalMovesFor(color, board).length - legalMovesFor(rival, board).length;
+            const frontierDiff = frontierCount(board, color) - frontierCount(board, rival);
+            const riskDiff = cornerRisk(board, color) - cornerRisk(board, rival);
+            const stableDiff = stableEdgeCount(board, color) - stableEdgeCount(board, rival);
+            let score = 0;
+            for (let y = 0; y < SIZE; y++) {
+                for (let x = 0; x < SIZE; x++) {
+                    const disc = board[y][x];
+                    if (!disc) continue;
+                    score += (disc.color === color ? 1 : -1) * POSITION_WEIGHTS[y][x] * 0.18;
+                }
+            }
+            score += cornerDiff * 34;
+            score += mobilityDiff * (phase < 0.78 ? 5.2 : 2.2);
+            score += stableDiff * 4.8;
+            score -= frontierDiff * (phase < 0.72 ? 2.6 : 1.1);
+            score -= riskDiff * 18;
+            score += discDiff * (phase < 0.52 ? -0.35 : phase < 0.78 ? 0.45 : 2.8);
+            return score;
+        }
+
+        function terminalScore(board, color) {
+            const counts = countBoardFor(board);
+            const diff = counts[color] - counts[opposite(color)];
+            if (diff === 0) return 0;
+            return diff > 0 ? 10000 + diff * 100 : -10000 + diff * 100;
+        }
+
+        function countOccupied(board) {
+            const counts = countBoardFor(board);
+            return counts.dark + counts.light;
+        }
+
+        function frontierCount(board, color) {
+            let count = 0;
+            for (let y = 0; y < SIZE; y++) {
+                for (let x = 0; x < SIZE; x++) {
+                    if (board[y][x]?.color !== color) continue;
+                    if (DIRECTIONS.some(([dx, dy]) => inside(x + dx, y + dy) && !board[y + dy][x + dx])) {
+                        count += 1;
+                    }
+                }
+            }
+            return count;
+        }
+
+        function cornerRisk(board, color) {
+            const risks = [
+                { corner: [0, 0], cells: [[1, 0, 1], [0, 1, 1], [1, 1, 2]] },
+                { corner: [7, 0], cells: [[6, 0, 1], [7, 1, 1], [6, 1, 2]] },
+                { corner: [0, 7], cells: [[1, 7, 1], [0, 6, 1], [1, 6, 2]] },
+                { corner: [7, 7], cells: [[6, 7, 1], [7, 6, 1], [6, 6, 2]] }
+            ];
+            let risk = 0;
+            for (const item of risks) {
+                const [cx, cy] = item.corner;
+                if (board[cy][cx]) continue;
+                for (const [x, y, weight] of item.cells) {
+                    if (board[y][x]?.color === color) risk += weight;
+                }
+            }
+            return risk;
+        }
+
+        function stableEdgeCount(board, color) {
+            const stable = new Set();
+            const corners = [
+                { x: 0, y: 0, lines: [[1, 0], [0, 1]] },
+                { x: 7, y: 0, lines: [[-1, 0], [0, 1]] },
+                { x: 0, y: 7, lines: [[1, 0], [0, -1]] },
+                { x: 7, y: 7, lines: [[-1, 0], [0, -1]] }
+            ];
+            for (const corner of corners) {
+                if (board[corner.y][corner.x]?.color !== color) continue;
+                stable.add(keyOf(corner.x, corner.y));
+                for (const [dx, dy] of corner.lines) {
+                    let x = corner.x + dx;
+                    let y = corner.y + dy;
+                    while (inside(x, y) && board[y][x]?.color === color) {
+                        stable.add(keyOf(x, y));
+                        x += dx;
+                        y += dy;
+                    }
+                }
+            }
+            return stable.size;
+        }
+
+        function focusCamera() {
+            if (state.focused) {
+                camera.position.set(0, 16.4, 0.2);
+            } else {
+                camera.position.set(0, 11.8, 13.2);
+            }
+            controls.target.set(0, 0, 0);
+            controls.update();
+        }
+
+        function formatMove(move) {
+            if (move.pass) return `${labelColor(move.color)[0]} pass`;
+            return `${formatCoord(move.to.x, move.to.y)} x${move.flips}`;
+        }
+
+        function formatCoord(x, y) {
+            return `${FILES[x]}${SIZE - y}`;
+        }
+
+        function labelColor(color) {
+            return color === 'dark' ? 'Dark' : 'Light';
+        }
+
+        function opposite(color) {
+            return color === 'dark' ? 'light' : 'dark';
+        }
+
+        function keyOf(x, y) {
+            return `${x},${y}`;
+        }
+
+        function emptyBoard() {
+            return Array.from({ length: SIZE }, () => Array.from({ length: SIZE }, () => null));
+        }
+
+        function cloneBoard(board) {
+            return board.map((row) => row.map((disc) => disc ? { ...disc } : null));
+        }
+
+        function cloneMove(move) {
+            return {
+                to: { ...move.to },
+                flips: move.flips.map((flip) => ({ ...flip }))
+            };
+        }
+
+        function sameSquare(a, b) {
+            return a?.x === b?.x && a?.y === b?.y;
+        }
+
+        function inside(x, y) {
+            return x >= 0 && x < SIZE && y >= 0 && y < SIZE;
+        }
+
+        function isCorner(x, y) {
+            return (x === 0 || x === SIZE - 1) && (y === 0 || y === SIZE - 1);
+        }
+
+        function isEdge(x, y) {
+            return x === 0 || x === SIZE - 1 || y === 0 || y === SIZE - 1;
+        }
+
+        function isXSquare(x, y) {
+            return (x === 1 || x === SIZE - 2) && (y === 1 || y === SIZE - 2);
+        }
+
+        function openAdjacentCorner(x, y, board) {
+            const cornerX = x < SIZE / 2 ? 0 : SIZE - 1;
+            const cornerY = y < SIZE / 2 ? 0 : SIZE - 1;
+            return !board[cornerY][cornerX];
+        }
+
+        function toWorld(index) {
+            return index - (SIZE - 1) / 2;
+        }
+
+        function clamp(value, min, max) {
+            return Math.max(min, Math.min(max, value));
+        }
+
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+            bloomPass.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+</body>
+</html>

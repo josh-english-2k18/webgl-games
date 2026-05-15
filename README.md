@@ -9,6 +9,7 @@ The strategic direction is to use small, self-contained WebGL experiments to exp
 - [Vesper Belt](https://josh-english-2k18.github.io/webgl-games/asteroids.html) (`asteroids.html`)
 - [Crownfield Chess](https://josh-english-2k18.github.io/webgl-games/chess.html) (`chess.html`)
 - [Crownline Checkers](https://josh-english-2k18.github.io/webgl-games/checkers.html) (`checkers.html`)
+- [Umbra Meridian Othello](https://josh-english-2k18.github.io/webgl-games/othello.html) (`othello.html`)
 - [Sente Garden](https://josh-english-2k18.github.io/webgl-games/go.webgl.html) (`go.webgl.html`)
 - [Matrix Audio Visualizer](https://josh-english-2k18.github.io/webgl-games/matrix-audio-visualizer.html) (`matrix-audio-visualizer.html`)
 - [Auralith Mastering Console](https://josh-english-2k18.github.io/webgl-games/mastering-console-visualizer.html) (`mastering-console-visualizer.html`)
