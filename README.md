@@ -7,6 +7,7 @@ The strategic direction is to use small, self-contained WebGL experiments to exp
 
 - [3D Audio Meter](https://josh-english-2k18.github.io/webgl-games/3d-audio-meter.html) (`3d-audio-meter.html`)
 - [Axiom Breach](https://josh-english-2k18.github.io/webgl-games/axiom-breach.html) (`axiom-breach.html`)
+- [Rift Conductor](https://josh-english-2k18.github.io/webgl-games/rift-conductor.html) (`rift-conductor.html`)
 - [Vesper Belt](https://josh-english-2k18.github.io/webgl-games/asteroids.html) (`asteroids.html`)
 - [Crownfield Chess](https://josh-english-2k18.github.io/webgl-games/chess.html) (`chess.html`)
 - [Crownline Checkers](https://josh-english-2k18.github.io/webgl-games/checkers.html) (`checkers.html`)

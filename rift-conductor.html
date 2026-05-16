@@ -1,0 +1,2873 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Rift Conductor</title>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.174.0/examples/jsm/"
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg: #03050a;
+            --ink: #f6fbff;
+            --muted: rgba(246, 251, 255, 0.64);
+            --line: rgba(246, 251, 255, 0.14);
+            --panel: rgba(7, 10, 16, 0.78);
+            --cyan: #74edff;
+            --green: #8cffb4;
+            --gold: #ffd56d;
+            --red: #ff5878;
+            --violet: #c799ff;
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            letter-spacing: 0;
+        }
+
+        button {
+            font: inherit;
+        }
+
+        #stage {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 18% 18%, rgba(116, 237, 255, 0.13), transparent 30%),
+                radial-gradient(circle at 80% 72%, rgba(255, 88, 120, 0.12), transparent 30%),
+                radial-gradient(circle at 48% 38%, rgba(199, 153, 255, 0.1), transparent 34%),
+                linear-gradient(180deg, #0e1722 0%, #05070d 68%, #020307 100%);
+        }
+
+        #stage canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .grain,
+        .vignette {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .grain {
+            opacity: 0.055;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 52px 52px;
+            mask-image: radial-gradient(circle at 50% 54%, #000 0%, #000 58%, transparent 86%);
+        }
+
+        .vignette {
+            background:
+                linear-gradient(to right, rgba(0, 0, 0, 0.58), transparent 19%, transparent 82%, rgba(0, 0, 0, 0.58)),
+                linear-gradient(to bottom, rgba(0, 0, 0, 0.28), transparent 28%, transparent 74%, rgba(0, 0, 0, 0.74));
+        }
+
+        .hud {
+            position: fixed;
+            top: 18px;
+            left: 18px;
+            z-index: 20;
+            max-width: 500px;
+            pointer-events: none;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .mark {
+            position: relative;
+            width: 32px;
+            height: 32px;
+            border: 1px solid rgba(116, 237, 255, 0.82);
+            border-radius: 50%;
+            box-shadow: 0 0 22px rgba(116, 237, 255, 0.18), inset 0 0 16px rgba(116, 237, 255, 0.12);
+        }
+
+        .mark::before,
+        .mark::after {
+            content: "";
+            position: absolute;
+            inset: 7px;
+            border: 1px solid rgba(255, 213, 109, 0.74);
+            transform: rotate(45deg);
+        }
+
+        .mark::after {
+            inset: 12px;
+            border-color: rgba(255, 88, 120, 0.74);
+            border-radius: 50%;
+            transform: none;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 40px;
+            line-height: 0.94;
+            text-transform: uppercase;
+            text-shadow: 0 0 28px rgba(116, 237, 255, 0.2);
+        }
+
+        .readout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 820;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+        }
+
+        .readout strong {
+            color: var(--ink);
+        }
+
+        .side-panel {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            z-index: 22;
+            display: grid;
+            gap: 12px;
+            width: 360px;
+            pointer-events: none;
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.4);
+            pointer-events: auto;
+        }
+
+        .panel-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 13px 14px 0;
+        }
+
+        .panel h2 {
+            margin: 0;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        .panel-body {
+            padding: 12px 14px 14px;
+        }
+
+        #mission-copy,
+        #plan-copy,
+        #inspect-copy,
+        #intent-copy {
+            min-height: 40px;
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .meter {
+            display: grid;
+            grid-template-columns: 72px 1fr 48px;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 850;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+        }
+
+        .track {
+            height: 5px;
+            overflow: hidden;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .fill {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--red), var(--gold), var(--green), var(--cyan));
+            transition: width 160ms ease;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1px;
+            overflow: hidden;
+            border: 1px solid rgba(246, 251, 255, 0.08);
+            border-radius: 6px;
+            background: rgba(246, 251, 255, 0.08);
+        }
+
+        .stat-cell {
+            min-width: 0;
+            padding: 10px;
+            background: rgba(4, 7, 12, 0.72);
+        }
+
+        .stat-cell span,
+        .stat-cell strong {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .stat-cell span {
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .stat-cell strong {
+            margin-top: 5px;
+            font-size: 15px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .action-log {
+            display: grid;
+            gap: 1px;
+            max-height: 168px;
+            overflow: auto;
+            border: 1px solid rgba(246, 251, 255, 0.08);
+            border-radius: 6px;
+            background: rgba(4, 7, 12, 0.66);
+        }
+
+        .log-entry {
+            padding: 8px 9px;
+            background: rgba(246, 251, 255, 0.055);
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        .log-entry strong {
+            color: var(--ink);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .log-entry.good {
+            color: rgba(140, 255, 180, 0.88);
+        }
+
+        .log-entry.bad {
+            color: rgba(255, 88, 120, 0.9);
+        }
+
+        .log-entry.system {
+            color: rgba(116, 237, 255, 0.86);
+        }
+
+        .controls {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            left: 18px;
+            z-index: 25;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 11px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.4);
+        }
+
+        .control-btn {
+            min-width: 92px;
+            min-height: 40px;
+            padding: 0 12px;
+            border: 1px solid rgba(246, 251, 255, 0.15);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.052);
+            color: var(--ink);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 840;
+            text-transform: uppercase;
+            transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+        }
+
+        .control-btn:hover,
+        .control-btn.active {
+            border-color: rgba(116, 237, 255, 0.66);
+            background: rgba(116, 237, 255, 0.12);
+        }
+
+        .control-btn.commit {
+            border-color: rgba(140, 255, 180, 0.44);
+            background: rgba(140, 255, 180, 0.1);
+        }
+
+        .control-btn:disabled {
+            border-color: rgba(246, 251, 255, 0.08);
+            background: rgba(255, 255, 255, 0.025);
+            color: rgba(246, 251, 255, 0.32);
+            cursor: not-allowed;
+        }
+
+        .debug-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 40;
+            display: none;
+            place-items: center;
+            padding: 18px;
+            background: rgba(0, 0, 0, 0.42);
+            backdrop-filter: blur(8px);
+        }
+
+        .debug-modal.visible {
+            display: grid;
+        }
+
+        .debug-panel {
+            width: min(640px, 100%);
+            border: 1px solid rgba(116, 237, 255, 0.32);
+            border-radius: var(--radius);
+            background: rgba(7, 10, 16, 0.93);
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.56);
+        }
+
+        .debug-head,
+        .debug-actions {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 14px;
+        }
+
+        .debug-actions {
+            border-top: 1px solid rgba(246, 251, 255, 0.08);
+            justify-content: flex-start;
+        }
+
+        .debug-head h2 {
+            margin: 0;
+            font-size: 15px;
+            text-transform: uppercase;
+        }
+
+        .debug-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 1px;
+            padding: 0 14px 14px;
+        }
+
+        .debug-stat {
+            min-width: 0;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.045);
+        }
+
+        .debug-stat span,
+        .debug-stat strong {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .debug-stat span {
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .debug-stat strong {
+            margin-top: 5px;
+            font-size: 14px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .debug-btn {
+            min-height: 36px;
+            padding: 0 11px;
+            border: 1px solid rgba(246, 251, 255, 0.15);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.055);
+            color: var(--ink);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 820;
+            text-transform: uppercase;
+        }
+
+        .debug-btn:hover {
+            border-color: rgba(116, 237, 255, 0.62);
+            background: rgba(116, 237, 255, 0.11);
+        }
+
+        .upgrade-options {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 10px;
+            padding: 0 14px 14px;
+        }
+
+        .upgrade-card {
+            min-height: 132px;
+            padding: 12px;
+            border: 1px solid rgba(116, 237, 255, 0.2);
+            border-radius: 7px;
+            background: rgba(255, 255, 255, 0.055);
+            color: var(--ink);
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .upgrade-card:hover {
+            border-color: rgba(140, 255, 180, 0.56);
+            background: rgba(140, 255, 180, 0.09);
+        }
+
+        .upgrade-card strong,
+        .upgrade-card span {
+            display: block;
+        }
+
+        .upgrade-card strong {
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        .upgrade-card span {
+            margin-top: 8px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        #fallback {
+            position: fixed;
+            inset: 18px;
+            z-index: 100;
+            display: none;
+            place-items: center;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: rgba(6, 7, 10, 0.94);
+            text-align: center;
+        }
+
+        #fallback.visible {
+            display: grid;
+        }
+
+        @media (max-width: 960px) {
+            .side-panel {
+                top: auto;
+                right: 12px;
+                bottom: 92px;
+                left: 12px;
+                width: auto;
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .side-panel .panel:first-child,
+            .side-panel .panel:last-child {
+                grid-column: 1 / -1;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .hud {
+                top: 12px;
+                left: 12px;
+                max-width: 320px;
+            }
+
+            h1 {
+                font-size: 28px;
+            }
+
+            .side-panel {
+                display: none;
+            }
+
+            .controls {
+                right: 10px;
+                bottom: 10px;
+                left: 10px;
+                padding: 9px;
+            }
+
+            .control-btn {
+                flex: 1 1 92px;
+                min-width: 0;
+            }
+
+            .upgrade-options {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="stage"></div>
+    <div class="grain"></div>
+    <div class="vignette"></div>
+
+    <section class="hud" aria-label="Mission status">
+        <div class="brand"><span class="mark"></span><span>Single-Unit Chain Reaction Tactics</span></div>
+        <h1>Rift Conductor</h1>
+        <div class="readout">
+            <span>Wave <strong id="turn">1</strong></span>
+            <span>Phase <strong id="phase">Planning</strong></span>
+            <span>Core <strong id="core">6</strong></span>
+            <span>Upgrades <strong id="upgrade-count">0</strong></span>
+        </div>
+    </section>
+
+    <aside class="side-panel">
+        <section class="panel" aria-label="Rift state">
+            <div class="panel-head">
+                <h2 id="mission-title">Conduct The Rift</h2>
+            </div>
+            <div class="panel-body">
+                <p id="mission-copy">Endless run. Clear waves, choose upgrades, and keep the core alive as the arena mutates.</p>
+                <div class="meter">
+                    <span>Core</span>
+                    <span class="track"><span id="core-fill" class="fill"></span></span>
+                    <strong id="core-label">6/6</strong>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Current plan">
+            <div class="panel-head">
+                <h2>Current Plan</h2>
+            </div>
+            <div class="panel-body">
+                <p id="plan-copy">Beam fires one strong line. Fork fires three weaker lines. Mine waits for a signal, then blasts nearby enemies.</p>
+                <div class="stat-grid">
+                    <div class="stat-cell"><span>Tool</span><strong id="mode-label">Beam</strong></div>
+                    <div class="stat-cell"><span>Move</span><strong id="move-label">Ready</strong></div>
+                    <div class="stat-cell"><span>Queued</span><strong id="power-label">None</strong></div>
+                    <div class="stat-cell"><span>Cascade</span><strong id="cascade-label">Idle</strong></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Enemy intent">
+            <div class="panel-head">
+                <h2>Enemy Intent</h2>
+            </div>
+            <div class="panel-body">
+                <p id="intent-copy">Enemy routes are visible before the cascade resolves.</p>
+                <div class="stat-grid">
+                    <div class="stat-cell"><span>Enemies</span><strong id="enemy-count">0</strong></div>
+                    <div class="stat-cell"><span>Relays</span><strong id="relay-count">0</strong></div>
+                    <div class="stat-cell"><span>Mines</span><strong id="anchor-count">0</strong></div>
+                    <div class="stat-cell"><span>Threat</span><strong id="threat-count">0</strong></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Board inspection">
+            <div class="panel-head">
+                <h2 id="inspect-title">Inspect Board</h2>
+            </div>
+            <div class="panel-body">
+                <p id="inspect-copy">Click any enemy, relay, mine, core, crack, or tile to see what it does.</p>
+                <div class="stat-grid">
+                    <div class="stat-cell"><span>Kind</span><strong id="inspect-kind">-</strong></div>
+                    <div class="stat-cell"><span>Tile</span><strong id="inspect-position">-</strong></div>
+                    <div class="stat-cell"><span>Effect</span><strong id="inspect-effect">-</strong></div>
+                    <div class="stat-cell"><span>State</span><strong id="inspect-state">-</strong></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Action log">
+            <div class="panel-head">
+                <h2>Signal Log</h2>
+            </div>
+            <div class="panel-body">
+                <div id="action-log" class="action-log"></div>
+            </div>
+        </section>
+    </aside>
+
+    <nav class="controls" aria-label="Game controls">
+        <button id="new-game" class="control-btn" type="button">New</button>
+        <button id="move-mode" class="control-btn" type="button">Move</button>
+        <button id="pulse-mode" class="control-btn active" type="button">Beam</button>
+        <button id="split-mode" class="control-btn" type="button">Fork</button>
+        <button id="anchor-mode" class="control-btn" type="button">Mine</button>
+        <button id="undo-plan" class="control-btn" type="button">Undo</button>
+        <button id="focus" class="control-btn" type="button">Focus</button>
+        <button id="commit" class="control-btn commit" type="button">Commit</button>
+    </nav>
+
+    <div id="debug-modal" class="debug-modal" aria-hidden="true">
+        <section class="debug-panel" role="dialog" aria-modal="true" aria-labelledby="debug-title">
+            <header class="debug-head">
+                <h2 id="debug-title">Debug Console</h2>
+                <button id="debug-close" class="debug-btn" type="button">Close</button>
+            </header>
+            <div class="debug-grid">
+                <div class="debug-stat"><span>Wave</span><strong id="debug-turn">1</strong></div>
+                <div class="debug-stat"><span>Core</span><strong id="debug-core">6</strong></div>
+                <div class="debug-stat"><span>Enemies</span><strong id="debug-enemies">0</strong></div>
+                <div class="debug-stat"><span>Signals</span><strong id="debug-signals">0</strong></div>
+                <div class="debug-stat"><span>Particles</span><strong id="debug-particles">0</strong></div>
+                <div class="debug-stat"><span>Phase</span><strong id="debug-phase">planning</strong></div>
+            </div>
+            <div class="debug-actions">
+                <button class="debug-btn" type="button" data-debug="core">Core +1</button>
+                <button class="debug-btn" type="button" data-debug="spawn">Spawn Enemy</button>
+                <button class="debug-btn" type="button" data-debug="surge">Signal Surge</button>
+                <button class="debug-btn" type="button" data-debug="clear">Clear Enemies</button>
+            </div>
+        </section>
+    </div>
+
+    <div id="upgrade-modal" class="debug-modal" aria-hidden="true">
+        <section class="debug-panel" role="dialog" aria-modal="true" aria-labelledby="upgrade-title">
+            <header class="debug-head">
+                <h2 id="upgrade-title">Choose Upgrade</h2>
+            </header>
+            <div id="upgrade-options" class="upgrade-options"></div>
+        </section>
+    </div>
+
+    <div id="fallback">
+        <div>
+            <h2>WebGL could not start.</h2>
+            <p>Try a current browser with hardware acceleration enabled.</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+        const SIZE = 9;
+        const CENTER = Math.floor(SIZE / 2);
+        const MAX_CORE = 6;
+        const UPGRADE_INTERVAL = 3;
+        const MUTATION_INTERVAL = 6;
+        const FILES = 'ABCDEFGHI'.split('');
+        const STEP_TIME = 0.135;
+        const CARDINALS = [
+            { x: 0, y: -1, name: 'North' },
+            { x: 1, y: 0, name: 'East' },
+            { x: 0, y: 1, name: 'South' },
+            { x: -1, y: 0, name: 'West' }
+        ];
+
+        const colors = {
+            conductor: new THREE.Color(0x74edff),
+            pulse: new THREE.Color(0x74edff),
+            split: new THREE.Color(0xffd56d),
+            anchor: new THREE.Color(0x8cffb4),
+            enemy: new THREE.Color(0xff5878),
+            violet: new THREE.Color(0xc799ff),
+            core: new THREE.Color(0xffffff)
+        };
+
+        const powerInfo = {
+            move: {
+                name: 'Move',
+                summary: 'Reposition up to 2 tiles before choosing a power.'
+            },
+            pulse: {
+                name: 'Beam',
+                summary: 'Fire one strong signal in a straight line. Best for direct hits and clean relay chains.'
+            },
+            split: {
+                name: 'Fork',
+                summary: 'Fire three weaker signals: forward, left, and right. Best when enemies or relays are spread out.'
+            },
+            anchor: {
+                name: 'Mine',
+                summary: 'Place a signal-triggered mine. Fire a signal through it later to blast nearby enemies.'
+            }
+        };
+
+        const ui = {
+            stage: document.getElementById('stage'),
+            fallback: document.getElementById('fallback'),
+            turn: document.getElementById('turn'),
+            phase: document.getElementById('phase'),
+            core: document.getElementById('core'),
+            upgradeCount: document.getElementById('upgrade-count'),
+            missionTitle: document.getElementById('mission-title'),
+            missionCopy: document.getElementById('mission-copy'),
+            coreFill: document.getElementById('core-fill'),
+            coreLabel: document.getElementById('core-label'),
+            planCopy: document.getElementById('plan-copy'),
+            modeLabel: document.getElementById('mode-label'),
+            moveLabel: document.getElementById('move-label'),
+            powerLabel: document.getElementById('power-label'),
+            cascadeLabel: document.getElementById('cascade-label'),
+            intentCopy: document.getElementById('intent-copy'),
+            enemyCount: document.getElementById('enemy-count'),
+            relayCount: document.getElementById('relay-count'),
+            anchorCount: document.getElementById('anchor-count'),
+            threatCount: document.getElementById('threat-count'),
+            inspectTitle: document.getElementById('inspect-title'),
+            inspectCopy: document.getElementById('inspect-copy'),
+            inspectKind: document.getElementById('inspect-kind'),
+            inspectPosition: document.getElementById('inspect-position'),
+            inspectEffect: document.getElementById('inspect-effect'),
+            inspectState: document.getElementById('inspect-state'),
+            actionLog: document.getElementById('action-log'),
+            newGame: document.getElementById('new-game'),
+            moveMode: document.getElementById('move-mode'),
+            pulseMode: document.getElementById('pulse-mode'),
+            splitMode: document.getElementById('split-mode'),
+            anchorMode: document.getElementById('anchor-mode'),
+            undoPlan: document.getElementById('undo-plan'),
+            focus: document.getElementById('focus'),
+            commit: document.getElementById('commit'),
+            debugModal: document.getElementById('debug-modal'),
+            debugClose: document.getElementById('debug-close'),
+            debugTurn: document.getElementById('debug-turn'),
+            debugCore: document.getElementById('debug-core'),
+            debugEnemies: document.getElementById('debug-enemies'),
+            debugSignals: document.getElementById('debug-signals'),
+            debugParticles: document.getElementById('debug-particles'),
+            debugPhase: document.getElementById('debug-phase'),
+            upgradeModal: document.getElementById('upgrade-modal'),
+            upgradeOptions: document.getElementById('upgrade-options')
+        };
+
+        const enemySpecs = {
+            seeker: {
+                name: 'Seeker',
+                hp: 1,
+                color: new THREE.Color(0xff5878),
+                damage: 1,
+                description: 'Fast weak enemy. It walks toward the core and drains 1 core if it reaches the conductor field or core.'
+            },
+            warden: {
+                name: 'Warden',
+                hp: 2,
+                color: new THREE.Color(0xc799ff),
+                damage: 1,
+                description: 'Tougher enemy. It usually needs a strong Beam, relay chain, or Mine blast to remove cleanly.'
+            },
+            siphon: {
+                name: 'Siphon',
+                hp: 1,
+                color: new THREE.Color(0xffd56d),
+                damage: 2,
+                description: 'Fragile but dangerous enemy. If it reaches the core or conductor field, it drains 2 core.'
+            }
+        };
+
+        const relayInfo = {
+            mirrorR: {
+                name: 'Right Mirror',
+                effect: 'Turns signal right',
+                description: 'Permanent relay. Any signal crossing this tile rotates 90 degrees to the right.'
+            },
+            mirrorL: {
+                name: 'Left Mirror',
+                effect: 'Turns signal left',
+                description: 'Permanent relay. Any signal crossing this tile rotates 90 degrees to the left.'
+            },
+            splitter: {
+                name: 'Splitter Relay',
+                effect: 'Forks signal once',
+                description: 'Permanent relay. The first signal crossing this tile creates left and right branches.'
+            },
+            amplifier: {
+                name: 'Amplifier Relay',
+                effect: 'Strengthens signal',
+                description: 'Permanent relay. Any signal crossing this tile gains power and travels farther.'
+            }
+        };
+
+        const upgradeSpecs = [
+            {
+                id: 'focusedBeam',
+                name: 'Focused Beam',
+                description: 'Beam starts with +1 strength, so it travels farther and hits harder.'
+            },
+            {
+                id: 'wideFork',
+                name: 'Wide Fork',
+                description: 'Fork branches start with +1 strength, making spread-out cascades more reliable.'
+            },
+            {
+                id: 'deepMines',
+                name: 'Deep Mines',
+                description: 'Mines last 2 extra waves before fading.'
+            },
+            {
+                id: 'mineBloom',
+                name: 'Mine Bloom',
+                description: 'Mines blast a radius of 2 tiles instead of adjacent tiles only.'
+            },
+            {
+                id: 'coolantLattice',
+                name: 'Coolant Lattice',
+                description: 'Signals heat tiles less, reducing overload damage to the core.'
+            },
+            {
+                id: 'coreBloom',
+                name: 'Core Bloom',
+                description: 'Signals routed through the core restore 2 core instead of 1.'
+            },
+            {
+                id: 'relayHarvest',
+                name: 'Relay Harvest',
+                description: 'Amplifier relays restore 1 core the first time each is triggered in a cascade.'
+            },
+            {
+                id: 'comboReactor',
+                name: 'Combo Reactor',
+                description: 'Destroying 3 enemies in one cascade restores 1 core.'
+            },
+            {
+                id: 'longStride',
+                name: 'Long Stride',
+                description: 'Move range increases from 2 tiles to 3 tiles.'
+            },
+            {
+                id: 'biggerCore',
+                name: 'Bigger Core',
+                description: 'Maximum core increases by 1 and current core restores by 1.'
+            }
+        ];
+
+        const state = {
+            turn: 1,
+            phase: 'planning',
+            core: MAX_CORE,
+            maxCore: MAX_CORE,
+            conductor: { x: CENTER, y: SIZE - 2 },
+            enemies: [],
+            relays: [],
+            anchors: [],
+            cracks: [],
+            signals: [],
+            markers: [],
+            hoveredMarker: null,
+            selectedMode: 'pulse',
+            moveUsed: false,
+            plannedPower: null,
+            upgrades: [],
+            upgradeChoices: [],
+            mutationLevel: 0,
+            totalKills: 0,
+            cascadeKills: 0,
+            harvestedRelays: [],
+            inspection: defaultInspection(),
+            lastSnapshot: null,
+            nextEnemyId: 1,
+            focused: false,
+            debugOpen: false,
+            status: 'Beam hits one line. Fork covers three lines. Mine detonates when a signal crosses it.',
+            time: 0,
+            stepTimer: 0,
+            resolvingDelay: 0,
+            log: [],
+            gameOver: false,
+            victory: false
+        };
+
+        let scene;
+        let camera;
+        let renderer;
+        let controls;
+        let composer;
+        let bloomPass;
+        let boardGroup;
+        let squareGroup;
+        let relayGroup;
+        let anchorGroup;
+        let crackGroup;
+        let coreGroup;
+        let conductorGroup;
+        let enemyGroup;
+        let markerGroup;
+        let intentGroup;
+        let labelGroup;
+        let effectRoot;
+        let starField;
+        let raycaster;
+        let pointer;
+        let clock;
+
+        const squareMeshes = [];
+        const effectParticles = [];
+        const effectAnimations = [];
+        const geometries = {};
+        const materials = {};
+
+        try {
+            init();
+        } catch (error) {
+            console.error(error);
+            ui.fallback.classList.add('visible');
+        }
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x03050a, 0.022);
+
+            camera = new THREE.PerspectiveCamera(46, window.innerWidth / window.innerHeight, 0.1, 900);
+            camera.position.set(0, 12.5, 14.2);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 0.9;
+            ui.stage.appendChild(renderer.domElement);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.07;
+            controls.enablePan = false;
+            controls.minDistance = 8;
+            controls.maxDistance = 34;
+            controls.maxPolarAngle = Math.PI * 0.49;
+            controls.target.set(0, 0, 0);
+
+            composer = new EffectComposer(renderer);
+            composer.addPass(new RenderPass(scene, camera));
+            bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.2, 0.26, 0.82);
+            composer.addPass(bloomPass);
+            composer.addPass(new OutputPass());
+
+            raycaster = new THREE.Raycaster();
+            pointer = new THREE.Vector2();
+            clock = new THREE.Clock();
+
+            buildGeometries();
+            buildMaterials();
+            buildLights();
+            buildWorld();
+            bindEvents();
+            resetGame();
+            renderer.setAnimationLoop(animate);
+            window.__riftConductorReady = true;
+        }
+
+        function buildGeometries() {
+            geometries.square = new THREE.BoxGeometry(0.98, 0.16, 0.98);
+            geometries.base = new THREE.BoxGeometry(10.6, 0.34, 10.6);
+            geometries.marker = new THREE.TorusGeometry(0.39, 0.022, 8, 56);
+            geometries.relay = new THREE.OctahedronGeometry(0.34, 0);
+            geometries.anchor = new THREE.TorusKnotGeometry(0.2, 0.045, 80, 8);
+            geometries.core = new THREE.IcosahedronGeometry(0.5, 2);
+            geometries.conductorBase = new THREE.CylinderGeometry(0.34, 0.42, 0.22, 36);
+            geometries.conductorCore = new THREE.IcosahedronGeometry(0.36, 2);
+            geometries.enemy = new THREE.IcosahedronGeometry(0.45, 1);
+            geometries.warden = new THREE.DodecahedronGeometry(0.46, 0);
+            geometries.siphon = new THREE.ConeGeometry(0.42, 0.92, 6);
+            geometries.spark = new THREE.SphereGeometry(0.07, 14, 10);
+        }
+
+        function buildMaterials() {
+            materials.base = new THREE.MeshStandardMaterial({
+                color: 0x101722,
+                roughness: 0.58,
+                metalness: 0.14,
+                emissive: 0x050a12,
+                emissiveIntensity: 0.18
+            });
+            materials.squareA = new THREE.MeshPhysicalMaterial({
+                color: 0x17283c,
+                roughness: 0.44,
+                metalness: 0.12,
+                clearcoat: 0.38,
+                transparent: true,
+                opacity: 0.86,
+                emissive: 0x06121f,
+                emissiveIntensity: 0.18
+            });
+            materials.squareB = new THREE.MeshPhysicalMaterial({
+                color: 0x101b2a,
+                roughness: 0.46,
+                metalness: 0.12,
+                clearcoat: 0.36,
+                transparent: true,
+                opacity: 0.86,
+                emissive: 0x050c16,
+                emissiveIntensity: 0.16
+            });
+            materials.coreTile = new THREE.MeshPhysicalMaterial({
+                color: 0x253244,
+                roughness: 0.34,
+                metalness: 0.18,
+                clearcoat: 0.62,
+                transparent: true,
+                opacity: 0.92,
+                emissive: 0x1a2f44,
+                emissiveIntensity: 0.42
+            });
+            materials.move = glowMaterial(0x8cffb4, 0.54);
+            materials.pulse = glowMaterial(0x74edff, 0.7);
+            materials.split = glowMaterial(0xffd56d, 0.7);
+            materials.anchor = glowMaterial(0x8cffb4, 0.7);
+            materials.danger = glowMaterial(0xff5878, 0.62);
+            materials.violet = glowMaterial(0xc799ff, 0.66);
+            materials.white = glowMaterial(0xffffff, 0.6);
+        }
+
+        function glowMaterial(color, opacity = 0.7) {
+            return new THREE.MeshBasicMaterial({
+                color,
+                transparent: true,
+                opacity,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+        }
+
+        function buildLights() {
+            scene.add(new THREE.AmbientLight(0xf6fbff, 0.54));
+            const key = new THREE.DirectionalLight(0xffffff, 2.15);
+            key.position.set(-8, 16, 10);
+            scene.add(key);
+            const cyan = new THREE.PointLight(0x74edff, 3.2, 42);
+            cyan.position.set(7, 5.8, -8);
+            scene.add(cyan);
+            const red = new THREE.PointLight(0xff5878, 2.4, 38);
+            red.position.set(-7, 4.2, 6);
+            scene.add(red);
+            const gold = new THREE.PointLight(0xffd56d, 1.7, 28);
+            gold.position.set(0, 5.2, 6);
+            scene.add(gold);
+        }
+
+        function buildWorld() {
+            boardGroup = new THREE.Group();
+            squareGroup = new THREE.Group();
+            relayGroup = new THREE.Group();
+            anchorGroup = new THREE.Group();
+            crackGroup = new THREE.Group();
+            coreGroup = new THREE.Group();
+            conductorGroup = new THREE.Group();
+            enemyGroup = new THREE.Group();
+            markerGroup = new THREE.Group();
+            intentGroup = new THREE.Group();
+            labelGroup = new THREE.Group();
+            effectRoot = new THREE.Group();
+            scene.add(boardGroup, relayGroup, anchorGroup, crackGroup, coreGroup, conductorGroup, enemyGroup, markerGroup, intentGroup, labelGroup, effectRoot);
+
+            const base = new THREE.Mesh(geometries.base, materials.base);
+            base.position.y = -0.22;
+            boardGroup.add(base);
+
+            for (let y = 0; y < SIZE; y++) {
+                for (let x = 0; x < SIZE; x++) {
+                    const isCore = x === CENTER && y === CENTER;
+                    const square = new THREE.Mesh(geometries.square, isCore ? materials.coreTile : (x + y) % 2 ? materials.squareA : materials.squareB);
+                    square.position.set(toWorld(x), 0, toWorld(y));
+                    square.userData.coord = { x, y };
+                    squareMeshes.push(square);
+                    squareGroup.add(square);
+                }
+            }
+            boardGroup.add(squareGroup);
+
+            const grid = new THREE.GridHelper(24, 24, 0x74edff, 0x26364d);
+            grid.position.y = -0.36;
+            grid.material.transparent = true;
+            grid.material.opacity = 0.065;
+            scene.add(grid);
+
+            buildStarField();
+        }
+
+        function buildStarField() {
+            const count = 900;
+            const positions = new Float32Array(count * 3);
+            for (let i = 0; i < count; i++) {
+                const radius = 13 + Math.random() * 30;
+                const angle = Math.random() * Math.PI * 2;
+                positions[i * 3] = Math.cos(angle) * radius;
+                positions[i * 3 + 1] = -1 + Math.random() * 14;
+                positions[i * 3 + 2] = Math.sin(angle) * radius;
+            }
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            starField = new THREE.Points(geometry, new THREE.PointsMaterial({
+                color: 0x74edff,
+                size: 0.026,
+                transparent: true,
+                opacity: 0.32,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            }));
+            scene.add(starField);
+        }
+
+        function bindEvents() {
+            window.addEventListener('resize', onResize);
+            document.addEventListener('keydown', onKeyDown);
+            renderer.domElement.addEventListener('pointerdown', onPointerDown);
+            renderer.domElement.addEventListener('pointermove', onPointerMove);
+            renderer.domElement.addEventListener('pointerleave', () => {
+                document.body.style.cursor = 'default';
+                state.hoveredMarker = null;
+                syncMarkers();
+            });
+            ui.newGame.addEventListener('click', resetGame);
+            ui.moveMode.addEventListener('click', () => setMode('move'));
+            ui.pulseMode.addEventListener('click', () => setMode('pulse'));
+            ui.splitMode.addEventListener('click', () => setMode('split'));
+            ui.anchorMode.addEventListener('click', () => setMode('anchor'));
+            ui.undoPlan.addEventListener('click', undoPlan);
+            ui.focus.addEventListener('click', () => {
+                state.focused = !state.focused;
+                focusCamera();
+                updateUi();
+            });
+            ui.commit.addEventListener('click', commitTurn);
+            ui.debugClose.addEventListener('click', () => setDebugOpen(false));
+            document.querySelectorAll('[data-debug]').forEach((button) => {
+                button.addEventListener('click', () => runDebugAction(button.dataset.debug));
+            });
+        }
+
+        function onKeyDown(event) {
+            if (event.code === 'Backquote') {
+                event.preventDefault();
+                setDebugOpen(!state.debugOpen);
+            }
+            if (event.code === 'Escape' && state.debugOpen) {
+                event.preventDefault();
+                setDebugOpen(false);
+            }
+            if (event.code === 'Space' && state.phase === 'planning') {
+                event.preventDefault();
+                commitTurn();
+            }
+            if (event.code === 'Digit1') setMode('move');
+            if (event.code === 'Digit2') setMode('pulse');
+            if (event.code === 'Digit3') setMode('split');
+            if (event.code === 'Digit4') setMode('anchor');
+        }
+
+        function resetGame() {
+            clearVisualEffects();
+            state.turn = 1;
+            state.phase = 'planning';
+            state.core = MAX_CORE;
+            state.maxCore = MAX_CORE;
+            state.conductor = { x: CENTER, y: SIZE - 2 };
+            state.enemies = [];
+            state.relays = createRelayLayout();
+            state.anchors = [];
+            state.cracks = [];
+            state.signals = [];
+            state.markers = [];
+            state.hoveredMarker = null;
+            state.selectedMode = 'pulse';
+            state.moveUsed = false;
+            state.plannedPower = null;
+            state.upgrades = [];
+            state.upgradeChoices = [];
+            state.mutationLevel = 0;
+            state.totalKills = 0;
+            state.cascadeKills = 0;
+            state.harvestedRelays = [];
+            state.inspection = defaultInspection();
+            state.lastSnapshot = null;
+            state.nextEnemyId = 1;
+            state.debugOpen = false;
+            state.status = 'Beam hits one line. Fork covers three lines. Mine detonates when a signal crosses it.';
+            state.stepTimer = 0;
+            state.resolvingDelay = 0;
+            state.log = [];
+            state.gameOver = false;
+            state.victory = false;
+            ui.debugModal.classList.remove('visible');
+            ui.debugModal.setAttribute('aria-hidden', 'true');
+            ui.upgradeModal.classList.remove('visible');
+            ui.upgradeModal.setAttribute('aria-hidden', 'true');
+            spawnEnemy('seeker', CENTER, 0);
+            spawnEnemy('siphon', 1, 1);
+            spawnEnemy('warden', SIZE - 2, 1);
+            generateEnemyIntents();
+            addLog('Rift opened. Endless run: clear waves, take upgrades, survive mutations.', 'system');
+            refreshMarkers();
+            syncScene();
+            updateUi();
+        }
+
+        function createRelayLayout() {
+            return [
+                { x: 2, y: 2, type: 'mirrorR', label: 'Right Mirror' },
+                { x: 6, y: 2, type: 'mirrorL', label: 'Left Mirror' },
+                { x: 2, y: 5, type: 'splitter', label: 'Splitter' },
+                { x: 6, y: 5, type: 'amplifier', label: 'Amplifier' },
+                { x: 4, y: 1, type: 'amplifier', label: 'Amplifier' },
+                { x: 4, y: 6, type: 'splitter', label: 'Splitter' }
+            ];
+        }
+
+        function spawnEnemy(type, x, y) {
+            if (!inside(x, y) || occupied(x, y)) return null;
+            const spec = enemySpecs[type];
+            const enemy = {
+                id: `e${state.nextEnemyId++}`,
+                type,
+                x,
+                y,
+                hp: spec.hp,
+                maxHp: spec.hp,
+                intent: null,
+                alive: true
+            };
+            state.enemies.push(enemy);
+            spawnNova({ x, y }, spec.color, 0.8);
+            return enemy;
+        }
+
+        function setMode(mode) {
+            if (state.phase !== 'planning' || state.gameOver) return;
+            state.selectedMode = mode;
+            state.status = powerInfo[mode]?.summary || state.status;
+            refreshMarkers();
+            syncMarkers();
+            updateUi();
+        }
+
+        function refreshMarkers() {
+            state.markers = [];
+            if (state.phase !== 'planning' || state.gameOver) return;
+            if (state.selectedMode === 'move') {
+                state.markers = legalMoveTiles().map((tile) => ({
+                    ...tile,
+                    kind: 'move',
+                    label: `Move to ${formatCoord(tile.x, tile.y)}`
+                }));
+                return;
+            }
+            if (state.selectedMode === 'anchor') {
+                state.markers = tilesInRange(state.conductor.x, state.conductor.y, 2)
+                    .filter((tile) => !enemyAt(tile.x, tile.y) && !sameSquare(tile, state.conductor))
+                    .map((tile) => ({
+                        ...tile,
+                        kind: 'anchor',
+                        label: `Mine ${formatCoord(tile.x, tile.y)}`
+                    }));
+                return;
+            }
+            state.markers = CARDINALS.map((dir) => ({
+                x: state.conductor.x + dir.x,
+                y: state.conductor.y + dir.y,
+                dir,
+                kind: state.selectedMode,
+                label: `${powerName(state.selectedMode)} ${dir.name}`
+            })).filter((marker) => inside(marker.x, marker.y));
+        }
+
+        function legalMoveTiles() {
+            if (state.moveUsed) return [];
+            const range = hasUpgrade('longStride') ? 3 : 2;
+            return tilesInRange(state.conductor.x, state.conductor.y, range)
+                .filter((tile) => !occupied(tile.x, tile.y) && !(tile.x === CENTER && tile.y === CENTER));
+        }
+
+        function onPointerDown(event) {
+            if (event.button !== 0) return;
+            const coord = pickBoardCoord(event);
+            if (!coord) return;
+            if (state.phase === 'planning' && !state.gameOver) {
+                const marker = state.markers.find((item) => sameSquare(item, coord));
+                if (marker) {
+                    state.lastSnapshot = snapshotState();
+                    if (marker.kind === 'move') {
+                        moveConductor(marker);
+                    } else {
+                        planPower(marker);
+                    }
+                    refreshMarkers();
+                    syncScene();
+                    updateUi();
+                    return;
+                }
+            }
+            inspectCoord(coord);
+            updateUi();
+        }
+
+        function onPointerMove(event) {
+            const coord = pickBoardCoord(event);
+            const marker = coord ? state.markers.find((item) => sameSquare(item, coord)) : null;
+            state.hoveredMarker = marker || null;
+            document.body.style.cursor = marker ? 'pointer' : coord ? 'help' : 'default';
+            syncMarkers();
+        }
+
+        function moveConductor(target) {
+            const from = { ...state.conductor };
+            state.conductor.x = target.x;
+            state.conductor.y = target.y;
+            state.moveUsed = true;
+            state.status = `Moved to ${formatCoord(target.x, target.y)}. Choose a power and commit.`;
+            spawnTravelEffect(from, state.conductor, colors.conductor, 0.38, 0.16);
+            spawnRingEffect(state.conductor, colors.conductor, 0.55, 1.15);
+            inspectCoord(state.conductor);
+            addLog(`Conductor moved to ${formatCoord(target.x, target.y)}.`, 'system');
+        }
+
+        function planPower(marker) {
+            const power = {
+                type: marker.kind,
+                target: { x: marker.x, y: marker.y },
+                dir: marker.dir ? { ...marker.dir } : null,
+                label: marker.label
+            };
+            state.plannedPower = power;
+            state.status = `${describePlannedPower(power)} Commit to release it.`;
+            const color = power.type === 'split' ? colors.split : power.type === 'anchor' ? colors.anchor : colors.pulse;
+            spawnBeamEffect(state.conductor, power.target, color, 0.4, 0.026);
+            spawnRingEffect(power.target, color, 0.56, power.type === 'anchor' ? 1.75 : 1.2);
+            inspectPower(power);
+            addLog(`Planned ${describePlannedPower(power)}`, 'system');
+        }
+
+        function undoPlan() {
+            if (!state.lastSnapshot || state.phase !== 'planning') return;
+            restoreSnapshot(state.lastSnapshot);
+            state.lastSnapshot = null;
+            addLog('Undid the last planning change.', 'system');
+            refreshMarkers();
+            syncScene();
+            updateUi();
+        }
+
+        function defaultInspection() {
+            return {
+                title: 'Inspect Board',
+                copy: 'Click any enemy, relay, mine, core, crack, or tile to see what it does.',
+                kind: '-',
+                position: '-',
+                effect: '-',
+                state: '-'
+            };
+        }
+
+        function setInspection(details) {
+            state.inspection = { ...defaultInspection(), ...details };
+        }
+
+        function inspectPower(power) {
+            const target = power.target || power;
+            const effect = power.type === 'pulse' ? 'One strong line'
+                : power.type === 'split' ? 'Three weaker lines'
+                    : 'Signal-triggered blast';
+            setInspection({
+                title: powerName(power.type),
+                copy: describePlannedPower(power),
+                kind: 'Power',
+                position: target ? formatCoord(target.x, target.y) : '-',
+                effect,
+                state: 'Queued'
+            });
+        }
+
+        function inspectCoord(coord) {
+            if (sameSquare(coord, state.conductor)) {
+                setInspection({
+                    title: 'Conductor',
+                    copy: 'Your only unit. Move up to 2 tiles, then use Beam, Fork, or Mine to shape the signal cascade.',
+                    kind: 'Player',
+                    position: formatCoord(coord.x, coord.y),
+                    effect: 'Casts powers',
+                    state: state.moveUsed ? 'Move spent' : 'Move ready'
+                });
+                return;
+            }
+
+            const enemy = enemyAt(coord.x, coord.y);
+            if (enemy) {
+                const spec = enemySpecs[enemy.type];
+                setInspection({
+                    title: spec.name,
+                    copy: spec.description,
+                    kind: 'Enemy',
+                    position: formatCoord(coord.x, coord.y),
+                    effect: `Drains ${spec.damage} core`,
+                    state: `${enemy.hp}/${enemy.maxHp} HP | ${enemy.intent?.label || 'No intent'}`
+                });
+                return;
+            }
+
+            const anchor = anchorAt(coord.x, coord.y);
+            if (anchor) {
+                setInspection({
+                    title: 'Mine',
+                    copy: 'A signal-triggered mine. When any signal crosses this tile, it detonates and damages adjacent enemies.',
+                    kind: 'Trap',
+                    position: formatCoord(coord.x, coord.y),
+                    effect: 'Adjacent blast',
+                    state: `${anchor.duration} turns left`
+                });
+                return;
+            }
+
+            const relay = relayAt(coord.x, coord.y);
+            if (relay) {
+                const info = relayInfo[relay.type];
+                setInspection({
+                    title: info.name,
+                    copy: info.description,
+                    kind: 'Relay',
+                    position: formatCoord(coord.x, coord.y),
+                    effect: info.effect,
+                    state: 'Permanent'
+                });
+                return;
+            }
+
+            if (coord.x === CENTER && coord.y === CENTER) {
+                setInspection({
+                    title: 'Rift Core',
+                    copy: 'The objective. Enemies try to reach it. Signals routed through the core restore 1 core health.',
+                    kind: 'Objective',
+                    position: formatCoord(coord.x, coord.y),
+                    effect: 'Signal restores core',
+                    state: `${state.core}/${state.maxCore}`
+                });
+                return;
+            }
+
+            const crack = crackAt(coord.x, coord.y);
+            if (crack) {
+                setInspection({
+                    title: 'Overheated Tile',
+                    copy: 'Signals heat tiles they cross. If heat gets too high, the tile overloads and the core loses 1.',
+                    kind: 'Terrain',
+                    position: formatCoord(coord.x, coord.y),
+                    effect: 'Can overload',
+                    state: `Heat ${crack.heat.toFixed(1)}/2.8`
+                });
+                return;
+            }
+
+            const canMove = state.phase === 'planning' && !state.moveUsed && legalMoveTiles().some((tile) => sameSquare(tile, coord));
+            setInspection({
+                title: 'Open Tile',
+                copy: canMove ? 'A legal move tile. Select Move, then click this tile to reposition the conductor.' : 'Empty arena tile. Signals can cross it and may heat it up.',
+                kind: 'Terrain',
+                position: formatCoord(coord.x, coord.y),
+                effect: canMove ? 'Legal move' : 'Signal path',
+                state: canMove ? 'Reachable' : 'Open'
+            });
+        }
+
+        function commitTurn() {
+            if (state.phase !== 'planning' || state.gameOver) return;
+            state.phase = 'resolving';
+            state.status = state.plannedPower ? 'Signal cascade resolving.' : 'No power planned. Enemy phase resolving.';
+            state.signals = [];
+            state.stepTimer = 0;
+            state.resolvingDelay = 0;
+            state.cascadeKills = 0;
+            state.harvestedRelays = [];
+            state.markers = [];
+            state.hoveredMarker = null;
+            addLog(`Committed wave ${state.turn}.`, 'system');
+
+            if (!state.plannedPower) {
+                state.resolvingDelay = 0.35;
+                syncScene();
+                updateUi();
+                return;
+            }
+
+            if (state.plannedPower.type === 'anchor') {
+                placeAnchor(state.plannedPower.target);
+                state.resolvingDelay = 0.75;
+            }
+
+            if (state.plannedPower.type === 'pulse') {
+                launchSignal(state.conductor, state.plannedPower.dir, hasUpgrade('focusedBeam') ? 6 : 5, colors.pulse, 'pulse');
+                addLog(`Beam launched one strong signal ${state.plannedPower.dir.name}.`, 'good');
+            }
+
+            if (state.plannedPower.type === 'split') {
+                const branchBonus = hasUpgrade('wideFork') ? 1 : 0;
+                launchSignal(state.conductor, state.plannedPower.dir, 4 + branchBonus, colors.split, 'split');
+                launchSignal(state.conductor, rotateDir(state.plannedPower.dir, -1), 3 + branchBonus, colors.split, 'branch');
+                launchSignal(state.conductor, rotateDir(state.plannedPower.dir, 1), 3 + branchBonus, colors.split, 'branch');
+                spawnNova(state.conductor, colors.split, 1.15);
+                addLog('Fork launched three weaker signal paths.', 'good');
+            }
+
+            syncScene();
+            updateUi();
+        }
+
+        function placeAnchor(target) {
+            state.anchors = state.anchors.filter((anchor) => !sameSquare(anchor, target));
+            state.anchors.push({ x: target.x, y: target.y, duration: hasUpgrade('deepMines') ? 5 : 3 });
+            spawnNova(target, colors.anchor, 1.25);
+            spawnRingEffect(target, colors.anchor, 0.95, 2.8);
+            addLog(`Mine armed at ${formatCoord(target.x, target.y)}. It detonates when a signal crosses it.`, 'good');
+        }
+
+        function launchSignal(origin, dir, strength, color, kind) {
+            state.signals.push({
+                x: origin.x,
+                y: origin.y,
+                dir: { ...dir },
+                strength,
+                color: color.clone(),
+                kind,
+                splitUsed: kind === 'branch',
+                alive: true
+            });
+            spawnRingEffect(origin, color, 0.58, 1.35);
+            spawnBurst(origin, color, 24, 1.15);
+        }
+
+        function updateSignals(dt) {
+            if (state.phase !== 'resolving') return;
+            if (!state.signals.length) {
+                if (state.resolvingDelay > 0) {
+                    state.resolvingDelay -= dt;
+                    if (state.resolvingDelay <= 0) finishEnemyPhase();
+                }
+                return;
+            }
+
+            state.stepTimer += dt;
+            if (state.stepTimer < STEP_TIME) return;
+            state.stepTimer = 0;
+
+            const active = state.signals.slice();
+            state.signals = [];
+            active.forEach((signal) => stepSignal(signal));
+            state.signals = state.signals.filter((signal) => signal.alive && signal.strength > 0);
+            syncScene();
+            updateUi();
+            if (!state.signals.length) state.resolvingDelay = 0.55;
+        }
+
+        function stepSignal(signal) {
+            const from = { x: signal.x, y: signal.y };
+            const next = { x: signal.x + signal.dir.x, y: signal.y + signal.dir.y };
+            if (!inside(next.x, next.y)) {
+                spawnBurst(from, signal.color, 18, 1.0);
+                spawnRingEffect(from, signal.color, 0.5, 1.4);
+                addLog('Signal discharged beyond the arena rim.', 'system');
+                signal.alive = false;
+                return;
+            }
+
+            signal.x = next.x;
+            signal.y = next.y;
+            spawnBeamEffect(from, next, signal.color, 0.28, 0.034 + signal.strength * 0.004);
+            spawnTravelEffect(from, next, signal.color, 0.28, 0.14 + signal.strength * 0.018);
+            spawnSignalSpray(from, next, signal.color, signal.strength);
+            heatTile(next, signal.color);
+
+            const relay = relayAt(next.x, next.y);
+            if (relay) handleRelay(signal, relay);
+
+            const anchor = anchorAt(next.x, next.y);
+            if (anchor) triggerAnchor(anchor, signal);
+
+            if (next.x === CENTER && next.y === CENTER) {
+                const restore = hasUpgrade('coreBloom') ? 2 : 1;
+                state.core = Math.min(state.maxCore, state.core + restore);
+                spawnNova(next, colors.core, 1.0);
+                addLog(`Signal harmonized through the core. Core +${restore}.`, 'good');
+            }
+
+            const enemy = enemyAt(next.x, next.y);
+            if (enemy) {
+                damageEnemy(enemy, signal.strength >= 5 ? 2 : 1, signal.color);
+                signal.strength -= 1;
+            }
+
+            signal.strength -= 0.16;
+            if (signal.strength > 0) state.signals.push(signal);
+        }
+
+        function handleRelay(signal, relay) {
+            const coord = { x: relay.x, y: relay.y };
+            if (relay.type === 'mirrorR') {
+                signal.dir = rotateDir(signal.dir, 1);
+                spawnNova(coord, colors.violet, 0.9);
+                addLog(`Right mirror bent the signal at ${formatCoord(relay.x, relay.y)}.`, 'good');
+            }
+            if (relay.type === 'mirrorL') {
+                signal.dir = rotateDir(signal.dir, -1);
+                spawnNova(coord, colors.violet, 0.9);
+                addLog(`Left mirror bent the signal at ${formatCoord(relay.x, relay.y)}.`, 'good');
+            }
+            if (relay.type === 'amplifier') {
+                signal.strength += 1.7;
+                if (hasUpgrade('relayHarvest') && !state.harvestedRelays.some((item) => sameSquare(item, relay))) {
+                    state.harvestedRelays.push({ x: relay.x, y: relay.y });
+                    state.core = Math.min(state.maxCore, state.core + 1);
+                    addLog(`Relay Harvest restored 1 core at ${formatCoord(relay.x, relay.y)}.`, 'good');
+                }
+                spawnNova(coord, colors.split, 1.3);
+                spawnRingEffect(coord, colors.split, 0.8, 2.3);
+                addLog(`Amplifier overcharged the signal at ${formatCoord(relay.x, relay.y)}.`, 'good');
+            }
+            if (relay.type === 'splitter' && !signal.splitUsed) {
+                signal.splitUsed = true;
+                const left = { ...signal, dir: rotateDir(signal.dir, -1), strength: Math.max(1.8, signal.strength - 1), splitUsed: true };
+                const right = { ...signal, dir: rotateDir(signal.dir, 1), strength: Math.max(1.8, signal.strength - 1), splitUsed: true };
+                state.signals.push(left, right);
+                spawnNova(coord, colors.split, 1.2);
+                addLog(`Splitter forked the cascade at ${formatCoord(relay.x, relay.y)}.`, 'good');
+            }
+        }
+
+        function triggerAnchor(anchor, signal) {
+            const coord = { x: anchor.x, y: anchor.y };
+            spawnNova(coord, colors.anchor, 1.45);
+            spawnRingEffect(coord, colors.anchor, 0.85, 3.2);
+            addLog(`Mine detonated at ${formatCoord(anchor.x, anchor.y)} and hit adjacent enemies.`, 'good');
+            const radius = hasUpgrade('mineBloom') ? 2 : 1;
+            tilesInRange(anchor.x, anchor.y, radius).forEach((tile) => {
+                const enemy = enemyAt(tile.x, tile.y);
+                if (enemy) damageEnemy(enemy, 1, colors.anchor);
+            });
+            signal.strength += 0.7;
+            anchor.duration = 0;
+        }
+
+        function heatTile(tile, color) {
+            if (tile.x === CENTER && tile.y === CENTER) return;
+            let crack = crackAt(tile.x, tile.y);
+            if (!crack) {
+                crack = { x: tile.x, y: tile.y, heat: 0 };
+                state.cracks.push(crack);
+            }
+            crack.heat += hasUpgrade('coolantLattice') ? 0.2 : 0.34;
+            spawnRingEffect(tile, color, 0.34, 0.78 + crack.heat * 0.08);
+            if (crack.heat > 2.8) {
+                crack.heat = 1.4;
+                state.core -= 1;
+                spawnNova(tile, colors.enemy, 1.0);
+                addLog(`Tile ${formatCoord(tile.x, tile.y)} overloaded. Core -1.`, 'bad');
+            }
+        }
+
+        function finishEnemyPhase() {
+            state.signals = [];
+            removeDeadEnemies();
+            moveEnemies();
+            decayAnchors();
+            const completedWave = state.turn;
+            state.turn += 1;
+            mutateArenaIfNeeded(completedWave);
+            spawnWaveIfNeeded();
+            removeDeadEnemies();
+            checkEndState();
+            if (!state.gameOver) {
+                if (completedWave > 0 && completedWave % UPGRADE_INTERVAL === 0) {
+                    startUpgradeChoice(completedWave);
+                } else {
+                    beginPlanningWave();
+                }
+            }
+            syncScene();
+            updateUi();
+        }
+
+        function beginPlanningWave() {
+            state.phase = 'planning';
+            state.moveUsed = false;
+            state.plannedPower = null;
+            state.lastSnapshot = null;
+            state.status = `Wave ${state.turn}. Choose one power and make the cascade count.`;
+            generateEnemyIntents();
+            refreshMarkers();
+        }
+
+        function startUpgradeChoice(completedWave) {
+            state.phase = 'upgrade';
+            state.moveUsed = false;
+            state.plannedPower = null;
+            state.lastSnapshot = null;
+            state.upgradeChoices = chooseUpgradeChoices();
+            state.status = `Wave ${completedWave} cleared. Choose an upgrade before wave ${state.turn}.`;
+            state.markers = [];
+            state.hoveredMarker = null;
+            addLog(`Wave ${completedWave} cleared. Upgrade available.`, 'good');
+            renderUpgradeChoices();
+            ui.upgradeModal.classList.add('visible');
+            ui.upgradeModal.setAttribute('aria-hidden', 'false');
+        }
+
+        function chooseUpgradeChoices() {
+            const available = upgradeSpecs.filter((upgrade) => upgrade.id === 'biggerCore' || !hasUpgrade(upgrade.id));
+            const offset = (state.turn + state.totalKills + state.mutationLevel) % Math.max(available.length, 1);
+            return available
+                .slice(offset)
+                .concat(available.slice(0, offset))
+                .slice(0, 3)
+                .map((upgrade) => upgrade.id);
+        }
+
+        function renderUpgradeChoices() {
+            ui.upgradeOptions.replaceChildren();
+            state.upgradeChoices.forEach((id) => {
+                const upgrade = upgradeById(id);
+                if (!upgrade) return;
+                const button = document.createElement('button');
+                button.className = 'upgrade-card';
+                button.type = 'button';
+                const title = document.createElement('strong');
+                title.textContent = upgrade.name;
+                const body = document.createElement('span');
+                body.textContent = upgrade.description;
+                button.append(title, body);
+                button.addEventListener('click', () => chooseUpgrade(id));
+                ui.upgradeOptions.append(button);
+            });
+        }
+
+        function chooseUpgrade(id) {
+            if (state.phase !== 'upgrade') return;
+            const upgrade = upgradeById(id);
+            if (!upgrade) return;
+            state.upgrades.push(id);
+            if (id === 'biggerCore') {
+                state.maxCore += 1;
+                state.core = Math.min(state.maxCore, state.core + 1);
+            }
+            ui.upgradeModal.classList.remove('visible');
+            ui.upgradeModal.setAttribute('aria-hidden', 'true');
+            state.upgradeChoices = [];
+            addLog(`Upgrade installed: ${upgrade.name}.`, 'good');
+            beginPlanningWave();
+            syncScene();
+            updateUi();
+        }
+
+        function upgradeById(id) {
+            return upgradeSpecs.find((upgrade) => upgrade.id === id);
+        }
+
+        function hasUpgrade(id) {
+            return state.upgrades.includes(id);
+        }
+
+        function moveEnemies() {
+            state.enemies.slice().forEach((enemy) => {
+                if (!enemy.alive) return;
+                const spec = enemySpecs[enemy.type];
+                if (manhattan(enemy, state.conductor) <= 1) {
+                    state.core -= spec.damage;
+                    spawnNova(enemy, spec.color, 1.0);
+                    addLog(`${spec.name} struck the conductor field. Core -${spec.damage}.`, 'bad');
+                    return;
+                }
+                if (manhattan(enemy, { x: CENTER, y: CENTER }) <= 1) {
+                    state.core -= spec.damage;
+                    spawnNova(enemy, spec.color, 1.0);
+                    enemy.alive = false;
+                    addLog(`${spec.name} breached the core. Core -${spec.damage}.`, 'bad');
+                    return;
+                }
+                const dir = stepToward(enemy, { x: CENTER, y: CENTER });
+                const target = { x: enemy.x + dir.x, y: enemy.y + dir.y };
+                if (inside(target.x, target.y) && !occupied(target.x, target.y, enemy.id)) {
+                    spawnTravelEffect(enemy, target, spec.color, 0.34, 0.13);
+                    spawnBeamEffect(enemy, target, spec.color, 0.28, 0.026);
+                    enemy.x = target.x;
+                    enemy.y = target.y;
+                    addLog(`${spec.name} advanced to ${formatCoord(enemy.x, enemy.y)}.`, 'bad');
+                }
+            });
+        }
+
+        function decayAnchors() {
+            state.anchors.forEach((anchor) => {
+                anchor.duration -= 1;
+            });
+            state.anchors = state.anchors.filter((anchor) => anchor.duration > 0);
+            state.cracks.forEach((crack) => {
+                crack.heat = Math.max(0, crack.heat - 0.22);
+            });
+            state.cracks = state.cracks.filter((crack) => crack.heat > 0.08);
+        }
+
+        function spawnWaveIfNeeded() {
+            const count = Math.min(5, 1 + Math.floor(state.turn / 3)) + (state.turn % 5 === 0 ? 1 : 0);
+            const types = state.turn < 3 ? ['seeker', 'siphon'] : state.turn < 7 ? ['seeker', 'warden', 'siphon'] : ['seeker', 'warden', 'siphon', 'warden'];
+            const edges = [
+                { x: CENTER, y: 0 },
+                { x: 0, y: CENTER },
+                { x: SIZE - 1, y: CENTER },
+                { x: 1, y: 0 },
+                { x: SIZE - 2, y: 0 },
+                { x: 0, y: 1 },
+                { x: SIZE - 1, y: 1 }
+            ];
+            for (let i = 0; i < count; i++) {
+                const tile = openSpawnTile(edges[(state.turn + i + state.mutationLevel) % edges.length]) || edges[(state.turn + i) % edges.length];
+                const type = types[(state.turn + i) % types.length];
+                const spawned = spawnEnemy(type, tile.x, tile.y);
+                if (spawned) addLog(`${enemySpecs[type].name} entered at ${formatCoord(tile.x, tile.y)}.`, 'bad');
+                else {
+                    state.core -= 1;
+                    addLog(`Entry lane ${formatCoord(tile.x, tile.y)} jammed. Core -1.`, 'bad');
+                    spawnNova(tile, colors.enemy, 0.9);
+                }
+            }
+        }
+
+        function mutateArenaIfNeeded(completedWave) {
+            if (completedWave <= 0 || completedWave % MUTATION_INTERVAL !== 0) return;
+            state.mutationLevel += 1;
+            const mode = state.mutationLevel % 3;
+            if (mode === 1) {
+                addMutatedRelay();
+                return;
+            }
+            if (mode === 2) {
+                heatMutationTiles();
+                return;
+            }
+            rotateMutatedRelay();
+        }
+
+        function addMutatedRelay() {
+            const relayTypes = ['mirrorR', 'mirrorL', 'splitter', 'amplifier'];
+            const type = relayTypes[state.mutationLevel % relayTypes.length];
+            const tile = firstOpenInteriorTile();
+            if (!tile) return;
+            state.relays.push({ x: tile.x, y: tile.y, type, label: relayInfo[type].name });
+            spawnNova(tile, relayColor({ type }), 1.0);
+            addLog(`Arena mutation: ${relayInfo[type].name} formed at ${formatCoord(tile.x, tile.y)}.`, 'system');
+        }
+
+        function heatMutationTiles() {
+            const candidates = [
+                { x: 1, y: 3 },
+                { x: 7, y: 3 },
+                { x: 3, y: 7 },
+                { x: 5, y: 7 }
+            ];
+            candidates.forEach((tile) => {
+                if (inside(tile.x, tile.y) && !sameSquare(tile, state.conductor) && !(tile.x === CENTER && tile.y === CENTER)) {
+                    let crack = crackAt(tile.x, tile.y);
+                    if (!crack) {
+                        crack = { x: tile.x, y: tile.y, heat: 0 };
+                        state.cracks.push(crack);
+                    }
+                    crack.heat = Math.max(crack.heat, 1.1);
+                    spawnRingEffect(tile, colors.enemy, 0.72, 1.2);
+                }
+            });
+            addLog('Arena mutation: unstable heat veins surfaced.', 'system');
+        }
+
+        function rotateMutatedRelay() {
+            const relay = state.relays[state.mutationLevel % state.relays.length];
+            if (!relay) return;
+            const next = relay.type === 'mirrorR' ? 'mirrorL' : relay.type === 'mirrorL' ? 'splitter' : relay.type === 'splitter' ? 'amplifier' : 'mirrorR';
+            relay.type = next;
+            relay.label = relayInfo[next].name;
+            spawnNova(relay, relayColor(relay), 1.0);
+            addLog(`Arena mutation: relay at ${formatCoord(relay.x, relay.y)} became ${relayInfo[next].name}.`, 'system');
+        }
+
+        function openSpawnTile(preferred) {
+            const candidates = [preferred, ...tilesInRange(preferred.x, preferred.y, 2)].filter((tile) => inside(tile.x, tile.y));
+            return candidates.find((tile) => !occupied(tile.x, tile.y) && !relayAt(tile.x, tile.y) && !anchorAt(tile.x, tile.y) && !(tile.x === CENTER && tile.y === CENTER)) || null;
+        }
+
+        function firstOpenInteriorTile() {
+            for (let y = 1; y < SIZE - 1; y++) {
+                for (let x = 1; x < SIZE - 1; x++) {
+                    if ((x + y + state.mutationLevel) % 3 !== 0) continue;
+                    if (x === CENTER && y === CENTER) continue;
+                    if (occupied(x, y) || relayAt(x, y) || anchorAt(x, y)) continue;
+                    return { x, y };
+                }
+            }
+            return null;
+        }
+
+        function checkEndState() {
+            if (state.core <= 0) {
+                state.gameOver = true;
+                state.victory = false;
+                state.phase = 'complete';
+                state.status = `Rift collapse on wave ${state.turn}. Total kills: ${state.totalKills}.`;
+                addLog(`Rift collapse on wave ${state.turn}. Total kills: ${state.totalKills}.`, 'bad');
+                return;
+            }
+        }
+
+        function generateEnemyIntents() {
+            state.enemies.forEach((enemy) => {
+                if (!enemy.alive) return;
+                const spec = enemySpecs[enemy.type];
+                if (manhattan(enemy, state.conductor) <= 1) {
+                    enemy.intent = { type: 'strike', label: `Strike field`, tiles: [{ ...state.conductor }] };
+                    return;
+                }
+                const dir = stepToward(enemy, { x: CENTER, y: CENTER });
+                const to = { x: enemy.x + dir.x, y: enemy.y + dir.y };
+                enemy.intent = { type: 'move', label: `${spec.name} to ${formatCoord(to.x, to.y)}`, to, tiles: [to] };
+            });
+        }
+
+        function damageEnemy(enemy, amount, color) {
+            enemy.hp -= amount;
+            spawnBurst(enemy, color, amount > 1 ? 34 : 22, amount > 1 ? 1.3 : 1.0);
+            spawnRingEffect(enemy, color, 0.55, amount > 1 ? 2.0 : 1.35);
+            if (enemy.hp <= 0) {
+                enemy.alive = false;
+                state.totalKills += 1;
+                state.cascadeKills += 1;
+                if (hasUpgrade('comboReactor') && state.cascadeKills === 3) {
+                    state.core = Math.min(state.maxCore, state.core + 1);
+                    addLog('Combo Reactor restored 1 core after a triple shatter.', 'good');
+                }
+                spawnNova(enemy, enemySpecs[enemy.type].color, 1.35);
+                addLog(`${enemySpecs[enemy.type].name} shattered.`, 'good');
+            } else {
+                addLog(`${enemySpecs[enemy.type].name} took ${amount} damage.`, 'good');
+            }
+        }
+
+        function removeDeadEnemies() {
+            state.enemies = state.enemies.filter((enemy) => enemy.alive && enemy.hp > 0);
+        }
+
+        function syncScene() {
+            syncRelays();
+            syncAnchors();
+            syncCracks();
+            syncCore();
+            syncConductor();
+            syncEnemies();
+            syncMarkers();
+            syncIntents();
+            syncLabels();
+        }
+
+        function syncRelays() {
+            clearGroup(relayGroup);
+            state.relays.forEach((relay) => {
+                const color = relay.type === 'amplifier' ? colors.split : relay.type === 'splitter' ? colors.anchor : colors.violet;
+                const material = new THREE.MeshStandardMaterial({
+                    color,
+                    roughness: 0.24,
+                    metalness: 0.26,
+                    emissive: color.clone().multiplyScalar(0.34),
+                    emissiveIntensity: 0.72,
+                    flatShading: true
+                });
+                const mesh = new THREE.Mesh(geometries.relay, material);
+                mesh.position.set(toWorld(relay.x), 0.5, toWorld(relay.y));
+                mesh.rotation.y = state.time * 0.8 + relay.x;
+                mesh.userData.baseY = 0.5;
+                mesh.userData.disposeMaterial = true;
+                relayGroup.add(mesh);
+
+                const ring = new THREE.Mesh(geometries.marker, relay.type === 'amplifier' ? materials.split : relay.type === 'splitter' ? materials.anchor : materials.violet);
+                ring.position.set(toWorld(relay.x), 0.09, toWorld(relay.y));
+                ring.rotation.x = Math.PI / 2;
+                ring.userData.baseScale = relay.type === 'amplifier' ? 1.1 : 0.95;
+                relayGroup.add(ring);
+            });
+        }
+
+        function syncAnchors() {
+            clearGroup(anchorGroup);
+            state.anchors.forEach((anchor) => {
+                const mesh = new THREE.Mesh(geometries.anchor, new THREE.MeshStandardMaterial({
+                    color: colors.anchor,
+                    roughness: 0.2,
+                    metalness: 0.22,
+                    emissive: colors.anchor.clone().multiplyScalar(0.36),
+                    emissiveIntensity: 0.78
+                }));
+                mesh.position.set(toWorld(anchor.x), 0.5, toWorld(anchor.y));
+                mesh.rotation.x = state.time * 1.2;
+                mesh.rotation.y = state.time * 0.9;
+                mesh.userData.disposeMaterial = true;
+                anchorGroup.add(mesh);
+                const ring = new THREE.Mesh(geometries.marker, materials.anchor);
+                ring.position.set(toWorld(anchor.x), 0.08, toWorld(anchor.y));
+                ring.rotation.x = Math.PI / 2;
+                ring.userData.baseScale = 1.2;
+                anchorGroup.add(ring);
+            });
+        }
+
+        function syncCracks() {
+            clearGroup(crackGroup);
+            state.cracks.forEach((crack) => {
+                const opacity = clamp(0.12 + crack.heat * 0.14, 0.16, 0.58);
+                const material = glowMaterial(0xff5878, opacity);
+                const mesh = new THREE.Mesh(geometries.marker, material);
+                mesh.position.set(toWorld(crack.x), 0.075, toWorld(crack.y));
+                mesh.rotation.x = Math.PI / 2;
+                mesh.scale.setScalar(0.66 + crack.heat * 0.14);
+                mesh.userData.disposeMaterial = true;
+                crackGroup.add(mesh);
+            });
+        }
+
+        function syncCore() {
+            clearGroup(coreGroup);
+            const health = clamp(state.core / state.maxCore, 0, 1);
+            const coreColor = new THREE.Color(0x74edff).lerp(new THREE.Color(0xff5878), 1 - health);
+            const material = new THREE.MeshPhysicalMaterial({
+                color: coreColor.clone().lerp(new THREE.Color(0xffffff), 0.2),
+                roughness: 0.18,
+                metalness: 0.28,
+                clearcoat: 0.78,
+                emissive: coreColor,
+                emissiveIntensity: 0.58 + health * 0.34,
+                transparent: true,
+                opacity: 0.94
+            });
+            const core = new THREE.Mesh(geometries.core, material);
+            core.position.set(toWorld(CENTER), 0.68, toWorld(CENTER));
+            core.scale.setScalar(0.82 + health * 0.22);
+            core.userData.kind = 'core';
+            core.userData.disposeMaterial = true;
+            const ringA = new THREE.Mesh(geometries.marker, health > 0.35 ? materials.pulse : materials.danger);
+            ringA.position.set(toWorld(CENTER), 0.16, toWorld(CENTER));
+            ringA.rotation.x = Math.PI / 2;
+            ringA.userData.baseScale = 1.45;
+            const ringB = new THREE.Mesh(geometries.marker, materials.white);
+            ringB.position.set(toWorld(CENTER), 0.7, toWorld(CENTER));
+            ringB.rotation.y = Math.PI / 2;
+            ringB.scale.setScalar(0.92);
+            ringB.userData.kind = 'core-ring';
+            coreGroup.add(core, ringA, ringB);
+        }
+
+        function syncConductor() {
+            clearGroup(conductorGroup);
+            const group = new THREE.Group();
+            const material = new THREE.MeshPhysicalMaterial({
+                color: colors.conductor,
+                roughness: 0.26,
+                metalness: 0.3,
+                clearcoat: 0.7,
+                emissive: colors.conductor.clone().multiplyScalar(0.24),
+                emissiveIntensity: 0.54
+            });
+            const base = new THREE.Mesh(geometries.conductorBase, material);
+            const core = new THREE.Mesh(geometries.conductorCore, material);
+            base.userData.disposeMaterial = true;
+            core.position.y = 0.42 + Math.sin(state.time * 3) * 0.035;
+            const ringA = new THREE.Mesh(geometries.marker, materials.pulse);
+            ringA.rotation.x = Math.PI / 2;
+            ringA.position.y = 0.1;
+            ringA.scale.setScalar(1.08 + Math.sin(state.time * 4) * 0.04);
+            const ringB = new THREE.Mesh(geometries.marker, materials.split);
+            ringB.rotation.y = Math.PI / 2;
+            ringB.position.y = 0.48;
+            ringB.scale.setScalar(0.72);
+            group.add(base, core, ringA, ringB);
+            group.position.set(toWorld(state.conductor.x), 0.33, toWorld(state.conductor.y));
+            conductorGroup.add(group);
+        }
+
+        function syncEnemies() {
+            clearGroup(enemyGroup);
+            state.enemies.filter((enemy) => enemy.alive).forEach((enemy) => {
+                const spec = enemySpecs[enemy.type];
+                const geometry = enemy.type === 'warden' ? geometries.warden : enemy.type === 'siphon' ? geometries.siphon : geometries.enemy;
+                const material = new THREE.MeshStandardMaterial({
+                    color: spec.color,
+                    roughness: 0.38,
+                    metalness: 0.2,
+                    emissive: spec.color.clone().multiplyScalar(0.26),
+                    emissiveIntensity: 0.64,
+                    flatShading: true
+                });
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.position.set(toWorld(enemy.x), 0.58 + Math.sin(state.time * 3 + enemy.x) * 0.025, toWorld(enemy.y));
+                mesh.rotation.y = state.time * 0.8 + enemy.y;
+                mesh.scale.setScalar(0.82 + enemy.hp / enemy.maxHp * 0.22);
+                mesh.userData.disposeMaterial = true;
+                enemyGroup.add(mesh);
+            });
+        }
+
+        function syncMarkers() {
+            clearGroup(markerGroup);
+            state.markers.forEach((marker) => {
+                const active = state.hoveredMarker && sameSquare(state.hoveredMarker, marker);
+                const material = marker.kind === 'move' ? materials.move : marker.kind === 'split' ? materials.split : marker.kind === 'anchor' ? materials.anchor : materials.pulse;
+                const mesh = new THREE.Mesh(geometries.marker, material);
+                mesh.position.set(toWorld(marker.x), active ? 0.13 : 0.1, toWorld(marker.y));
+                mesh.rotation.x = Math.PI / 2;
+                mesh.userData.baseScale = active ? 1.28 : 1.0;
+                mesh.userData.phase = Math.random() * Math.PI * 2;
+                markerGroup.add(mesh);
+            });
+            if (state.plannedPower) {
+                addPowerPreview(state.plannedPower, true);
+            } else if (state.hoveredMarker && state.hoveredMarker.kind !== 'move') {
+                addPowerPreview(state.hoveredMarker, false);
+            }
+        }
+
+        function addPowerPreview(power, committed) {
+            if (power.kind === 'anchor' || power.type === 'anchor') {
+                addMinePreview(power, committed);
+                return;
+            }
+            const type = power.type || power.kind;
+            const color = type === 'split' ? colors.split : colors.pulse;
+            const material = type === 'split' ? materials.split : materials.pulse;
+            const dirs = type === 'split'
+                ? [power.dir, rotateDir(power.dir, -1), rotateDir(power.dir, 1)]
+                : [power.dir];
+            dirs.filter(Boolean).forEach((dir, index) => {
+                const tiles = pathTiles(state.conductor, dir);
+                const pathScale = committed ? 0.74 : 0.62;
+                tiles.forEach((tile, step) => {
+                    const preview = new THREE.Mesh(geometries.marker, material);
+                    preview.position.set(toWorld(tile.x), 0.14 + index * 0.008, toWorld(tile.y));
+                    preview.rotation.x = Math.PI / 2;
+                    preview.scale.setScalar(pathScale * (index === 0 ? 1 : 0.72) * (1 - Math.min(step, 7) * 0.035));
+                    preview.userData.baseScale = preview.scale.x;
+                    markerGroup.add(preview);
+                });
+                if (tiles.length) {
+                    addPreviewLine(state.conductor, tiles[tiles.length - 1], color, committed ? 0.56 : 0.42);
+                }
+            });
+        }
+
+        function addMinePreview(power, committed) {
+            const target = power.target || power;
+            const tiles = [{ ...target }, ...tilesInRange(target.x, target.y, 1)];
+            tiles.forEach((tile, index) => {
+                if (!inside(tile.x, tile.y)) return;
+                const preview = new THREE.Mesh(geometries.marker, index === 0 ? materials.anchor : materials.move);
+                preview.position.set(toWorld(tile.x), index === 0 ? 0.16 : 0.12, toWorld(tile.y));
+                preview.rotation.x = Math.PI / 2;
+                preview.scale.setScalar(index === 0 ? (committed ? 1.3 : 1.12) : 0.66);
+                preview.userData.baseScale = preview.scale.x;
+                markerGroup.add(preview);
+            });
+        }
+
+        function addPreviewLine(from, to, color, opacity) {
+            const geometry = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(toWorld(from.x), 0.18, toWorld(from.y)),
+                new THREE.Vector3(toWorld(to.x), 0.18, toWorld(to.y))
+            ]);
+            const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({
+                color,
+                transparent: true,
+                opacity
+            }));
+            line.userData.disposeGeometry = true;
+            line.userData.disposeMaterial = true;
+            markerGroup.add(line);
+        }
+
+        function syncIntents() {
+            clearGroup(intentGroup);
+            let threats = 0;
+            state.enemies.forEach((enemy) => {
+                if (!enemy.intent) return;
+                const spec = enemySpecs[enemy.type];
+                enemy.intent.tiles.forEach((tile) => {
+                    if (!inside(tile.x, tile.y)) return;
+                    const marker = new THREE.Mesh(geometries.marker, materials.danger);
+                    marker.position.set(toWorld(tile.x), 0.055, toWorld(tile.y));
+                    marker.rotation.x = Math.PI / 2;
+                    marker.userData.baseScale = enemy.intent.type === 'strike' ? 1.22 : 0.92;
+                    intentGroup.add(marker);
+                    threats += enemy.intent.type === 'strike' ? 2 : 1;
+                });
+                const to = enemy.intent.to || enemy.intent.tiles[0];
+                if (to && inside(to.x, to.y)) addIntentLine(enemy, to, spec.color);
+            });
+            ui.threatCount.textContent = String(threats);
+        }
+
+        function syncLabels() {
+            clearLabels();
+            addLabel('Core', CENTER, CENTER, 1.45, colors.core);
+            state.enemies.filter((enemy) => enemy.alive).forEach((enemy) => {
+                addLabel(enemySpecs[enemy.type].name, enemy.x, enemy.y, 1.28, enemySpecs[enemy.type].color);
+            });
+            state.relays.forEach((relay) => {
+                addLabel(relayLabel(relay), relay.x, relay.y, 0.98, relayColor(relay));
+            });
+            state.anchors.forEach((anchor) => {
+                addLabel('Mine', anchor.x, anchor.y, 1.02, colors.anchor);
+            });
+            state.cracks.filter((crack) => crack.heat >= 0.65).forEach((crack) => {
+                addLabel('Heat', crack.x, crack.y, 0.58, colors.enemy);
+            });
+        }
+
+        function addLabel(text, x, y, height, color) {
+            const sprite = createLabelSprite(text, color);
+            sprite.position.set(toWorld(x), height, toWorld(y));
+            labelGroup.add(sprite);
+        }
+
+        function createLabelSprite(text, color) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 96;
+            const ctx = canvas.getContext('2d');
+            const base = color instanceof THREE.Color ? color : new THREE.Color(color);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawRoundedRect(ctx, 18, 20, 220, 52, 15);
+            ctx.fillStyle = 'rgba(3, 5, 10, 0.78)';
+            ctx.fill();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = colorToRgba(base, 0.82);
+            ctx.stroke();
+            ctx.font = '800 25px Inter, system-ui, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = 'rgba(246, 251, 255, 0.96)';
+            ctx.shadowColor = colorToRgba(base, 0.55);
+            ctx.shadowBlur = 12;
+            ctx.fillText(text, 128, 47, 190);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.colorSpace = THREE.SRGBColorSpace;
+            const material = new THREE.SpriteMaterial({
+                map: texture,
+                transparent: true,
+                opacity: 0.94,
+                depthTest: false,
+                depthWrite: false
+            });
+            const sprite = new THREE.Sprite(material);
+            const width = clamp(text.length * 0.115 + 0.68, 1.05, 1.75);
+            sprite.scale.set(width, width * 0.38, 1);
+            sprite.renderOrder = 40;
+            sprite.userData.label = true;
+            return sprite;
+        }
+
+        function drawRoundedRect(ctx, x, y, width, height, radius) {
+            ctx.beginPath();
+            ctx.moveTo(x + radius, y);
+            ctx.lineTo(x + width - radius, y);
+            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+            ctx.lineTo(x + width, y + height - radius);
+            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+            ctx.lineTo(x + radius, y + height);
+            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+            ctx.lineTo(x, y + radius);
+            ctx.quadraticCurveTo(x, y, x + radius, y);
+            ctx.closePath();
+        }
+
+        function clearLabels() {
+            labelGroup.children.forEach((label) => {
+                if (label.material.map) label.material.map.dispose();
+                label.material.dispose();
+            });
+            labelGroup.clear();
+        }
+
+        function relayLabel(relay) {
+            if (relay.type === 'mirrorR') return 'Mirror R';
+            if (relay.type === 'mirrorL') return 'Mirror L';
+            if (relay.type === 'splitter') return 'Splitter';
+            if (relay.type === 'amplifier') return 'Amplifier';
+            return relayInfo[relay.type]?.name || 'Relay';
+        }
+
+        function relayColor(relay) {
+            if (relay.type === 'amplifier') return colors.split;
+            if (relay.type === 'splitter') return colors.anchor;
+            return colors.violet;
+        }
+
+        function colorToRgba(color, alpha) {
+            return `rgba(${Math.round(color.r * 255)}, ${Math.round(color.g * 255)}, ${Math.round(color.b * 255)}, ${alpha})`;
+        }
+
+        function addIntentLine(from, to, color) {
+            const geometry = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(toWorld(from.x), 0.24, toWorld(from.y)),
+                new THREE.Vector3(toWorld(to.x), 0.24, toWorld(to.y))
+            ]);
+            const line = new THREE.Line(geometry, new THREE.LineBasicMaterial({
+                color,
+                transparent: true,
+                opacity: 0.6
+            }));
+            line.userData.disposeGeometry = true;
+            line.userData.disposeMaterial = true;
+            intentGroup.add(line);
+        }
+
+        function spawnBeamEffect(from, to, color, life = 0.42, radius = 0.035) {
+            const start = worldPoint(from, 0.74);
+            const end = worldPoint(to, 0.74);
+            const delta = end.clone().sub(start);
+            const length = delta.length();
+            if (length < 0.01) return;
+            const base = color instanceof THREE.Color ? color : new THREE.Color(color);
+            const material = glowMaterial(base.clone().lerp(new THREE.Color(0xffffff), 0.16), 0.62);
+            const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, length, 16, 1, true), material);
+            mesh.position.copy(start.clone().add(end).multiplyScalar(0.5));
+            mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize());
+            mesh.userData.disposeGeometry = true;
+            effectRoot.add(mesh);
+            effectAnimations.push({ mesh, material, life, maxLife: life, type: 'beam' });
+        }
+
+        function spawnTravelEffect(from, to, color, life = 0.32, size = 0.15) {
+            const base = color instanceof THREE.Color ? color : new THREE.Color(color);
+            const material = glowMaterial(base.clone().lerp(new THREE.Color(0xffffff), 0.26), 0.82);
+            const mesh = new THREE.Mesh(geometries.spark, material);
+            const start = worldPoint(from, 0.84);
+            const end = worldPoint(to, 0.84);
+            const visibleScale = size * 9.5;
+            mesh.position.copy(start);
+            mesh.scale.setScalar(visibleScale);
+            effectRoot.add(mesh);
+            effectAnimations.push({ mesh, material, life, maxLife: life, type: 'travel', start, end, scale: visibleScale });
+        }
+
+        function spawnRingEffect(coord, color, life = 0.62, scale = 1.6) {
+            const base = color instanceof THREE.Color ? color : new THREE.Color(color);
+            const material = glowMaterial(base.clone().lerp(new THREE.Color(0xffffff), 0.1), 0.58);
+            const mesh = new THREE.Mesh(geometries.marker, material);
+            mesh.position.set(toWorld(coord.x), 0.13, toWorld(coord.y));
+            mesh.rotation.x = Math.PI / 2;
+            mesh.scale.setScalar(0.28);
+            effectRoot.add(mesh);
+            effectAnimations.push({ mesh, material, life, maxLife: life, type: 'ring', targetScale: scale });
+        }
+
+        function spawnBurst(coord, color, count = 24, power = 1) {
+            const base = color instanceof THREE.Color ? color : new THREE.Color(color);
+            const burstCount = Math.min(count, 48);
+            for (let i = 0; i < burstCount; i++) {
+                const material = glowMaterial(base.clone().lerp(new THREE.Color(0xffffff), Math.random() * 0.28), 0.62);
+                const particle = new THREE.Mesh(geometries.spark, material);
+                const size = (0.55 + Math.random() * 0.85) * power;
+                particle.position.set(
+                    toWorld(coord.x) + (Math.random() - 0.5) * 0.32,
+                    0.52 + Math.random() * 0.32,
+                    toWorld(coord.y) + (Math.random() - 0.5) * 0.32
+                );
+                particle.scale.setScalar(size);
+                particle.userData.velocity = new THREE.Vector3(
+                    (Math.random() - 0.5) * 1.65 * power,
+                    (Math.random() * 1.4 + 0.42) * power,
+                    (Math.random() - 0.5) * 1.65 * power
+                );
+                particle.userData.life = 0.42 + Math.random() * 0.42;
+                particle.userData.maxLife = particle.userData.life;
+                particle.userData.size = size;
+                effectRoot.add(particle);
+                effectParticles.push(particle);
+            }
+            trimParticles();
+        }
+
+        function spawnSignalSpray(from, to, color, strength) {
+            const base = color instanceof THREE.Color ? color : new THREE.Color(color);
+            const count = Math.min(14, Math.max(5, Math.floor(strength * 2)));
+            const start = worldPoint(from, 0.72);
+            const end = worldPoint(to, 0.72);
+            for (let i = 0; i < count; i++) {
+                const material = glowMaterial(base.clone().lerp(new THREE.Color(0xffffff), Math.random() * 0.18), 0.5);
+                const particle = new THREE.Mesh(geometries.spark, material);
+                const t = Math.random();
+                particle.position.lerpVectors(start, end, t);
+                particle.position.x += (Math.random() - 0.5) * 0.12;
+                particle.position.y += (Math.random() - 0.5) * 0.18;
+                particle.position.z += (Math.random() - 0.5) * 0.12;
+                particle.scale.setScalar(0.38 + Math.random() * 0.36);
+                particle.userData.velocity = new THREE.Vector3((Math.random() - 0.5) * 0.5, Math.random() * 0.5, (Math.random() - 0.5) * 0.5);
+                particle.userData.life = 0.24 + Math.random() * 0.2;
+                particle.userData.maxLife = particle.userData.life;
+                particle.userData.size = particle.scale.x;
+                effectRoot.add(particle);
+                effectParticles.push(particle);
+            }
+            trimParticles();
+        }
+
+        function spawnNova(coord, color, power = 1) {
+            spawnBurst(coord, color, Math.floor(28 * power), power);
+            spawnRingEffect(coord, color, 0.72, 2.1 * power);
+            CARDINALS.forEach((dir) => {
+                const to = { x: coord.x + dir.x, y: coord.y + dir.y };
+                if (inside(to.x, to.y)) spawnBeamEffect(coord, to, color, 0.32, 0.022 * power);
+            });
+        }
+
+        function updateParticles(dt) {
+            for (let i = effectParticles.length - 1; i >= 0; i--) {
+                const particle = effectParticles[i];
+                particle.userData.life -= dt;
+                particle.userData.velocity.y -= dt * 2.25;
+                particle.position.addScaledVector(particle.userData.velocity, dt);
+                const alpha = Math.max(0, particle.userData.life / particle.userData.maxLife);
+                particle.material.opacity = alpha * 0.58;
+                particle.scale.setScalar(particle.userData.size * (0.74 + (1 - alpha) * 0.42));
+                if (particle.userData.life <= 0) {
+                    effectRoot.remove(particle);
+                    particle.material.dispose();
+                    effectParticles.splice(i, 1);
+                }
+            }
+        }
+
+        function updateEffectAnimations(dt) {
+            for (let i = effectAnimations.length - 1; i >= 0; i--) {
+                const effect = effectAnimations[i];
+                effect.life -= dt;
+                const alpha = Math.max(0, effect.life / effect.maxLife);
+                const progress = 1 - alpha;
+                effect.material.opacity = alpha * 0.68;
+                if (effect.type === 'ring') {
+                    const eased = 1 - Math.pow(1 - progress, 2);
+                    effect.mesh.scale.setScalar(0.28 + eased * effect.targetScale);
+                }
+                if (effect.type === 'beam') {
+                    const width = 0.36 + alpha * 0.64;
+                    effect.mesh.scale.set(width, 1, width);
+                }
+                if (effect.type === 'travel') {
+                    const eased = progress < 0.5 ? 2 * progress * progress : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+                    effect.mesh.position.lerpVectors(effect.start, effect.end, eased);
+                    effect.mesh.scale.setScalar(effect.scale * (0.9 + Math.sin(progress * Math.PI) * 0.75));
+                }
+                if (effect.life <= 0) {
+                    effectRoot.remove(effect.mesh);
+                    if (effect.mesh.userData.disposeGeometry) effect.mesh.geometry.dispose();
+                    effect.material.dispose();
+                    effectAnimations.splice(i, 1);
+                }
+            }
+        }
+
+        function updateSceneMotion() {
+            if (starField) {
+                starField.rotation.y += 0.0008;
+                starField.rotation.x = Math.sin(state.time * 0.1) * 0.015;
+            }
+            [markerGroup, intentGroup, relayGroup, anchorGroup].forEach((group) => {
+                group.children.forEach((child) => {
+                    if (child.type !== 'Mesh' || !child.userData.baseScale) return;
+                    const pulse = 1 + Math.sin(state.time * 5 + (child.userData.phase || 0)) * 0.04;
+                    child.scale.setScalar(child.userData.baseScale * pulse);
+                });
+            });
+            coreGroup.children.forEach((child, index) => {
+                if (child.userData.kind === 'core') {
+                    child.rotation.x += 0.012;
+                    child.rotation.y += 0.018;
+                    const pulse = 1 + Math.sin(state.time * 4.2) * 0.035;
+                    child.scale.setScalar((0.82 + clamp(state.core / state.maxCore, 0, 1) * 0.22) * pulse);
+                }
+                if (child.userData.kind === 'core-ring') {
+                    child.rotation.x += 0.018 + index * 0.002;
+                    child.rotation.z += 0.014;
+                }
+            });
+        }
+
+        function clearVisualEffects() {
+            while (effectParticles.length) {
+                const particle = effectParticles.pop();
+                effectRoot.remove(particle);
+                particle.material.dispose();
+            }
+            while (effectAnimations.length) {
+                const effect = effectAnimations.pop();
+                effectRoot.remove(effect.mesh);
+                if (effect.mesh.userData.disposeGeometry) effect.mesh.geometry.dispose();
+                effect.material.dispose();
+            }
+        }
+
+        function trimParticles() {
+            while (effectParticles.length > 360) {
+                const old = effectParticles.shift();
+                effectRoot.remove(old);
+                old.material.dispose();
+            }
+        }
+
+        function updateUi() {
+            const enemies = state.enemies.filter((enemy) => enemy.alive);
+            ui.turn.textContent = String(state.turn);
+            ui.phase.textContent = state.gameOver ? 'Failed' : state.phase === 'upgrade' ? 'Upgrade' : capitalize(state.phase);
+            ui.core.textContent = String(Math.max(0, state.core));
+            ui.upgradeCount.textContent = String(state.upgrades.length);
+            ui.missionTitle.textContent = state.gameOver ? 'Containment Lost' : `Wave ${state.turn} | Mutation ${state.mutationLevel}`;
+            ui.missionCopy.textContent = state.status;
+            ui.coreFill.style.width = `${clamp(state.core / state.maxCore * 100, 0, 100)}%`;
+            ui.coreLabel.textContent = `${Math.max(0, state.core)}/${state.maxCore}`;
+            ui.planCopy.textContent = describeCurrentPlan();
+            ui.modeLabel.textContent = powerName(state.selectedMode);
+            ui.moveLabel.textContent = state.moveUsed ? 'Spent' : 'Ready';
+            ui.powerLabel.textContent = state.plannedPower ? state.plannedPower.label : 'None';
+            ui.cascadeLabel.textContent = state.signals.length ? `${state.signals.length} live` : state.phase === 'resolving' ? 'Resolving' : 'Idle';
+            ui.intentCopy.textContent = summarizeIntents();
+            ui.enemyCount.textContent = String(enemies.length);
+            ui.relayCount.textContent = String(state.relays.length);
+            ui.anchorCount.textContent = String(state.anchors.length);
+            ui.inspectTitle.textContent = state.inspection.title;
+            ui.inspectCopy.textContent = state.inspection.copy;
+            ui.inspectKind.textContent = state.inspection.kind;
+            ui.inspectPosition.textContent = state.inspection.position;
+            ui.inspectEffect.textContent = state.inspection.effect;
+            ui.inspectState.textContent = state.inspection.state;
+            ui.debugTurn.textContent = String(state.turn);
+            ui.debugCore.textContent = String(state.core);
+            ui.debugEnemies.textContent = String(enemies.length);
+            ui.debugSignals.textContent = String(state.signals.length);
+            ui.debugParticles.textContent = String(effectParticles.length + effectAnimations.length);
+            ui.debugPhase.textContent = state.phase;
+            renderLog();
+            updateButtons();
+        }
+
+        function updateButtons() {
+            const locked = state.phase !== 'planning' || state.gameOver;
+            ui.moveMode.classList.toggle('active', state.selectedMode === 'move');
+            ui.pulseMode.classList.toggle('active', state.selectedMode === 'pulse');
+            ui.splitMode.classList.toggle('active', state.selectedMode === 'split');
+            ui.anchorMode.classList.toggle('active', state.selectedMode === 'anchor');
+            ui.focus.classList.toggle('active', state.focused);
+            ui.moveMode.disabled = locked || state.moveUsed;
+            ui.pulseMode.disabled = locked;
+            ui.splitMode.disabled = locked;
+            ui.anchorMode.disabled = locked;
+            ui.undoPlan.disabled = locked || !state.lastSnapshot;
+            ui.commit.disabled = locked;
+        }
+
+        function powerName(mode) {
+            return powerInfo[mode]?.name || capitalize(mode);
+        }
+
+        function describeCurrentPlan() {
+            if (state.plannedPower) return `${describePlannedPower(state.plannedPower)} Commit to release it.`;
+            return powerInfo[state.selectedMode]?.summary || 'Choose a power, preview its path, then commit the cascade.';
+        }
+
+        function describePlannedPower(power) {
+            if (power.type === 'pulse') {
+                return `Beam ${power.dir.name}: one strong signal travels in a straight line.`;
+            }
+            if (power.type === 'split') {
+                return `Fork ${power.dir.name}: three weaker signals fire forward, left, and right.`;
+            }
+            if (power.type === 'anchor') {
+                return `Mine ${formatCoord(power.target.x, power.target.y)}: detonates when a signal crosses it.`;
+            }
+            return power.label;
+        }
+
+        function summarizeIntents() {
+            const pieces = state.enemies
+                .filter((enemy) => enemy.alive && enemy.intent)
+                .slice(0, 4)
+                .map((enemy) => enemy.intent.label);
+            return pieces.length ? pieces.join(' | ') : 'No active enemy intent.';
+        }
+
+        function addLog(text, tone = 'system') {
+            state.log.unshift({ turn: state.turn, text, tone });
+            state.log = state.log.slice(0, 18);
+        }
+
+        function renderLog() {
+            ui.actionLog.replaceChildren();
+            state.log.forEach((entry) => {
+                const item = document.createElement('div');
+                item.className = `log-entry ${entry.tone}`;
+                const turn = document.createElement('strong');
+                turn.textContent = `T${entry.turn}`;
+                item.append(turn, ` ${entry.text}`);
+                ui.actionLog.append(item);
+            });
+        }
+
+        function runDebugAction(action) {
+            if (action === 'core') state.core = Math.min(state.maxCore, state.core + 1);
+            if (action === 'spawn') {
+                const tile = [{ x: 0, y: CENTER }, { x: SIZE - 1, y: CENTER }, { x: CENTER, y: 0 }][state.enemies.length % 3];
+                spawnEnemy('seeker', tile.x, tile.y);
+            }
+            if (action === 'surge') {
+                launchSignal(state.conductor, CARDINALS[state.turn % CARDINALS.length], 6, colors.pulse, 'pulse');
+                state.phase = 'resolving';
+            }
+            if (action === 'clear') state.enemies = [];
+            addLog(`Debug action: ${action}.`, 'system');
+            generateEnemyIntents();
+            refreshMarkers();
+            syncScene();
+            updateUi();
+        }
+
+        function setDebugOpen(open) {
+            state.debugOpen = open;
+            ui.debugModal.classList.toggle('visible', open);
+            ui.debugModal.setAttribute('aria-hidden', open ? 'false' : 'true');
+            updateUi();
+        }
+
+        function snapshotState() {
+            return {
+                conductor: { ...state.conductor },
+                enemies: state.enemies.map((enemy) => ({ ...enemy, intent: enemy.intent ? cloneIntent(enemy.intent) : null })),
+                anchors: state.anchors.map((anchor) => ({ ...anchor })),
+                cracks: state.cracks.map((crack) => ({ ...crack })),
+                moveUsed: state.moveUsed,
+                plannedPower: state.plannedPower ? clonePower(state.plannedPower) : null,
+                inspection: { ...state.inspection },
+                selectedMode: state.selectedMode,
+                status: state.status,
+                log: state.log.map((entry) => ({ ...entry }))
+            };
+        }
+
+        function restoreSnapshot(snapshot) {
+            state.conductor = { ...snapshot.conductor };
+            state.enemies = snapshot.enemies.map((enemy) => ({ ...enemy, intent: enemy.intent ? cloneIntent(enemy.intent) : null }));
+            state.anchors = snapshot.anchors.map((anchor) => ({ ...anchor }));
+            state.cracks = snapshot.cracks.map((crack) => ({ ...crack }));
+            state.moveUsed = snapshot.moveUsed;
+            state.plannedPower = snapshot.plannedPower ? clonePower(snapshot.plannedPower) : null;
+            state.inspection = snapshot.inspection ? { ...snapshot.inspection } : defaultInspection();
+            state.selectedMode = snapshot.selectedMode;
+            state.status = snapshot.status;
+            state.log = snapshot.log.map((entry) => ({ ...entry }));
+        }
+
+        function clonePower(power) {
+            return {
+                ...power,
+                target: power.target ? { ...power.target } : null,
+                dir: power.dir ? { ...power.dir } : null
+            };
+        }
+
+        function cloneIntent(intent) {
+            return {
+                ...intent,
+                to: intent.to ? { ...intent.to } : null,
+                tiles: intent.tiles ? intent.tiles.map((tile) => ({ ...tile })) : []
+            };
+        }
+
+        function pickBoardCoord(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            pointer.y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
+            raycaster.setFromCamera(pointer, camera);
+            const hits = raycaster.intersectObjects(squareMeshes, false);
+            return hits[0]?.object.userData.coord || null;
+        }
+
+        function enemyAt(x, y, ignoredId = null) {
+            return state.enemies.find((enemy) => enemy.alive && enemy.id !== ignoredId && enemy.x === x && enemy.y === y) || null;
+        }
+
+        function relayAt(x, y) {
+            return state.relays.find((relay) => relay.x === x && relay.y === y) || null;
+        }
+
+        function anchorAt(x, y) {
+            return state.anchors.find((anchor) => anchor.x === x && anchor.y === y && anchor.duration > 0) || null;
+        }
+
+        function crackAt(x, y) {
+            return state.cracks.find((crack) => crack.x === x && crack.y === y) || null;
+        }
+
+        function occupied(x, y, ignoredEnemyId = null) {
+            return sameSquare(state.conductor, { x, y }) || enemyAt(x, y, ignoredEnemyId);
+        }
+
+        function tilesInRange(x, y, range) {
+            const tiles = [];
+            for (let yy = 0; yy < SIZE; yy++) {
+                for (let xx = 0; xx < SIZE; xx++) {
+                    if (manhattan({ x, y }, { x: xx, y: yy }) <= range && (xx !== x || yy !== y)) {
+                        tiles.push({ x: xx, y: yy });
+                    }
+                }
+            }
+            return tiles;
+        }
+
+        function pathTiles(origin, dir) {
+            const tiles = [];
+            let x = origin.x + dir.x;
+            let y = origin.y + dir.y;
+            while (inside(x, y)) {
+                tiles.push({ x, y });
+                x += dir.x;
+                y += dir.y;
+            }
+            return tiles;
+        }
+
+        function stepToward(from, to) {
+            const dx = Math.sign(to.x - from.x);
+            const dy = Math.sign(to.y - from.y);
+            return Math.abs(to.x - from.x) > Math.abs(to.y - from.y) ? { x: dx, y: 0 } : { x: 0, y: dy };
+        }
+
+        function rotateDir(dir, turn) {
+            const index = CARDINALS.findIndex((candidate) => candidate.x === dir.x && candidate.y === dir.y);
+            const next = (index + turn + CARDINALS.length) % CARDINALS.length;
+            return { x: CARDINALS[next].x, y: CARDINALS[next].y, name: CARDINALS[next].name };
+        }
+
+        function sameSquare(a, b) {
+            return a?.x === b?.x && a?.y === b?.y;
+        }
+
+        function manhattan(a, b) {
+            return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+        }
+
+        function inside(x, y) {
+            return x >= 0 && x < SIZE && y >= 0 && y < SIZE;
+        }
+
+        function toWorld(index) {
+            return index - (SIZE - 1) / 2;
+        }
+
+        function worldPoint(coord, y = 0.72) {
+            return new THREE.Vector3(toWorld(coord.x), y, toWorld(coord.y));
+        }
+
+        function formatCoord(x, y) {
+            return `${FILES[x]}${SIZE - y}`;
+        }
+
+        function capitalize(value) {
+            return value.charAt(0).toUpperCase() + value.slice(1);
+        }
+
+        function clamp(value, min, max) {
+            return Math.max(min, Math.min(max, value));
+        }
+
+        function clearGroup(group) {
+            group.traverse((child) => {
+                if (child.userData.disposeGeometry && child.geometry) {
+                    child.geometry.dispose();
+                }
+                if (child.userData.disposeMaterial && child.material) {
+                    const materialsToDispose = Array.isArray(child.material) ? child.material : [child.material];
+                    materialsToDispose.forEach((material) => material.dispose());
+                }
+            });
+            group.clear();
+        }
+
+        function focusCamera() {
+            if (state.focused) {
+                camera.position.set(0, 16.8, 0.2);
+            } else {
+                camera.position.set(0, 12.5, 14.2);
+            }
+            controls.target.set(0, 0, 0);
+            controls.update();
+        }
+
+        function animate() {
+            const dt = Math.min(clock.getDelta(), 0.033);
+            state.time += dt;
+            updateSignals(dt);
+            updateParticles(dt);
+            updateEffectAnimations(dt);
+            updateSceneMotion();
+            controls.update();
+            bloomPass.strength = 0.18 + Math.min(0.08, (effectParticles.length + effectAnimations.length * 5) * 0.0007) + (state.signals.length ? 0.035 : 0);
+            composer.render();
+        }
+
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+            bloomPass.setSize(window.innerWidth, window.innerHeight);
+        }
+    </script>
+</body>
+</html>
