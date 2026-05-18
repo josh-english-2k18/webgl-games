@@ -1,0 +1,1836 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kinetic Containment</title>
+    <style>
+        :root {
+            --bg: #05080d;
+            --ink: #f5f7fb;
+            --muted: rgba(245, 247, 251, 0.64);
+            --line: rgba(245, 247, 251, 0.15);
+            --panel: rgba(7, 11, 18, 0.78);
+            --panel-strong: rgba(10, 15, 24, 0.9);
+            --cyan: #73e8ff;
+            --green: #86f0b7;
+            --gold: #ffd36a;
+            --red: #ff657f;
+            --violet: #bba2ff;
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            letter-spacing: 0;
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        button {
+            color: inherit;
+        }
+
+        #stage {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background:
+                linear-gradient(150deg, rgba(115, 232, 255, 0.08), transparent 34%),
+                linear-gradient(28deg, transparent 42%, rgba(255, 211, 106, 0.07) 60%, transparent 84%),
+                linear-gradient(180deg, #111824 0%, #05080d 62%, #020305 100%);
+        }
+
+        #stage canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .grain,
+        .vignette {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .grain {
+            opacity: 0.055;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+            background-size: 54px 54px;
+            mask-image: radial-gradient(circle at 50% 52%, #000 0%, #000 58%, transparent 84%);
+        }
+
+        .vignette {
+            background:
+                linear-gradient(to right, rgba(0, 0, 0, 0.56), transparent 20%, transparent 80%, rgba(0, 0, 0, 0.56)),
+                linear-gradient(to bottom, rgba(0, 0, 0, 0.32), transparent 26%, transparent 72%, rgba(0, 0, 0, 0.78));
+        }
+
+        .hud {
+            position: fixed;
+            top: 18px;
+            left: 18px;
+            z-index: 20;
+            max-width: 520px;
+            pointer-events: none;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 11px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .mark {
+            position: relative;
+            width: 31px;
+            height: 31px;
+            border: 1px solid rgba(115, 232, 255, 0.84);
+            border-radius: 50%;
+            box-shadow: 0 0 24px rgba(115, 232, 255, 0.18), inset 0 0 16px rgba(115, 232, 255, 0.12);
+        }
+
+        .mark::before,
+        .mark::after {
+            content: "";
+            position: absolute;
+            inset: 7px;
+            border: 1px solid rgba(255, 211, 106, 0.74);
+        }
+
+        .mark::before {
+            transform: rotate(45deg);
+        }
+
+        .mark::after {
+            inset: 12px;
+            border-color: rgba(134, 240, 183, 0.78);
+            border-radius: 50%;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(29px, 4.6vw, 46px);
+            line-height: 0.95;
+            text-transform: uppercase;
+            text-shadow: 0 0 28px rgba(115, 232, 255, 0.2);
+        }
+
+        .readout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 820;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+        }
+
+        .readout strong {
+            color: var(--ink);
+        }
+
+        .side-panel {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            z-index: 22;
+            display: grid;
+            gap: 12px;
+            width: 370px;
+            pointer-events: none;
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.38);
+            pointer-events: auto;
+        }
+
+        .panel-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 13px 14px 0;
+        }
+
+        .panel h2 {
+            margin: 0;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        .panel-body {
+            padding: 12px 14px 14px;
+        }
+
+        #mode-copy,
+        #selection-copy {
+            min-height: 40px;
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .meter {
+            display: grid;
+            grid-template-columns: 78px 1fr 54px;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 850;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+        }
+
+        .track {
+            height: 5px;
+            overflow: hidden;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .fill {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--red), var(--gold), var(--green), var(--cyan));
+            transition: width 160ms ease;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1px;
+            overflow: hidden;
+            border: 1px solid rgba(245, 247, 251, 0.08);
+            border-radius: 6px;
+            background: rgba(245, 247, 251, 0.08);
+        }
+
+        .stat-cell {
+            min-width: 0;
+            padding: 10px;
+            background: rgba(4, 7, 12, 0.72);
+        }
+
+        .stat-cell span,
+        .stat-cell strong {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .stat-cell span {
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .stat-cell strong {
+            margin-top: 5px;
+            font-size: 15px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .event-log {
+            display: grid;
+            gap: 1px;
+            max-height: 142px;
+            overflow: auto;
+            border: 1px solid rgba(245, 247, 251, 0.08);
+            border-radius: 6px;
+            background: rgba(4, 7, 12, 0.66);
+        }
+
+        .log-entry {
+            padding: 8px 9px;
+            background: rgba(245, 247, 251, 0.055);
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        .log-entry strong {
+            color: var(--ink);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .log-entry.impact {
+            color: rgba(255, 211, 106, 0.9);
+        }
+
+        .log-entry.system {
+            color: rgba(115, 232, 255, 0.86);
+        }
+
+        .controls {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            left: 18px;
+            z-index: 25;
+            display: grid;
+            grid-template-columns: minmax(290px, 1fr) auto minmax(300px, 0.84fr);
+            gap: 10px;
+            max-width: 1220px;
+            margin: 0 auto;
+            padding: 11px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.38);
+        }
+
+        .mode-list,
+        .action-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .mode-btn,
+        .control-btn {
+            min-width: 92px;
+            min-height: 40px;
+            padding: 0 12px;
+            border: 1px solid rgba(245, 247, 251, 0.15);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--ink);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 840;
+            text-transform: uppercase;
+            transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+        }
+
+        .mode-btn:hover,
+        .mode-btn.active,
+        .control-btn:hover,
+        .control-btn.active {
+            border-color: rgba(115, 232, 255, 0.64);
+            background: rgba(115, 232, 255, 0.12);
+        }
+
+        .control-btn.commit {
+            border-color: rgba(134, 240, 183, 0.42);
+            background: rgba(134, 240, 183, 0.1);
+        }
+
+        .range-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px 10px;
+            min-width: 0;
+        }
+
+        .range-control {
+            display: grid;
+            grid-template-columns: 70px 44px;
+            align-items: center;
+            gap: 6px 8px;
+            min-width: 0;
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 850;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+        }
+
+        .range-control strong {
+            color: var(--ink);
+            text-align: right;
+        }
+
+        .range-control input {
+            grid-column: 1 / -1;
+            width: 100%;
+            accent-color: var(--cyan);
+        }
+
+        .world-label {
+            position: fixed;
+            z-index: 24;
+            display: none;
+            min-width: 106px;
+            padding: 6px 8px;
+            border: 1px solid rgba(115, 232, 255, 0.34);
+            border-radius: 6px;
+            background: rgba(5, 8, 13, 0.74);
+            color: var(--ink);
+            font-size: 11px;
+            font-weight: 820;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+            pointer-events: none;
+            transform: translate(-50%, -120%);
+            backdrop-filter: blur(14px);
+        }
+
+        #fallback {
+            position: fixed;
+            inset: 18px;
+            z-index: 100;
+            display: none;
+            place-items: center;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: rgba(6, 7, 10, 0.94);
+            text-align: center;
+        }
+
+        #fallback.visible {
+            display: grid;
+        }
+
+        @media (max-width: 1060px) {
+            .controls {
+                grid-template-columns: 1fr;
+                max-height: 45vh;
+                overflow: auto;
+            }
+
+            .action-list {
+                order: 3;
+            }
+
+            .side-panel {
+                top: auto;
+                right: 12px;
+                bottom: 202px;
+                left: 12px;
+                width: auto;
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .side-panel .panel:first-child,
+            .side-panel .panel:last-child {
+                grid-column: 1 / -1;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .hud {
+                top: 12px;
+                left: 12px;
+                max-width: 320px;
+            }
+
+            .readout {
+                max-width: 300px;
+                font-size: 11px;
+            }
+
+            .side-panel {
+                display: none;
+            }
+
+            .controls {
+                right: 10px;
+                bottom: 10px;
+                left: 10px;
+                padding: 9px;
+            }
+
+            .mode-btn,
+            .control-btn {
+                flex: 1 1 92px;
+                min-width: 0;
+            }
+
+            .range-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="stage" aria-label="Interactive kinetic containment simulation"></div>
+    <div class="grain"></div>
+    <div class="vignette"></div>
+
+    <section class="hud" aria-label="Simulation status">
+        <div class="brand"><span class="mark"></span><span>Rigid Body Particle Lab</span></div>
+        <h1>Kinetic Containment</h1>
+        <div class="readout">
+            <span>Bodies <strong id="body-count">0</strong></span>
+            <span>Pairs <strong id="pair-count">0</strong></span>
+            <span>Impacts <strong id="impact-count">0</strong></span>
+            <span>FPS <strong id="fps-count">0</strong></span>
+        </div>
+    </section>
+
+    <aside class="side-panel">
+        <section class="panel" aria-label="Containment mode">
+            <div class="panel-head">
+                <h2 id="mode-title">Containment Drift</h2>
+            </div>
+            <div class="panel-body">
+                <p id="mode-copy">A stable chamber for reading collision flow, broadphase density, and shell response.</p>
+                <div class="meter">
+                    <span>Integrity</span>
+                    <span class="track"><span id="integrity-fill" class="fill"></span></span>
+                    <strong id="integrity-label">100%</strong>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Selected body">
+            <div class="panel-head">
+                <h2 id="selection-title">No Body Selected</h2>
+            </div>
+            <div class="panel-body">
+                <p id="selection-copy">Click a body to inspect velocity, mass, impact heat, and wall contact behavior.</p>
+                <div class="stat-grid">
+                    <div class="stat-cell"><span>Speed</span><strong id="selected-speed">-</strong></div>
+                    <div class="stat-cell"><span>Radius</span><strong id="selected-radius">-</strong></div>
+                    <div class="stat-cell"><span>Mass</span><strong id="selected-mass">-</strong></div>
+                    <div class="stat-cell"><span>Heat</span><strong id="selected-heat">-</strong></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Solver diagnostics">
+            <div class="panel-head">
+                <h2>Solver Diagnostics</h2>
+            </div>
+            <div class="panel-body">
+                <div class="stat-grid">
+                    <div class="stat-cell"><span>Kinetic</span><strong id="energy-readout">0</strong></div>
+                    <div class="stat-cell"><span>Cell Size</span><strong id="cell-readout">1.25</strong></div>
+                    <div class="stat-cell"><span>Wall Hits</span><strong id="wall-hit-count">0</strong></div>
+                    <div class="stat-cell"><span>Broadphase</span><strong id="broadphase-count">0</strong></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Event log">
+            <div class="panel-head">
+                <h2>Event Log</h2>
+            </div>
+            <div class="panel-body">
+                <div id="event-log" class="event-log"></div>
+            </div>
+        </section>
+    </aside>
+
+    <nav class="controls" aria-label="Physics controls">
+        <div class="mode-list" role="tablist" aria-label="Simulation modes">
+            <button class="mode-btn active" type="button" data-mode="0" role="tab" aria-selected="true">Contain</button>
+            <button class="mode-btn" type="button" data-mode="1" role="tab" aria-selected="false">Orbit</button>
+            <button class="mode-btn" type="button" data-mode="2" role="tab" aria-selected="false">Pressure</button>
+            <button class="mode-btn" type="button" data-mode="3" role="tab" aria-selected="false">Breach</button>
+        </div>
+
+        <div class="action-list">
+            <button id="pulse-btn" class="control-btn commit" type="button">Pulse</button>
+            <button id="vortex-btn" class="control-btn" type="button">Vortex</button>
+            <button id="cool-btn" class="control-btn" type="button">Cool</button>
+            <button id="labels-btn" class="control-btn active" type="button" aria-pressed="true">Labels</button>
+            <button id="reset-btn" class="control-btn" type="button">Reset</button>
+        </div>
+
+        <div class="range-grid">
+            <label class="range-control" for="count-slider">
+                <span>Count</span><strong id="count-label">320</strong>
+                <input id="count-slider" type="range" min="36" max="640" step="1" value="320">
+            </label>
+            <label class="range-control" for="heat-slider">
+                <span>Heat</span><strong id="heat-label">100</strong>
+                <input id="heat-slider" type="range" min="45" max="180" step="1" value="100">
+            </label>
+            <label class="range-control" for="gravity-slider">
+                <span>Gravity</span><strong id="gravity-label">0</strong>
+                <input id="gravity-slider" type="range" min="0" max="120" step="1" value="0">
+            </label>
+            <label class="range-control" for="bounce-slider">
+                <span>Bounce</span><strong id="bounce-label">88</strong>
+                <input id="bounce-slider" type="range" min="55" max="98" step="1" value="88">
+            </label>
+        </div>
+    </nav>
+
+    <div id="selected-label" class="world-label"></div>
+
+    <div id="fallback">
+        <p>WebGL initialization failed.</p>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.174.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+        const isCompact = window.matchMedia('(max-width: 720px)').matches;
+        const containerRadius = 9.4;
+        const maxBodies = 640;
+        const defaultCount = 320;
+        const sparkLimit = isCompact ? 360 : 640;
+        const fieldParticleCount = isCompact ? 900 : 1800;
+        const cellSize = 1.25;
+        const neighborOffsets = [];
+
+        for (let x = -1; x <= 1; x += 1) {
+            for (let y = -1; y <= 1; y += 1) {
+                for (let z = -1; z <= 1; z += 1) {
+                    neighborOffsets.push([x, y, z]);
+                }
+            }
+        }
+
+        const modes = [
+            {
+                name: 'Containment Drift',
+                copy: 'A stable chamber for reading collision flow, broadphase density, and shell response.',
+                palette: [0x9bdcff, 0x62c5ff, 0x2fa8ff, 0x1677ff, 0x244ce8, 0x0b2f85],
+                gravity: 0.14,
+                centerPull: 0.36,
+                swirl: 0.22,
+                turbulence: 0.12,
+                restitution: 0.98,
+                bloom: 0.18
+            },
+            {
+                name: 'Orbital Exchange',
+                copy: 'Tangential force turns impacts into orbiting lanes while the particle field reveals the velocity shell.',
+                palette: [0xc6f1ff, 0x7dd3fc, 0x38bdf8, 0x0ea5e9, 0x2563eb, 0x1e40af],
+                gravity: 0.08,
+                centerPull: 0.58,
+                swirl: 1.1,
+                turbulence: 0.08,
+                restitution: 0.95,
+                bloom: 0.25
+            },
+            {
+                name: 'Pressure Lattice',
+                copy: 'Higher downward bias and tighter damping make dense contacts visible without losing energy completely.',
+                palette: [0xdbeafe, 0x93c5fd, 0x60a5fa, 0x3b82f6, 0x1d4ed8, 0x172554],
+                gravity: 0.78,
+                centerPull: 0.46,
+                swirl: 0.1,
+                turbulence: 0.2,
+                restitution: 0.88,
+                bloom: 0.22
+            },
+            {
+                name: 'Axiom Breach',
+                copy: 'A volatile mode inspired by the tactics prototype: visible intents, sharp impulses, and controlled chaos.',
+                palette: [0xe0f2fe, 0x67e8f9, 0x22d3ee, 0x0284c7, 0x1d4ed8, 0x1e3a8a],
+                gravity: 0.22,
+                centerPull: -0.12,
+                swirl: -0.92,
+                turbulence: 0.68,
+                restitution: 1,
+                bloom: 0.34
+            }
+        ];
+
+        const ui = {
+            stage: document.getElementById('stage'),
+            fallback: document.getElementById('fallback'),
+            bodyCount: document.getElementById('body-count'),
+            pairCount: document.getElementById('pair-count'),
+            impactCount: document.getElementById('impact-count'),
+            fpsCount: document.getElementById('fps-count'),
+            modeTitle: document.getElementById('mode-title'),
+            modeCopy: document.getElementById('mode-copy'),
+            integrityFill: document.getElementById('integrity-fill'),
+            integrityLabel: document.getElementById('integrity-label'),
+            selectionTitle: document.getElementById('selection-title'),
+            selectionCopy: document.getElementById('selection-copy'),
+            selectedSpeed: document.getElementById('selected-speed'),
+            selectedRadius: document.getElementById('selected-radius'),
+            selectedMass: document.getElementById('selected-mass'),
+            selectedHeat: document.getElementById('selected-heat'),
+            energyReadout: document.getElementById('energy-readout'),
+            cellReadout: document.getElementById('cell-readout'),
+            wallHitCount: document.getElementById('wall-hit-count'),
+            broadphaseCount: document.getElementById('broadphase-count'),
+            eventLog: document.getElementById('event-log'),
+            selectedLabel: document.getElementById('selected-label'),
+            modeButtons: Array.from(document.querySelectorAll('[data-mode]')),
+            pulse: document.getElementById('pulse-btn'),
+            vortex: document.getElementById('vortex-btn'),
+            cool: document.getElementById('cool-btn'),
+            labels: document.getElementById('labels-btn'),
+            reset: document.getElementById('reset-btn'),
+            countSlider: document.getElementById('count-slider'),
+            heatSlider: document.getElementById('heat-slider'),
+            gravitySlider: document.getElementById('gravity-slider'),
+            bounceSlider: document.getElementById('bounce-slider'),
+            countLabel: document.getElementById('count-label'),
+            heatLabel: document.getElementById('heat-label'),
+            gravityLabel: document.getElementById('gravity-label'),
+            bounceLabel: document.getElementById('bounce-label')
+        };
+
+        const state = {
+            mode: 0,
+            count: defaultCount,
+            heat: Number(ui.heatSlider.value) / 100,
+            gravity: Number(ui.gravitySlider.value) / 100,
+            restitution: Number(ui.bounceSlider.value) / 100,
+            labels: true,
+            selectedId: null,
+            hoveredId: null,
+            time: 0,
+            impacts: 0,
+            wallHits: 0,
+            framePairs: 0,
+            broadphaseCells: 0,
+            kineticEnergy: 0,
+            recentImpactEnergy: 0,
+            integrity: 1,
+            fps: 60,
+            vortex: 0,
+            log: []
+        };
+
+        ui.countSlider.max = String(maxBodies);
+        ui.countSlider.value = String(defaultCount);
+        ui.countLabel.textContent = String(defaultCount);
+
+        let scene;
+        let camera;
+        let renderer;
+        let controls;
+        let composer;
+        let bloomPass;
+        let clock;
+        let raycaster;
+        let pointer;
+        let containerGroup;
+        let bodyMesh;
+        let trailMesh;
+        let trailPositions;
+        let trailColors;
+        let fieldMesh;
+        let sparkMesh;
+        let sparkPositions;
+        let sparkColors;
+        let sparkLives;
+        let sparkSizes;
+        let selectionRing;
+        let bodyMaterial;
+        let fieldMaterial;
+        let sparkMaterial;
+
+        const bodies = [];
+        const sparks = [];
+        const spatialGrid = new Map();
+        const tempObject = new THREE.Object3D();
+        const tempColor = new THREE.Color();
+        const tempColorB = new THREE.Color();
+        const tempVec = new THREE.Vector3();
+        const tempVecB = new THREE.Vector3();
+        const tempVecC = new THREE.Vector3();
+        const white = new THREE.Color(0xffffff);
+
+        try {
+            init();
+        } catch (error) {
+            console.error(error);
+            ui.fallback.classList.add('visible');
+        }
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x05080d, 0.045);
+
+            camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 120);
+            camera.position.set(0, 7.2, 18.2);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 0.9;
+            ui.stage.appendChild(renderer.domElement);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.07;
+            controls.enablePan = false;
+            controls.minDistance = 11;
+            controls.maxDistance = 30;
+            controls.maxPolarAngle = Math.PI * 0.82;
+            controls.target.set(0, 0, 0);
+
+            composer = new EffectComposer(renderer);
+            composer.addPass(new RenderPass(scene, camera));
+            bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), modes[state.mode].bloom, 0.34, 0.58);
+            composer.addPass(bloomPass);
+            composer.addPass(new OutputPass());
+
+            clock = new THREE.Clock();
+            raycaster = new THREE.Raycaster();
+            pointer = new THREE.Vector2();
+
+            buildLights();
+            buildContainer();
+            buildBodies();
+            buildTrails();
+            buildFieldParticles();
+            buildSparks();
+            buildSelection();
+            bindEvents();
+            resetSimulation();
+
+            renderer.setAnimationLoop(animate);
+            window.__ballPhysicsReady = true;
+            window.__kineticContainmentReady = true;
+        }
+
+        function buildLights() {
+            scene.add(new THREE.AmbientLight(0xf5f7fb, 0.54));
+            const key = new THREE.DirectionalLight(0xffffff, 2.5);
+            key.position.set(-8, 12, 9);
+            scene.add(key);
+
+            const cyan = new THREE.PointLight(0x73e8ff, 3.2, 36);
+            cyan.position.set(7, 5.4, -8);
+            scene.add(cyan);
+
+            const warm = new THREE.PointLight(0xffd36a, 2.2, 34);
+            warm.position.set(-7, -3, 7);
+            scene.add(warm);
+
+            const breach = new THREE.PointLight(0xff657f, 1.4, 30);
+            breach.position.set(0, 7, 4);
+            scene.add(breach);
+        }
+
+        function buildContainer() {
+            containerGroup = new THREE.Group();
+            scene.add(containerGroup);
+
+            const sphereGeometry = new THREE.SphereGeometry(containerRadius, 72, 36);
+            const shellMaterial = new THREE.MeshPhysicalMaterial({
+                color: 0x182334,
+                roughness: 0.28,
+                metalness: 0.1,
+                transparent: true,
+                opacity: 0.15,
+                side: THREE.DoubleSide,
+                emissive: 0x06111b,
+                emissiveIntensity: 0.28,
+                depthWrite: false
+            });
+            const shell = new THREE.Mesh(sphereGeometry, shellMaterial);
+            containerGroup.add(shell);
+
+            const wireframe = new THREE.LineSegments(
+                new THREE.WireframeGeometry(sphereGeometry),
+                new THREE.LineBasicMaterial({
+                    color: 0x73e8ff,
+                    transparent: true,
+                    opacity: 0.08,
+                    blending: THREE.AdditiveBlending
+                })
+            );
+            containerGroup.add(wireframe);
+
+            const ringGeometry = new THREE.TorusGeometry(containerRadius, 0.012, 8, 192);
+            const ringColors = [0x73e8ff, 0xffd36a, 0x86f0b7];
+            for (let i = 0; i < 3; i += 1) {
+                const ring = new THREE.Mesh(
+                    ringGeometry,
+                    new THREE.MeshBasicMaterial({
+                        color: ringColors[i],
+                        transparent: true,
+                        opacity: 0.22,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false
+                    })
+                );
+                if (i === 1) ring.rotation.x = Math.PI / 2;
+                if (i === 2) ring.rotation.y = Math.PI / 2;
+                containerGroup.add(ring);
+            }
+
+            const grid = new THREE.GridHelper(26, 26, 0x73e8ff, 0x26364d);
+            grid.position.y = -containerRadius - 0.28;
+            grid.material.transparent = true;
+            grid.material.opacity = 0.06;
+            scene.add(grid);
+        }
+
+        function buildBodies() {
+            const geometry = new THREE.SphereGeometry(1, 32, 18);
+            bodyMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                roughness: 0.38,
+                metalness: 0.36,
+                emissive: 0x05080d,
+                emissiveIntensity: 0.16
+            });
+
+            bodyMesh = new THREE.InstancedMesh(geometry, bodyMaterial, maxBodies);
+            bodyMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            bodyMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(maxBodies * 3), 3);
+            bodyMesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+            bodyMesh.count = state.count;
+            scene.add(bodyMesh);
+        }
+
+        function buildTrails() {
+            trailPositions = new Float32Array(maxBodies * 6);
+            trailColors = new Float32Array(maxBodies * 6);
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(trailColors, 3));
+            trailMesh = new THREE.LineSegments(
+                geometry,
+                new THREE.LineBasicMaterial({
+                    vertexColors: true,
+                    transparent: true,
+                    opacity: 0.24,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                })
+            );
+            scene.add(trailMesh);
+        }
+
+        function buildFieldParticles() {
+            const positions = new Float32Array(fieldParticleCount * 3);
+            const colors = new Float32Array(fieldParticleCount * 3);
+            const seeds = new Float32Array(fieldParticleCount);
+            const sizes = new Float32Array(fieldParticleCount);
+            const palette = modes[state.mode].palette;
+
+            for (let i = 0; i < fieldParticleCount; i += 1) {
+                randomPointInSphere(tempVec, containerRadius * (0.72 + Math.random() * 0.62));
+                positions[i * 3] = tempVec.x;
+                positions[i * 3 + 1] = tempVec.y;
+                positions[i * 3 + 2] = tempVec.z;
+
+                tempColor.setHex(palette[i % palette.length]).lerp(white, Math.random() * 0.18);
+                colors[i * 3] = tempColor.r;
+                colors[i * 3 + 1] = tempColor.g;
+                colors[i * 3 + 2] = tempColor.b;
+                seeds[i] = Math.random();
+                sizes[i] = 0.55 + Math.random() * 1.75;
+            }
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geometry.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
+            geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+
+            fieldMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    uTime: { value: 0 },
+                    uEnergy: { value: 1 },
+                    uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) }
+                },
+                vertexShader: `
+                    attribute float aSeed;
+                    attribute float aSize;
+                    varying vec3 vColor;
+                    varying float vSeed;
+                    uniform float uTime;
+                    uniform float uEnergy;
+                    uniform float uPixelRatio;
+
+                    void main() {
+                        vec3 p = position;
+                        float wave = sin(uTime * 0.42 + aSeed * 18.849);
+                        p.x += wave * 0.12 * uEnergy;
+                        p.y += cos(uTime * 0.3 + aSeed * 11.0) * 0.08 * uEnergy;
+                        p.z += sin(uTime * 0.24 + aSeed * 7.2) * 0.1 * uEnergy;
+                        vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
+                        gl_Position = projectionMatrix * mvPosition;
+                        gl_PointSize = aSize * uPixelRatio * (70.0 / max(8.0, -mvPosition.z));
+                        vColor = color;
+                        vSeed = aSeed;
+                    }
+                `,
+                fragmentShader: `
+                    varying vec3 vColor;
+                    varying float vSeed;
+
+                    void main() {
+                        vec2 uv = gl_PointCoord - 0.5;
+                        float d = length(uv);
+                        float alpha = smoothstep(0.5, 0.08, d) * (0.18 + vSeed * 0.22);
+                        gl_FragColor = vec4(vColor, alpha);
+                    }
+                `,
+                transparent: true,
+                vertexColors: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            fieldMesh = new THREE.Points(geometry, fieldMaterial);
+            scene.add(fieldMesh);
+        }
+
+        function buildSparks() {
+            sparkPositions = new Float32Array(sparkLimit * 3);
+            sparkColors = new Float32Array(sparkLimit * 3);
+            sparkLives = new Float32Array(sparkLimit);
+            sparkSizes = new Float32Array(sparkLimit);
+
+            for (let i = 0; i < sparkLimit; i += 1) {
+                sparkPositions[i * 3 + 1] = 9999;
+                sparkSizes[i] = 1;
+                sparks.push({
+                    position: new THREE.Vector3(0, 9999, 0),
+                    velocity: new THREE.Vector3(),
+                    color: new THREE.Color(0x73e8ff),
+                    life: 0,
+                    maxLife: 1,
+                    size: 1
+                });
+            }
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(sparkPositions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(sparkColors, 3));
+            geometry.setAttribute('aLife', new THREE.BufferAttribute(sparkLives, 1));
+            geometry.setAttribute('aSize', new THREE.BufferAttribute(sparkSizes, 1));
+
+            sparkMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) }
+                },
+                vertexShader: `
+                    attribute float aLife;
+                    attribute float aSize;
+                    varying vec3 vColor;
+                    varying float vLife;
+                    uniform float uPixelRatio;
+
+                    void main() {
+                        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                        gl_Position = projectionMatrix * mvPosition;
+                        gl_PointSize = aSize * uPixelRatio * (165.0 / max(6.0, -mvPosition.z));
+                        vColor = color;
+                        vLife = aLife;
+                    }
+                `,
+                fragmentShader: `
+                    varying vec3 vColor;
+                    varying float vLife;
+
+                    void main() {
+                        vec2 uv = gl_PointCoord - 0.5;
+                        float d = length(uv);
+                        float core = smoothstep(0.5, 0.05, d);
+                        gl_FragColor = vec4(vColor * (0.45 + vLife * 1.65), core * vLife);
+                    }
+                `,
+                transparent: true,
+                vertexColors: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            sparkMesh = new THREE.Points(geometry, sparkMaterial);
+            scene.add(sparkMesh);
+        }
+
+        function buildSelection() {
+            const geometry = new THREE.TorusGeometry(0.72, 0.026, 8, 80);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.74,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            selectionRing = new THREE.Mesh(geometry, material);
+            selectionRing.visible = false;
+            scene.add(selectionRing);
+        }
+
+        function bindEvents() {
+            window.addEventListener('resize', onResize);
+            renderer.domElement.addEventListener('pointerdown', onPointerDown);
+            renderer.domElement.addEventListener('pointermove', onPointerMove);
+            renderer.domElement.addEventListener('pointerleave', () => {
+                state.hoveredId = null;
+                document.body.style.cursor = 'default';
+            });
+
+            ui.modeButtons.forEach((button) => {
+                button.addEventListener('click', () => setMode(Number(button.dataset.mode)));
+            });
+            ui.pulse.addEventListener('click', triggerPulse);
+            ui.vortex.addEventListener('click', triggerVortex);
+            ui.cool.addEventListener('click', coolSystem);
+            ui.labels.addEventListener('click', toggleLabels);
+            ui.reset.addEventListener('click', resetSimulation);
+
+            ui.countSlider.addEventListener('input', () => setBodyCount(Number(ui.countSlider.value)));
+            ui.heatSlider.addEventListener('input', () => {
+                state.heat = Number(ui.heatSlider.value) / 100;
+                updateUi();
+            });
+            ui.gravitySlider.addEventListener('input', () => {
+                state.gravity = Number(ui.gravitySlider.value) / 100;
+                updateUi();
+            });
+            ui.bounceSlider.addEventListener('input', () => {
+                state.restitution = Number(ui.bounceSlider.value) / 100;
+                updateUi();
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key >= '1' && event.key <= String(modes.length)) {
+                    setMode(Number(event.key) - 1);
+                }
+                if (event.key.toLowerCase() === 'p') triggerPulse();
+                if (event.key.toLowerCase() === 'v') triggerVortex();
+                if (event.key.toLowerCase() === 'r') resetSimulation();
+                if (event.key.toLowerCase() === 'l') toggleLabels();
+            });
+        }
+
+        function resetSimulation() {
+            bodies.length = 0;
+            state.count = Number(ui.countSlider.value);
+            state.selectedId = null;
+            state.hoveredId = null;
+            state.impacts = 0;
+            state.wallHits = 0;
+            state.recentImpactEnergy = 0;
+            state.integrity = 1;
+            state.vortex = 0;
+
+            for (let i = 0; i < state.count; i += 1) {
+                bodies.push(createBody(i));
+            }
+
+            clearSparks();
+            bodyMesh.count = state.count;
+            repaintBodies();
+            syncInstances(0);
+            syncTrails();
+            addLog(`Reset chamber with <strong>${state.count}</strong> active bodies.`, 'system');
+            updateUi();
+        }
+
+        function createBody(index) {
+            const radius = 0.16 + Math.pow(Math.random(), 0.8) * 0.17 + (index % 5 === 0 ? 0.08 : 0);
+            const mass = Math.pow(radius, 3) * 9.5;
+            const body = {
+                id: index,
+                position: new THREE.Vector3(),
+                previous: new THREE.Vector3(),
+                velocity: new THREE.Vector3(),
+                color: new THREE.Color(),
+                radius,
+                mass,
+                invMass: 1 / mass,
+                heat: 0,
+                phase: Math.random() * Math.PI * 2,
+                impacts: 0
+            };
+
+            let placed = false;
+            for (let attempt = 0; attempt < 80; attempt += 1) {
+                randomPointInSphere(body.position, containerRadius - radius - 0.45);
+                placed = true;
+                for (let i = 0; i < bodies.length; i += 1) {
+                    const other = bodies[i];
+                    const minDist = body.radius + other.radius + 0.08;
+                    if (body.position.distanceToSquared(other.position) < minDist * minDist) {
+                        placed = false;
+                        break;
+                    }
+                }
+                if (placed) break;
+            }
+
+            if (!placed) {
+                randomPointInSphere(body.position, containerRadius - radius - 0.45);
+            }
+            body.previous.copy(body.position);
+
+            randomDirection(body.velocity);
+            body.velocity.multiplyScalar((1.7 + Math.random() * 3.8) * state.heat);
+            assignBodyColor(body, index);
+            return body;
+        }
+
+        function setBodyCount(count) {
+            const clamped = THREE.MathUtils.clamp(count, 36, maxBodies);
+            if (clamped > bodies.length) {
+                for (let i = bodies.length; i < clamped; i += 1) {
+                    bodies.push(createBody(i));
+                }
+            }
+            state.count = clamped;
+            bodyMesh.count = state.count;
+            if (state.selectedId !== null && state.selectedId >= state.count) {
+                state.selectedId = null;
+            }
+            repaintBodies();
+            updateUi();
+        }
+
+        function setMode(index) {
+            if (index === state.mode || !modes[index]) return;
+            state.mode = index;
+            bloomPass.strength = modes[index].bloom;
+            repaintBodies();
+            addLog(`Mode changed to <strong>${modes[index].name}</strong>.`, 'system');
+            updateUi();
+        }
+
+        function repaintBodies() {
+            for (let i = 0; i < bodies.length; i += 1) {
+                assignBodyColor(bodies[i], i);
+            }
+            const colors = fieldMesh.geometry.attributes.color.array;
+            const palette = modes[state.mode].palette;
+            for (let i = 0; i < fieldParticleCount; i += 1) {
+                tempColor.setHex(palette[i % palette.length]).lerp(white, (i % 11) / 80);
+                colors[i * 3] = tempColor.r;
+                colors[i * 3 + 1] = tempColor.g;
+                colors[i * 3 + 2] = tempColor.b;
+            }
+            fieldMesh.geometry.attributes.color.needsUpdate = true;
+        }
+
+        function assignBodyColor(body, index) {
+            const palette = modes[state.mode].palette;
+            const base = palette[index % palette.length];
+            const next = palette[(index + 2) % palette.length];
+            const mix = (Math.sin(index * 12.9898) * 43758.5453) % 1;
+            tempColor.setHex(base);
+            tempColorB.setHex(next);
+            body.color.copy(tempColor).lerp(tempColorB, Math.abs(mix) * 0.42);
+            if (index % 7 === 0) body.color.lerp(white, 0.2);
+        }
+
+        function triggerPulse() {
+            for (let i = 0; i < state.count; i += 1) {
+                const body = bodies[i];
+                tempVec.copy(body.position).normalize();
+                if (tempVec.lengthSq() < 0.0001) randomDirection(tempVec);
+                const strength = (2.6 + Math.random() * 3.6) * state.heat;
+                body.velocity.addScaledVector(tempVec, strength);
+                body.heat = Math.min(1, body.heat + 0.22);
+            }
+            emitSparks(new THREE.Vector3(), new THREE.Color(modes[state.mode].palette[0]), 90, 1.3);
+            state.recentImpactEnergy += 48;
+            addLog('Radial pulse injected into the chamber.', 'impact');
+        }
+
+        function triggerVortex() {
+            state.vortex = 1.8;
+            for (let i = 0; i < state.count; i += 1) {
+                const body = bodies[i];
+                tempVec.set(-body.position.z, 0, body.position.x);
+                if (tempVec.lengthSq() > 0.0001) {
+                    tempVec.normalize();
+                    body.velocity.addScaledVector(tempVec, (2.2 + Math.random() * 2.8) * state.heat);
+                }
+                body.heat = Math.min(1, body.heat + 0.16);
+            }
+            addLog('Vortex shear engaged for a short burst.', 'system');
+        }
+
+        function coolSystem() {
+            for (let i = 0; i < state.count; i += 1) {
+                bodies[i].velocity.multiplyScalar(0.58);
+                bodies[i].heat *= 0.35;
+            }
+            state.recentImpactEnergy *= 0.45;
+            addLog('System cooled. Velocities damped without resetting positions.', 'system');
+        }
+
+        function toggleLabels() {
+            state.labels = !state.labels;
+            ui.labels.classList.toggle('active', state.labels);
+            ui.labels.setAttribute('aria-pressed', String(state.labels));
+            updateLabels();
+        }
+
+        function onPointerDown(event) {
+            const hit = getBodyHit(event);
+            if (!hit) {
+                state.selectedId = null;
+                updateUi();
+                return;
+            }
+            state.selectedId = hit.instanceId;
+            const body = bodies[state.selectedId];
+            if (body) {
+                body.heat = Math.min(1, body.heat + 0.18);
+                emitSparks(body.position, body.color, 28, 0.8);
+                addLog(`Body <strong>${body.id + 1}</strong> selected at ${body.velocity.length().toFixed(2)} u/s.`, 'system');
+            }
+            updateUi();
+        }
+
+        function onPointerMove(event) {
+            const hit = getBodyHit(event);
+            state.hoveredId = hit ? hit.instanceId : null;
+            document.body.style.cursor = hit ? 'pointer' : 'default';
+        }
+
+        function getBodyHit(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(pointer, camera);
+            const hits = raycaster.intersectObject(bodyMesh, false);
+            if (!hits.length) return null;
+            return hits.find((hit) => hit.instanceId !== undefined && hit.instanceId < state.count) || null;
+        }
+
+        function animate() {
+            const dt = Math.min(clock.getDelta(), 0.033);
+            state.time += dt;
+            state.vortex = Math.max(0, state.vortex - dt * 0.72);
+            sampleFps(dt);
+
+            beginPhysicsFrame();
+            const substeps = Math.max(3, Math.ceil(dt / 0.008));
+            const stepDt = dt / substeps;
+            for (let step = 0; step < substeps; step += 1) {
+                integrateBodies(stepDt);
+                resolveWallCollisions();
+                resolveBodyCollisions();
+                resolveBodyCollisions();
+            }
+            decayImpactEnergy(dt);
+            updateSparks(dt);
+            updateScene(dt);
+            updateUi();
+
+            controls.update();
+            composer.render();
+        }
+
+        function sampleFps(dt) {
+            sampleFps.elapsed += dt;
+            sampleFps.frames += 1;
+            if (sampleFps.elapsed >= 0.35) {
+                state.fps = sampleFps.frames / sampleFps.elapsed;
+                sampleFps.elapsed = 0;
+                sampleFps.frames = 0;
+            }
+        }
+        sampleFps.elapsed = 0;
+        sampleFps.frames = 0;
+
+        function beginPhysicsFrame() {
+            state.framePairs = 0;
+            state.broadphaseCells = 0;
+            for (let i = 0; i < state.count; i += 1) {
+                bodies[i].previous.copy(bodies[i].position);
+            }
+        }
+
+        function integrateBodies(dt) {
+            const mode = modes[state.mode];
+            state.kineticEnergy = 0;
+            const heatScale = 0.82 + state.heat * 0.24;
+            const damping = Math.pow(0.994, dt * 60);
+
+            for (let i = 0; i < state.count; i += 1) {
+                const body = bodies[i];
+                const p = body.position;
+                const v = body.velocity;
+
+                v.addScaledVector(p, -mode.centerPull * (0.2 + state.gravity * 0.48) * dt);
+                v.y -= 5.8 * mode.gravity * state.gravity * dt;
+
+                const swirl = mode.swirl + state.vortex * 2.4;
+                v.x += -p.z * swirl * dt;
+                v.z += p.x * swirl * dt;
+
+                const wave = state.time + body.phase;
+                const turbulence = mode.turbulence * state.heat;
+                v.x += Math.sin(wave * 1.7 + p.y * 0.8) * turbulence * dt * 2.8;
+                v.y += Math.cos(wave * 1.3 + p.z * 0.7) * turbulence * dt * 2.4;
+                v.z += Math.sin(wave * 1.1 + p.x * 0.9) * turbulence * dt * 2.8;
+
+                v.multiplyScalar(damping);
+                const maxSpeed = 8.4 + state.heat * 7.2 + state.vortex * 4.2;
+                const speed = v.length();
+                if (speed > maxSpeed) {
+                    v.multiplyScalar(maxSpeed / speed);
+                }
+
+                p.addScaledVector(v, dt * heatScale);
+                body.heat = Math.max(0, body.heat - dt * 0.42);
+                state.kineticEnergy += 0.5 * body.mass * v.lengthSq();
+            }
+        }
+
+        function resolveWallCollisions() {
+            const mode = modes[state.mode];
+            const restitution = THREE.MathUtils.clamp(state.restitution * mode.restitution, 0.52, 1.04);
+            let frameWallHits = 0;
+
+            for (let i = 0; i < state.count; i += 1) {
+                const body = bodies[i];
+                const limit = containerRadius - body.radius;
+                const dist = body.position.length();
+                if (dist <= limit) continue;
+
+                tempVec.copy(body.position).multiplyScalar(1 / Math.max(dist, 0.0001));
+                body.position.copy(tempVec).multiplyScalar(limit);
+
+                const normalSpeed = body.velocity.dot(tempVec);
+                if (normalSpeed > 0) {
+                    body.velocity.addScaledVector(tempVec, -(1 + restitution) * normalSpeed);
+                    body.velocity.multiplyScalar(0.994);
+                    body.heat = Math.min(1, body.heat + Math.min(0.34, normalSpeed * 0.025));
+                    state.recentImpactEnergy += normalSpeed * body.mass * 1.2;
+                    state.wallHits += 1;
+                    frameWallHits += 1;
+                    if (normalSpeed > 2.2 && frameWallHits < 16) {
+                        emitSparks(body.position, body.color, 8, Math.min(1.8, normalSpeed * 0.12), tempVec);
+                    }
+                }
+            }
+        }
+
+        function resolveBodyCollisions() {
+            spatialGrid.clear();
+
+            for (let i = 0; i < state.count; i += 1) {
+                const body = bodies[i];
+                const ix = Math.floor((body.position.x + containerRadius) / cellSize);
+                const iy = Math.floor((body.position.y + containerRadius) / cellSize);
+                const iz = Math.floor((body.position.z + containerRadius) / cellSize);
+                const key = `${ix},${iy},${iz}`;
+                let bucket = spatialGrid.get(key);
+                if (!bucket) {
+                    bucket = [];
+                    spatialGrid.set(key, bucket);
+                }
+                bucket.push(i);
+            }
+
+            state.broadphaseCells = Math.max(state.broadphaseCells, spatialGrid.size);
+            let impactBudget = 20;
+
+            for (let i = 0; i < state.count; i += 1) {
+                const body = bodies[i];
+                const ix = Math.floor((body.position.x + containerRadius) / cellSize);
+                const iy = Math.floor((body.position.y + containerRadius) / cellSize);
+                const iz = Math.floor((body.position.z + containerRadius) / cellSize);
+
+                for (let n = 0; n < neighborOffsets.length; n += 1) {
+                    const offset = neighborOffsets[n];
+                    const bucket = spatialGrid.get(`${ix + offset[0]},${iy + offset[1]},${iz + offset[2]}`);
+                    if (!bucket) continue;
+
+                    for (let k = 0; k < bucket.length; k += 1) {
+                        const j = bucket[k];
+                        if (j <= i) continue;
+                        state.framePairs += 1;
+                        const impact = resolveBodyPair(body, bodies[j]);
+                        if (impact && impactBudget > 0) {
+                            const count = impact.speed > 5 ? 10 : 6;
+                            emitSparks(impact.point, impact.color, count, Math.min(1.8, impact.speed * 0.16), impact.normal);
+                            impactBudget -= 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        function decayImpactEnergy(dt) {
+            state.recentImpactEnergy *= Math.pow(0.9, Math.max(1, dt * 60));
+            state.integrity = THREE.MathUtils.clamp(1 - state.recentImpactEnergy / 320, 0.18, 1);
+        }
+
+        function resolveBodyPair(a, b) {
+            tempVec.subVectors(a.position, b.position);
+            let distSq = tempVec.lengthSq();
+            const minDist = a.radius + b.radius;
+            if (distSq >= minDist * minDist) return null;
+
+            let dist = Math.sqrt(distSq);
+            if (dist < 0.0001) {
+                randomDirection(tempVec);
+                dist = 0.0001;
+                distSq = dist * dist;
+            } else {
+                tempVec.multiplyScalar(1 / dist);
+            }
+
+            const normal = tempVec;
+            const penetration = minDist - dist;
+            const totalInvMass = a.invMass + b.invMass;
+            const aShare = a.invMass / totalInvMass;
+            const bShare = b.invMass / totalInvMass;
+            a.position.addScaledVector(normal, penetration * aShare);
+            b.position.addScaledVector(normal, -penetration * bShare);
+
+            tempVecB.subVectors(a.velocity, b.velocity);
+            const relNormalSpeed = tempVecB.dot(normal);
+            if (relNormalSpeed >= 0) return null;
+
+            const mode = modes[state.mode];
+            const restitution = THREE.MathUtils.clamp(state.restitution * mode.restitution, 0.52, 1.04);
+            const impulse = -(1 + restitution) * relNormalSpeed / totalInvMass;
+            a.velocity.addScaledVector(normal, impulse * a.invMass);
+            b.velocity.addScaledVector(normal, -impulse * b.invMass);
+
+            tempVecC.copy(tempVecB).addScaledVector(normal, -relNormalSpeed);
+            const tangentSpeed = tempVecC.length();
+            if (tangentSpeed > 0.0001) {
+                tempVecC.multiplyScalar(1 / tangentSpeed);
+                const friction = Math.min(impulse * 0.025, tangentSpeed * 0.08);
+                a.velocity.addScaledVector(tempVecC, -friction * a.invMass);
+                b.velocity.addScaledVector(tempVecC, friction * b.invMass);
+            }
+
+            const impactSpeed = -relNormalSpeed;
+            const heatGain = Math.min(0.34, impactSpeed * 0.04);
+            a.heat = Math.min(1, a.heat + heatGain);
+            b.heat = Math.min(1, b.heat + heatGain);
+            a.impacts += 1;
+            b.impacts += 1;
+            state.impacts += 1;
+            state.recentImpactEnergy += impactSpeed * (a.mass + b.mass) * 0.36;
+
+            if (impactSpeed > 2.4) {
+                tempColor.copy(a.color).lerp(b.color, 0.5);
+                return {
+                    point: tempVecB.copy(a.position).add(b.position).multiplyScalar(0.5),
+                    normal: normal.clone(),
+                    color: tempColor.clone(),
+                    speed: impactSpeed
+                };
+            }
+            return null;
+        }
+
+        function updateScene(dt) {
+            const elapsed = state.time;
+            containerGroup.rotation.y += dt * (0.08 + state.vortex * 0.08);
+            containerGroup.rotation.x = Math.sin(elapsed * 0.12) * 0.06;
+
+            fieldMaterial.uniforms.uTime.value = elapsed;
+            fieldMaterial.uniforms.uEnergy.value = 0.65 + state.heat * 0.34 + state.vortex * 0.14;
+            sparkMaterial.uniforms.uPixelRatio.value = Math.min(window.devicePixelRatio, 2);
+            bodyMaterial.emissiveIntensity = 0.14 + (1 - state.integrity) * 0.24;
+            bloomPass.strength = modes[state.mode].bloom + (1 - state.integrity) * 0.18 + state.vortex * 0.07;
+
+            syncInstances(elapsed);
+            syncTrails();
+            updateSelection(elapsed);
+            updateLabels();
+        }
+
+        function syncInstances(elapsed) {
+            bodyMesh.count = state.count;
+            for (let i = 0; i < state.count; i += 1) {
+                const body = bodies[i];
+                const hoverBoost = i === state.hoveredId ? 0.08 : 0;
+                const selectedBoost = i === state.selectedId ? 0.12 : 0;
+                const pulse = Math.sin(elapsed * 4 + body.phase) * body.heat * 0.025;
+                const scale = body.radius * (1 + body.heat * 0.08 + hoverBoost + selectedBoost + pulse);
+
+                tempObject.position.copy(body.position);
+                tempObject.scale.setScalar(scale);
+                tempObject.rotation.set(
+                    elapsed * (0.21 + body.phase * 0.02),
+                    elapsed * (0.17 + body.phase * 0.015),
+                    elapsed * (0.11 + body.phase * 0.01)
+                );
+                tempObject.updateMatrix();
+                bodyMesh.setMatrixAt(i, tempObject.matrix);
+
+                tempColor.copy(body.color).lerp(white, body.heat * 0.46 + selectedBoost);
+                bodyMesh.setColorAt(i, tempColor);
+            }
+            bodyMesh.instanceMatrix.needsUpdate = true;
+            if (bodyMesh.instanceColor) bodyMesh.instanceColor.needsUpdate = true;
+        }
+
+        function syncTrails() {
+            for (let i = 0; i < maxBodies; i += 1) {
+                const p = i * 6;
+                const c = i * 6;
+                if (i < state.count) {
+                    const body = bodies[i];
+                    trailPositions[p] = body.previous.x;
+                    trailPositions[p + 1] = body.previous.y;
+                    trailPositions[p + 2] = body.previous.z;
+                    trailPositions[p + 3] = body.position.x;
+                    trailPositions[p + 4] = body.position.y;
+                    trailPositions[p + 5] = body.position.z;
+
+                    tempColor.copy(body.color).lerp(white, body.heat * 0.26);
+                    const intensity = 0.28 + body.heat * 0.48;
+                    trailColors[c] = tempColor.r * intensity;
+                    trailColors[c + 1] = tempColor.g * intensity;
+                    trailColors[c + 2] = tempColor.b * intensity;
+                    trailColors[c + 3] = tempColor.r;
+                    trailColors[c + 4] = tempColor.g;
+                    trailColors[c + 5] = tempColor.b;
+                } else {
+                    for (let j = 0; j < 6; j += 1) {
+                        trailPositions[p + j] = 0;
+                        trailColors[c + j] = 0;
+                    }
+                }
+            }
+            trailMesh.geometry.attributes.position.needsUpdate = true;
+            trailMesh.geometry.attributes.color.needsUpdate = true;
+        }
+
+        function updateSelection(elapsed) {
+            if (state.selectedId === null || !bodies[state.selectedId]) {
+                selectionRing.visible = false;
+                return;
+            }
+            const body = bodies[state.selectedId];
+            selectionRing.visible = true;
+            selectionRing.position.copy(body.position);
+            selectionRing.scale.setScalar(body.radius * 1.55);
+            selectionRing.rotation.x = Math.PI / 2 + Math.sin(elapsed * 1.4) * 0.18;
+            selectionRing.rotation.z += 0.025;
+            selectionRing.material.color.copy(body.color).lerp(white, 0.28);
+        }
+
+        function emitSparks(origin, color, count, power = 1, normal = null) {
+            for (let i = 0; i < count; i += 1) {
+                const spark = sparks[(emitSparks.cursor + i) % sparkLimit];
+                spark.position.copy(origin);
+                randomDirection(spark.velocity);
+                if (normal) {
+                    spark.velocity.addScaledVector(normal, 0.8 + Math.random() * 1.4).normalize();
+                }
+                spark.velocity.multiplyScalar((1.4 + Math.random() * 5.8) * power);
+                spark.life = 0.34 + Math.random() * 0.62;
+                spark.maxLife = spark.life;
+                spark.size = 0.7 + Math.random() * 1.9;
+                spark.color.copy(color).lerp(white, Math.random() * 0.28);
+            }
+            emitSparks.cursor = (emitSparks.cursor + count) % sparkLimit;
+        }
+        emitSparks.cursor = 0;
+
+        function clearSparks() {
+            for (let i = 0; i < sparks.length; i += 1) {
+                sparks[i].life = 0;
+                sparks[i].position.set(0, 9999, 0);
+                sparkPositions[i * 3] = 0;
+                sparkPositions[i * 3 + 1] = 9999;
+                sparkPositions[i * 3 + 2] = 0;
+                sparkLives[i] = 0;
+            }
+            sparkMesh.geometry.attributes.position.needsUpdate = true;
+            sparkMesh.geometry.attributes.aLife.needsUpdate = true;
+        }
+
+        function updateSparks(dt) {
+            for (let i = 0; i < sparks.length; i += 1) {
+                const spark = sparks[i];
+                const p = i * 3;
+                if (spark.life <= 0) {
+                    sparkPositions[p] = 0;
+                    sparkPositions[p + 1] = 9999;
+                    sparkPositions[p + 2] = 0;
+                    sparkLives[i] = 0;
+                    continue;
+                }
+
+                spark.life -= dt;
+                spark.velocity.multiplyScalar(Math.pow(0.965, dt * 60));
+                spark.velocity.y -= dt * 1.15;
+                spark.position.addScaledVector(spark.velocity, dt);
+
+                const lifeT = Math.max(0, spark.life / spark.maxLife);
+                sparkPositions[p] = spark.position.x;
+                sparkPositions[p + 1] = spark.position.y;
+                sparkPositions[p + 2] = spark.position.z;
+                sparkColors[p] = spark.color.r;
+                sparkColors[p + 1] = spark.color.g;
+                sparkColors[p + 2] = spark.color.b;
+                sparkLives[i] = lifeT;
+                sparkSizes[i] = spark.size * (0.55 + lifeT);
+            }
+
+            sparkMesh.geometry.attributes.position.needsUpdate = true;
+            sparkMesh.geometry.attributes.color.needsUpdate = true;
+            sparkMesh.geometry.attributes.aLife.needsUpdate = true;
+            sparkMesh.geometry.attributes.aSize.needsUpdate = true;
+        }
+
+        function updateUi() {
+            ui.bodyCount.textContent = String(state.count);
+            ui.pairCount.textContent = state.framePairs.toLocaleString();
+            ui.impactCount.textContent = state.impacts.toLocaleString();
+            ui.fpsCount.textContent = String(Math.round(state.fps));
+            ui.modeTitle.textContent = modes[state.mode].name;
+            ui.modeCopy.textContent = modes[state.mode].copy;
+
+            const integrityPct = Math.round(state.integrity * 100);
+            ui.integrityFill.style.width = `${integrityPct}%`;
+            ui.integrityLabel.textContent = `${integrityPct}%`;
+
+            ui.energyReadout.textContent = state.kineticEnergy.toFixed(1);
+            ui.cellReadout.textContent = cellSize.toFixed(2);
+            ui.wallHitCount.textContent = state.wallHits.toLocaleString();
+            ui.broadphaseCount.textContent = state.broadphaseCells.toLocaleString();
+
+            ui.countLabel.textContent = String(state.count);
+            ui.heatLabel.textContent = String(Math.round(state.heat * 100));
+            ui.gravityLabel.textContent = String(Math.round(state.gravity * 100));
+            ui.bounceLabel.textContent = String(Math.round(state.restitution * 100));
+
+            ui.modeButtons.forEach((button, index) => {
+                const active = index === state.mode;
+                button.classList.toggle('active', active);
+                button.setAttribute('aria-selected', String(active));
+            });
+
+            updateSelectionUi();
+        }
+
+        function updateSelectionUi() {
+            if (state.selectedId === null || !bodies[state.selectedId]) {
+                ui.selectionTitle.textContent = 'No Body Selected';
+                ui.selectionCopy.textContent = 'Click a body to inspect velocity, mass, impact heat, and wall contact behavior.';
+                ui.selectedSpeed.textContent = '-';
+                ui.selectedRadius.textContent = '-';
+                ui.selectedMass.textContent = '-';
+                ui.selectedHeat.textContent = '-';
+                return;
+            }
+
+            const body = bodies[state.selectedId];
+            ui.selectionTitle.textContent = `Body ${body.id + 1}`;
+            ui.selectionCopy.textContent = `${body.impacts.toLocaleString()} contacts recorded. Current vector is ${formatVector(body.velocity)}.`;
+            ui.selectedSpeed.textContent = body.velocity.length().toFixed(2);
+            ui.selectedRadius.textContent = body.radius.toFixed(2);
+            ui.selectedMass.textContent = body.mass.toFixed(2);
+            ui.selectedHeat.textContent = `${Math.round(body.heat * 100)}%`;
+        }
+
+        function updateLabels() {
+            if (!state.labels || state.selectedId === null || !bodies[state.selectedId]) {
+                ui.selectedLabel.style.display = 'none';
+                return;
+            }
+
+            const body = bodies[state.selectedId];
+            tempVec.copy(body.position).project(camera);
+            if (tempVec.z < -1 || tempVec.z > 1) {
+                ui.selectedLabel.style.display = 'none';
+                return;
+            }
+
+            const x = (tempVec.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-tempVec.y * 0.5 + 0.5) * window.innerHeight;
+            ui.selectedLabel.style.display = 'block';
+            ui.selectedLabel.style.left = `${x}px`;
+            ui.selectedLabel.style.top = `${y}px`;
+            ui.selectedLabel.textContent = `Body ${body.id + 1} | ${body.velocity.length().toFixed(1)} u/s`;
+        }
+
+        function addLog(message, type = '') {
+            state.log.unshift({ message, type });
+            state.log = state.log.slice(0, 6);
+            ui.eventLog.innerHTML = state.log
+                .map((entry) => `<div class="log-entry ${entry.type}">${entry.message}</div>`)
+                .join('');
+        }
+
+        function onResize() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+            composer.setSize(width, height);
+            bloomPass.setSize(width, height);
+            fieldMaterial.uniforms.uPixelRatio.value = Math.min(window.devicePixelRatio, 2);
+            sparkMaterial.uniforms.uPixelRatio.value = Math.min(window.devicePixelRatio, 2);
+        }
+
+        function randomPointInSphere(target, radius) {
+            const u = Math.random();
+            const v = Math.random();
+            const theta = 2 * Math.PI * u;
+            const phi = Math.acos(2 * v - 1);
+            const r = radius * Math.cbrt(Math.random());
+            const sinPhi = Math.sin(phi);
+            target.set(
+                r * sinPhi * Math.cos(theta),
+                r * Math.cos(phi),
+                r * sinPhi * Math.sin(theta)
+            );
+            return target;
+        }
+
+        function randomDirection(target) {
+            const z = Math.random() * 2 - 1;
+            const angle = Math.random() * Math.PI * 2;
+            const r = Math.sqrt(Math.max(0, 1 - z * z));
+            target.set(r * Math.cos(angle), z, r * Math.sin(angle));
+            return target;
+        }
+
+        function formatVector(vector) {
+            return `${vector.x.toFixed(1)}, ${vector.y.toFixed(1)}, ${vector.z.toFixed(1)}`;
+        }
+
+    </script>
+</body>
+</html>

@@ -16,6 +16,7 @@ The strategic direction is to use small, self-contained WebGL experiments to exp
 - [Matrix Audio Visualizer](https://josh-english-2k18.github.io/webgl-games/matrix-audio-visualizer.html) (`matrix-audio-visualizer.html`)
 - [Auralith Mastering Console](https://josh-english-2k18.github.io/webgl-games/mastering-console-visualizer.html) (`mastering-console-visualizer.html`)
 - [3D Ball Physics Simulation](https://josh-english-2k18.github.io/webgl-games/ball-physics-simulation.html) (`ball-physics-simulation.html`)
+- [Kinetic Containment](https://josh-english-2k18.github.io/webgl-games/ball-physics-simulation-v2.html) (`ball-physics-simulation-v2.html`)
 - [Vectorwing: Rift Patrol](https://josh-english-2k18.github.io/webgl-games/starfox.html) (`starfox.html`)
 - [Fractal Music Visualizer](https://josh-english-2k18.github.io/webgl-games/fractal-music-visualizer.html) (`fractal-music-visualizer.html`)
 - [MandelTone Engine](https://josh-english-2k18.github.io/webgl-games/fractal-music-visualizer-v2.html) (`fractal-music-visualizer-v2.html`)
@@ -26,6 +27,15 @@ The strategic direction is to use small, self-contained WebGL experiments to exp
 - [Prismalith Engine](https://josh-english-2k18.github.io/webgl-games/holograph-particle-morphing-v2.html) (`holograph-particle-morphing-v2.html`)
 - [Causal Field](https://josh-english-2k18.github.io/webgl-games/causal-field.html) (`causal-field.html`)
 - [Signal City](https://josh-english-2k18.github.io/webgl-games/signal-city.html) (`signal-city.html`)
+- [Gravity Loom](https://josh-english-2k18.github.io/webgl-games/gravity-loom.html) (`gravity-loom.html`)
+
+## notes
+
+`ball-physics-simulation.html` is the original r128 global-script ball-physics container demo and should remain available for comparison.
+
+`ball-physics-simulation-v2.html` is Kinetic Containment, a polished v2 built with the newer Three.js module/import-map pattern used by the recent experiments. It keeps the simulation self-contained and currently defaults to 320 small blue bodies, max 640 bodies, gravity 0, substepped collision resolution, spatial-hash broadphase checks, raycast body inspection, shader field particles, event sparks, and HUD diagnostics. Use manual playtesting as the source of truth for visual and physics feel unless browser automation is explicitly requested.
+
+`gravity-loom.html` is Gravity Loom, a process test for the shared design philosophy. It is visually strong, graphically solid, and has a strong UI, but playtesting showed that the concept itself is not as exciting as the best particle engines. Keep that distinction visible when evaluating future experiments: polished execution is necessary, but not the same as concept strength.
 
 ## License
 

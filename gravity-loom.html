@@ -1,0 +1,1621 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gravity Loom</title>
+    <style>
+        :root {
+            --bg: #05070b;
+            --ink: #f6f7fb;
+            --muted: rgba(246, 247, 251, 0.64);
+            --line: rgba(246, 247, 251, 0.15);
+            --panel: rgba(7, 10, 16, 0.78);
+            --cyan: #78e7ff;
+            --green: #8ef0b8;
+            --gold: #f5c96b;
+            --rose: #ff7190;
+            --violet: #bda8ff;
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            letter-spacing: 0;
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        button {
+            color: inherit;
+        }
+
+        #stage {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background:
+                linear-gradient(135deg, rgba(120, 231, 255, 0.1), transparent 30%),
+                linear-gradient(28deg, transparent 38%, rgba(245, 201, 107, 0.08) 62%, transparent 86%),
+                linear-gradient(180deg, #101721 0%, #05070b 64%, #020304 100%);
+        }
+
+        #stage canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .grain,
+        .vignette {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .grain {
+            opacity: 0.052;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+            background-size: 48px 48px;
+            mask-image: linear-gradient(to bottom, transparent, #000 18%, #000 82%, transparent);
+        }
+
+        .vignette {
+            background:
+                linear-gradient(to right, rgba(0, 0, 0, 0.58), transparent 20%, transparent 80%, rgba(0, 0, 0, 0.58)),
+                linear-gradient(to bottom, rgba(0, 0, 0, 0.34), transparent 28%, transparent 72%, rgba(0, 0, 0, 0.78));
+        }
+
+        .hud {
+            position: fixed;
+            top: 18px;
+            left: 18px;
+            z-index: 20;
+            max-width: 520px;
+            pointer-events: none;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 11px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .mark {
+            position: relative;
+            width: 32px;
+            height: 32px;
+            border: 1px solid rgba(120, 231, 255, 0.78);
+            border-radius: 50%;
+            box-shadow: 0 0 24px rgba(120, 231, 255, 0.18), inset 0 0 16px rgba(120, 231, 255, 0.1);
+        }
+
+        .mark::before,
+        .mark::after {
+            content: "";
+            position: absolute;
+            inset: 7px;
+            border: 1px solid rgba(245, 201, 107, 0.74);
+            transform: rotate(45deg);
+        }
+
+        .mark::after {
+            inset: 12px;
+            border-color: rgba(142, 240, 184, 0.76);
+            border-radius: 50%;
+            transform: none;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(31px, 4.8vw, 52px);
+            line-height: 0.95;
+            text-transform: uppercase;
+            text-shadow: 0 0 28px rgba(120, 231, 255, 0.2);
+        }
+
+        .readout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 820;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+        }
+
+        .readout strong {
+            color: var(--ink);
+        }
+
+        .side-panel {
+            position: fixed;
+            top: 18px;
+            right: 18px;
+            z-index: 22;
+            display: grid;
+            gap: 12px;
+            width: 372px;
+            pointer-events: none;
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.38);
+            pointer-events: auto;
+        }
+
+        .panel-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 13px 14px 0;
+        }
+
+        .panel h2 {
+            margin: 0;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+
+        .panel-body {
+            padding: 12px 14px 14px;
+        }
+
+        #mode-copy,
+        #selection-copy {
+            min-height: 40px;
+            margin: 0;
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.45;
+        }
+
+        .meter {
+            display: grid;
+            grid-template-columns: 78px 1fr 54px;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 850;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+        }
+
+        .track {
+            height: 5px;
+            overflow: hidden;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .fill {
+            display: block;
+            width: 100%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--rose), var(--gold), var(--green), var(--cyan));
+            transition: width 160ms ease;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1px;
+            overflow: hidden;
+            border: 1px solid rgba(246, 247, 251, 0.08);
+            border-radius: 6px;
+            background: rgba(246, 247, 251, 0.08);
+        }
+
+        .stat-cell {
+            min-width: 0;
+            padding: 10px;
+            background: rgba(4, 7, 12, 0.72);
+        }
+
+        .stat-cell span,
+        .stat-cell strong {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .stat-cell span {
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 850;
+            text-transform: uppercase;
+        }
+
+        .stat-cell strong {
+            margin-top: 5px;
+            font-size: 15px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .event-log {
+            display: grid;
+            gap: 1px;
+            max-height: 142px;
+            overflow: auto;
+            border: 1px solid rgba(246, 247, 251, 0.08);
+            border-radius: 6px;
+            background: rgba(4, 7, 12, 0.66);
+        }
+
+        .log-entry {
+            padding: 8px 9px;
+            background: rgba(246, 247, 251, 0.055);
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        .log-entry strong {
+            color: var(--ink);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .log-entry.energy {
+            color: rgba(245, 201, 107, 0.9);
+        }
+
+        .log-entry.system {
+            color: rgba(120, 231, 255, 0.86);
+        }
+
+        .controls {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            left: 18px;
+            z-index: 25;
+            display: grid;
+            grid-template-columns: minmax(300px, 1fr) auto minmax(320px, 0.9fr);
+            gap: 10px;
+            max-width: 1240px;
+            margin: 0 auto;
+            padding: 11px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(24px);
+            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.38);
+        }
+
+        .mode-list,
+        .action-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .mode-btn,
+        .control-btn {
+            min-width: 94px;
+            min-height: 40px;
+            padding: 0 12px;
+            border: 1px solid rgba(246, 247, 251, 0.15);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--ink);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 840;
+            text-transform: uppercase;
+            transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
+        }
+
+        .mode-btn:hover,
+        .mode-btn.active,
+        .control-btn:hover,
+        .control-btn.active {
+            border-color: rgba(120, 231, 255, 0.64);
+            background: rgba(120, 231, 255, 0.12);
+        }
+
+        .control-btn.commit {
+            border-color: rgba(142, 240, 184, 0.42);
+            background: rgba(142, 240, 184, 0.1);
+        }
+
+        .range-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px 10px;
+            min-width: 0;
+        }
+
+        .range-control {
+            display: grid;
+            grid-template-columns: 78px 44px;
+            align-items: center;
+            gap: 6px 8px;
+            min-width: 0;
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 850;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+        }
+
+        .range-control strong {
+            color: var(--ink);
+            text-align: right;
+        }
+
+        .range-control input {
+            grid-column: 1 / -1;
+            width: 100%;
+            accent-color: var(--cyan);
+        }
+
+        .world-label {
+            position: fixed;
+            z-index: 24;
+            display: none;
+            min-width: 120px;
+            padding: 6px 8px;
+            border: 1px solid rgba(120, 231, 255, 0.34);
+            border-radius: 6px;
+            background: rgba(5, 8, 13, 0.74);
+            color: var(--ink);
+            font-size: 11px;
+            font-weight: 820;
+            font-variant-numeric: tabular-nums;
+            text-transform: uppercase;
+            pointer-events: none;
+            transform: translate(-50%, -120%);
+            backdrop-filter: blur(14px);
+        }
+
+        #fallback {
+            position: fixed;
+            inset: 18px;
+            z-index: 100;
+            display: none;
+            place-items: center;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: rgba(6, 7, 10, 0.94);
+            text-align: center;
+        }
+
+        #fallback.visible {
+            display: grid;
+        }
+
+        @media (max-width: 1080px) {
+            .controls {
+                grid-template-columns: 1fr;
+                max-height: 45vh;
+                overflow: auto;
+            }
+
+            .action-list {
+                order: 3;
+            }
+
+            .side-panel {
+                top: auto;
+                right: 12px;
+                bottom: 202px;
+                left: 12px;
+                width: auto;
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .side-panel .panel:first-child,
+            .side-panel .panel:last-child {
+                grid-column: 1 / -1;
+            }
+        }
+
+        @media (max-width: 720px) {
+            .hud {
+                top: 12px;
+                left: 12px;
+                max-width: 320px;
+            }
+
+            .readout {
+                max-width: 300px;
+                font-size: 11px;
+            }
+
+            .side-panel {
+                display: none;
+            }
+
+            .controls {
+                right: 10px;
+                bottom: 10px;
+                left: 10px;
+                padding: 9px;
+            }
+
+            .mode-btn,
+            .control-btn {
+                flex: 1 1 96px;
+                min-width: 0;
+            }
+
+            .range-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="stage" aria-label="Interactive gravity loom simulation"></div>
+    <div class="grain"></div>
+    <div class="vignette"></div>
+
+    <section class="hud" aria-label="Gravity Loom status">
+        <div class="brand"><span class="mark"></span><span>Mass Thread Instrument</span></div>
+        <h1>Gravity Loom</h1>
+        <div class="readout">
+            <span>Nodes <strong id="node-count">0</strong></span>
+            <span>Strands <strong id="strand-count">0</strong></span>
+            <span>Flow <strong id="flow-count">0</strong></span>
+            <span>Energy <strong id="energy-count">0</strong></span>
+        </div>
+    </section>
+
+    <aside class="side-panel">
+        <section class="panel" aria-label="Loom mode">
+            <div class="panel-head">
+                <h2 id="mode-title">Tidal Weave</h2>
+            </div>
+            <div class="panel-body">
+                <p id="mode-copy">Balanced gravity threads orbit around suspended masses, keeping the weave readable at rest.</p>
+                <div class="meter">
+                    <span>Cohesion</span>
+                    <span class="track"><span id="cohesion-fill" class="fill"></span></span>
+                    <strong id="cohesion-label">100%</strong>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Selected mass">
+            <div class="panel-head">
+                <h2 id="selection-title">No Mass Selected</h2>
+            </div>
+            <div class="panel-body">
+                <p id="selection-copy">Click a suspended mass to inspect its pull, speed, heat, and active thread load.</p>
+                <div class="stat-grid">
+                    <div class="stat-cell"><span>Speed</span><strong id="selected-speed">-</strong></div>
+                    <div class="stat-cell"><span>Pull</span><strong id="selected-pull">-</strong></div>
+                    <div class="stat-cell"><span>Threads</span><strong id="selected-threads">-</strong></div>
+                    <div class="stat-cell"><span>Heat</span><strong id="selected-heat">-</strong></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Loom diagnostics">
+            <div class="panel-head">
+                <h2>Loom Diagnostics</h2>
+            </div>
+            <div class="panel-body">
+                <div class="stat-grid">
+                    <div class="stat-cell"><span>Tension</span><strong id="tension-readout">0</strong></div>
+                    <div class="stat-cell"><span>Gravity</span><strong id="gravity-readout">0</strong></div>
+                    <div class="stat-cell"><span>Packets</span><strong id="packet-readout">0</strong></div>
+                    <div class="stat-cell"><span>Bloom</span><strong id="bloom-readout">0</strong></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Event log">
+            <div class="panel-head">
+                <h2>Loom Log</h2>
+            </div>
+            <div class="panel-body">
+                <div id="event-log" class="event-log"></div>
+            </div>
+        </section>
+    </aside>
+
+    <nav class="controls" aria-label="Gravity Loom controls">
+        <div class="mode-list" role="tablist" aria-label="Loom modes">
+            <button class="mode-btn active" type="button" data-mode="0" role="tab" aria-selected="true">Tidal</button>
+            <button class="mode-btn" type="button" data-mode="1" role="tab" aria-selected="false">Helix</button>
+            <button class="mode-btn" type="button" data-mode="2" role="tab" aria-selected="false">Knot</button>
+            <button class="mode-btn" type="button" data-mode="3" role="tab" aria-selected="false">Forge</button>
+        </div>
+
+        <div class="action-list">
+            <button id="pulse-btn" class="control-btn commit" type="button">Pulse</button>
+            <button id="knot-btn" class="control-btn" type="button">Knot</button>
+            <button id="unwind-btn" class="control-btn" type="button">Unwind</button>
+            <button id="labels-btn" class="control-btn active" type="button" aria-pressed="true">Labels</button>
+            <button id="reset-btn" class="control-btn" type="button">Reset</button>
+        </div>
+
+        <div class="range-grid">
+            <label class="range-control" for="strand-slider">
+                <span>Strands</span><strong id="strand-label">144</strong>
+                <input id="strand-slider" type="range" min="48" max="240" step="1" value="144">
+            </label>
+            <label class="range-control" for="tension-slider">
+                <span>Tension</span><strong id="tension-label">62</strong>
+                <input id="tension-slider" type="range" min="20" max="100" step="1" value="62">
+            </label>
+            <label class="range-control" for="gravity-slider">
+                <span>Gravity</span><strong id="gravity-label">38</strong>
+                <input id="gravity-slider" type="range" min="0" max="100" step="1" value="38">
+            </label>
+            <label class="range-control" for="flow-slider">
+                <span>Flow</span><strong id="flow-label">72</strong>
+                <input id="flow-slider" type="range" min="20" max="140" step="1" value="72">
+            </label>
+        </div>
+    </nav>
+
+    <div id="selected-label" class="world-label"></div>
+
+    <div id="fallback">
+        <p>WebGL initialization failed.</p>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.174.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+        const isCompact = window.matchMedia('(max-width: 720px)').matches;
+        const maxStrands = isCompact ? 160 : 240;
+        const defaultStrands = isCompact ? 96 : 144;
+        const strandSegments = 24;
+        const maxPackets = isCompact ? 620 : 1180;
+        const fieldParticleCount = isCompact ? 900 : 1600;
+        const palette = [0x78e7ff, 0x8ef0b8, 0xf5c96b, 0xff7190, 0xbda8ff, 0xf6f7fb];
+
+        const nodeSpecs = [
+            { id: 'crown', name: 'Crown Mass', home: [0, 4.25, 0], color: 0x78e7ff, pull: 1.12 },
+            { id: 'north', name: 'North Shuttle', home: [0, 1.65, -5.35], color: 0x8ef0b8, pull: 0.86 },
+            { id: 'east', name: 'East Shuttle', home: [5.15, 1.2, -1.1], color: 0xf5c96b, pull: 0.95 },
+            { id: 'south', name: 'South Shuttle', home: [2.9, -1.95, 4.5], color: 0xff7190, pull: 1.05 },
+            { id: 'west', name: 'West Shuttle', home: [-4.8, -1.25, 2.4], color: 0xbda8ff, pull: 0.92 },
+            { id: 'low', name: 'Lower Weight', home: [-1.0, -4.45, -0.45], color: 0xf5c96b, pull: 1.24 },
+            { id: 'needle', name: 'Needle Gate', home: [3.55, -2.85, -3.65], color: 0x78e7ff, pull: 0.78 },
+            { id: 'anchor', name: 'Anchor Gate', home: [-3.7, 2.55, -2.95], color: 0xff7190, pull: 0.82 },
+            { id: 'memory', name: 'Memory Knot', home: [-2.75, 0.4, 4.95], color: 0x8ef0b8, pull: 0.98 }
+        ];
+
+        const modes = [
+            {
+                name: 'Tidal Weave',
+                copy: 'Balanced gravity threads orbit around suspended masses, keeping the weave readable at rest.',
+                tension: 0.82,
+                gravity: 0.62,
+                swirl: 0.22,
+                turbulence: 0.1,
+                flow: 1,
+                bloom: 0.22
+            },
+            {
+                name: 'Helix Draft',
+                copy: 'The frame twists into a rotating helical loom, stretching packets into long orbital lanes.',
+                tension: 0.72,
+                gravity: 0.38,
+                swirl: 1.05,
+                turbulence: 0.08,
+                flow: 1.18,
+                bloom: 0.28
+            },
+            {
+                name: 'Knot Weather',
+                copy: 'Masses pull into competing knots. Threads bunch, split, and release through visible strain.',
+                tension: 1.12,
+                gravity: 0.82,
+                swirl: -0.34,
+                turbulence: 0.42,
+                flow: 0.9,
+                bloom: 0.32
+            },
+            {
+                name: 'Collapse Forge',
+                copy: 'A hotter forge state: strong compression, sharper thread glow, and fast shuttle traffic.',
+                tension: 1.25,
+                gravity: 0.48,
+                swirl: 0.48,
+                turbulence: 0.28,
+                flow: 1.36,
+                bloom: 0.38
+            }
+        ];
+
+        const ui = {
+            stage: document.getElementById('stage'),
+            fallback: document.getElementById('fallback'),
+            nodeCount: document.getElementById('node-count'),
+            strandCount: document.getElementById('strand-count'),
+            flowCount: document.getElementById('flow-count'),
+            energyCount: document.getElementById('energy-count'),
+            modeTitle: document.getElementById('mode-title'),
+            modeCopy: document.getElementById('mode-copy'),
+            cohesionFill: document.getElementById('cohesion-fill'),
+            cohesionLabel: document.getElementById('cohesion-label'),
+            selectionTitle: document.getElementById('selection-title'),
+            selectionCopy: document.getElementById('selection-copy'),
+            selectedSpeed: document.getElementById('selected-speed'),
+            selectedPull: document.getElementById('selected-pull'),
+            selectedThreads: document.getElementById('selected-threads'),
+            selectedHeat: document.getElementById('selected-heat'),
+            tensionReadout: document.getElementById('tension-readout'),
+            gravityReadout: document.getElementById('gravity-readout'),
+            packetReadout: document.getElementById('packet-readout'),
+            bloomReadout: document.getElementById('bloom-readout'),
+            eventLog: document.getElementById('event-log'),
+            selectedLabel: document.getElementById('selected-label'),
+            modeButtons: Array.from(document.querySelectorAll('[data-mode]')),
+            pulse: document.getElementById('pulse-btn'),
+            knot: document.getElementById('knot-btn'),
+            unwind: document.getElementById('unwind-btn'),
+            labels: document.getElementById('labels-btn'),
+            reset: document.getElementById('reset-btn'),
+            strandSlider: document.getElementById('strand-slider'),
+            tensionSlider: document.getElementById('tension-slider'),
+            gravitySlider: document.getElementById('gravity-slider'),
+            flowSlider: document.getElementById('flow-slider'),
+            strandLabel: document.getElementById('strand-label'),
+            tensionLabel: document.getElementById('tension-label'),
+            gravityLabel: document.getElementById('gravity-label'),
+            flowLabel: document.getElementById('flow-label')
+        };
+
+        const state = {
+            mode: 0,
+            strands: defaultStrands,
+            tension: Number(ui.tensionSlider.value) / 100,
+            gravity: Number(ui.gravitySlider.value) / 100,
+            flow: Number(ui.flowSlider.value) / 100,
+            labels: true,
+            selectedNode: 0,
+            hoveredNode: null,
+            time: 0,
+            energy: 0,
+            cohesion: 1,
+            knotForce: 0,
+            log: []
+        };
+
+        ui.strandSlider.max = String(maxStrands);
+        ui.strandSlider.value = String(defaultStrands);
+        ui.strandLabel.textContent = String(defaultStrands);
+
+        let scene;
+        let camera;
+        let renderer;
+        let controls;
+        let composer;
+        let bloomPass;
+        let clock;
+        let raycaster;
+        let pointer;
+        let frameGroup;
+        let nodeMesh;
+        let nodeMaterial;
+        let strandMesh;
+        let strandPositions;
+        let strandColors;
+        let packetMesh;
+        let packetPositions;
+        let packetColors;
+        let packetSizes;
+        let packetLife;
+        let packetMaterial;
+        let fieldMesh;
+        let fieldMaterial;
+        let selectionRing;
+
+        const nodes = [];
+        const strands = [];
+        const packets = [];
+        const tempObject = new THREE.Object3D();
+        const tempVec = new THREE.Vector3();
+        const tempVecB = new THREE.Vector3();
+        const tempVecC = new THREE.Vector3();
+        const tempSide = new THREE.Vector3();
+        const tempColor = new THREE.Color();
+        const white = new THREE.Color(0xffffff);
+
+        try {
+            init();
+        } catch (error) {
+            console.error(error);
+            ui.fallback.classList.add('visible');
+        }
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x05070b, 0.04);
+
+            camera = new THREE.PerspectiveCamera(47, window.innerWidth / window.innerHeight, 0.1, 140);
+            camera.position.set(0, 7.8, 18.5);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 0.88;
+            ui.stage.appendChild(renderer.domElement);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.07;
+            controls.enablePan = false;
+            controls.minDistance = 11;
+            controls.maxDistance = 32;
+            controls.maxPolarAngle = Math.PI * 0.84;
+            controls.target.set(0, 0, 0);
+
+            composer = new EffectComposer(renderer);
+            composer.addPass(new RenderPass(scene, camera));
+            bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), modes[state.mode].bloom, 0.36, 0.58);
+            composer.addPass(bloomPass);
+            composer.addPass(new OutputPass());
+
+            clock = new THREE.Clock();
+            raycaster = new THREE.Raycaster();
+            pointer = new THREE.Vector2();
+
+            buildLights();
+            buildFrame();
+            buildNodes();
+            buildStrandMesh();
+            buildPackets();
+            buildField();
+            buildSelection();
+            bindEvents();
+            resetLoom();
+
+            renderer.setAnimationLoop(animate);
+            window.__gravityLoomReady = true;
+        }
+
+        function buildLights() {
+            scene.add(new THREE.AmbientLight(0xf6f7fb, 0.5));
+            const key = new THREE.DirectionalLight(0xffffff, 2.4);
+            key.position.set(-7, 12, 8);
+            scene.add(key);
+
+            const cyan = new THREE.PointLight(0x78e7ff, 3.6, 42);
+            cyan.position.set(7, 5, -8);
+            scene.add(cyan);
+
+            const gold = new THREE.PointLight(0xf5c96b, 2.4, 36);
+            gold.position.set(-7, -3, 7);
+            scene.add(gold);
+
+            const rose = new THREE.PointLight(0xff7190, 2.2, 34);
+            rose.position.set(0, 6, 6);
+            scene.add(rose);
+        }
+
+        function buildFrame() {
+            frameGroup = new THREE.Group();
+            scene.add(frameGroup);
+
+            const ringMaterial = new THREE.MeshBasicMaterial({
+                color: 0x78e7ff,
+                transparent: true,
+                opacity: 0.16,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            const ringGeometry = new THREE.TorusGeometry(7.2, 0.016, 8, 180);
+            for (let i = 0; i < 3; i += 1) {
+                const ring = new THREE.Mesh(ringGeometry, ringMaterial.clone());
+                ring.material.color.setHex(palette[i]);
+                ring.material.opacity = 0.1 + i * 0.035;
+                if (i === 1) ring.rotation.x = Math.PI / 2;
+                if (i === 2) ring.rotation.y = Math.PI / 2;
+                frameGroup.add(ring);
+            }
+
+            const spineMaterial = new THREE.LineBasicMaterial({
+                color: 0xf6f7fb,
+                transparent: true,
+                opacity: 0.1,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            const spinePoints = [];
+            for (let i = 0; i < 7; i += 1) {
+                const y = -5.4 + i * 1.8;
+                spinePoints.push(new THREE.Vector3(-6.6, y, 0), new THREE.Vector3(6.6, y, 0));
+                spinePoints.push(new THREE.Vector3(0, y, -6.6), new THREE.Vector3(0, y, 6.6));
+            }
+            const spine = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(spinePoints), spineMaterial);
+            frameGroup.add(spine);
+        }
+
+        function buildNodes() {
+            nodeMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                roughness: 0.36,
+                metalness: 0.32,
+                emissive: 0x05070b,
+                emissiveIntensity: 0.2
+            });
+
+            nodeMesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.5, 2), nodeMaterial, nodeSpecs.length);
+            nodeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            nodeMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(nodeSpecs.length * 3), 3);
+            nodeMesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+            scene.add(nodeMesh);
+        }
+
+        function buildStrandMesh() {
+            const segmentPairs = maxStrands * (strandSegments - 1);
+            strandPositions = new Float32Array(segmentPairs * 2 * 3);
+            strandColors = new Float32Array(segmentPairs * 2 * 3);
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(strandPositions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(strandColors, 3));
+            strandMesh = new THREE.LineSegments(
+                geometry,
+                new THREE.LineBasicMaterial({
+                    vertexColors: true,
+                    transparent: true,
+                    opacity: 0.42,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                })
+            );
+            scene.add(strandMesh);
+        }
+
+        function buildPackets() {
+            packetPositions = new Float32Array(maxPackets * 3);
+            packetColors = new Float32Array(maxPackets * 3);
+            packetSizes = new Float32Array(maxPackets);
+            packetLife = new Float32Array(maxPackets);
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(packetPositions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(packetColors, 3));
+            geometry.setAttribute('aSize', new THREE.BufferAttribute(packetSizes, 1));
+            geometry.setAttribute('aLife', new THREE.BufferAttribute(packetLife, 1));
+
+            packetMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) }
+                },
+                vertexShader: `
+                    attribute float aSize;
+                    attribute float aLife;
+                    varying vec3 vColor;
+                    varying float vLife;
+                    uniform float uPixelRatio;
+
+                    void main() {
+                        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                        gl_Position = projectionMatrix * mvPosition;
+                        gl_PointSize = aSize * uPixelRatio * (150.0 / max(6.0, -mvPosition.z));
+                        vColor = color;
+                        vLife = aLife;
+                    }
+                `,
+                fragmentShader: `
+                    varying vec3 vColor;
+                    varying float vLife;
+
+                    void main() {
+                        vec2 uv = gl_PointCoord - 0.5;
+                        float d = length(uv);
+                        float core = smoothstep(0.5, 0.06, d);
+                        gl_FragColor = vec4(vColor * (0.7 + vLife * 1.45), core * vLife);
+                    }
+                `,
+                transparent: true,
+                vertexColors: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            packetMesh = new THREE.Points(geometry, packetMaterial);
+            scene.add(packetMesh);
+        }
+
+        function buildField() {
+            const positions = new Float32Array(fieldParticleCount * 3);
+            const colors = new Float32Array(fieldParticleCount * 3);
+            const seeds = new Float32Array(fieldParticleCount);
+            const sizes = new Float32Array(fieldParticleCount);
+
+            for (let i = 0; i < fieldParticleCount; i += 1) {
+                const y = -6 + Math.random() * 12;
+                const angle = Math.random() * Math.PI * 2;
+                const radius = 3.5 + Math.random() * 8.5;
+                positions[i * 3] = Math.cos(angle) * radius;
+                positions[i * 3 + 1] = y;
+                positions[i * 3 + 2] = Math.sin(angle) * radius;
+                tempColor.setHex(palette[i % palette.length]).lerp(white, Math.random() * 0.16);
+                colors[i * 3] = tempColor.r;
+                colors[i * 3 + 1] = tempColor.g;
+                colors[i * 3 + 2] = tempColor.b;
+                seeds[i] = Math.random();
+                sizes[i] = 0.45 + Math.random() * 1.65;
+            }
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geometry.setAttribute('aSeed', new THREE.BufferAttribute(seeds, 1));
+            geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+
+            fieldMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    uTime: { value: 0 },
+                    uEnergy: { value: 1 },
+                    uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) }
+                },
+                vertexShader: `
+                    attribute float aSeed;
+                    attribute float aSize;
+                    varying vec3 vColor;
+                    varying float vSeed;
+                    uniform float uTime;
+                    uniform float uEnergy;
+                    uniform float uPixelRatio;
+
+                    void main() {
+                        vec3 p = position;
+                        float drift = uTime * (0.08 + aSeed * 0.06);
+                        p.x += sin(drift + p.y * 0.14 + aSeed * 12.0) * 0.25 * uEnergy;
+                        p.z += cos(drift + p.y * 0.12 + aSeed * 9.0) * 0.25 * uEnergy;
+                        vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
+                        gl_Position = projectionMatrix * mvPosition;
+                        gl_PointSize = aSize * uPixelRatio * (82.0 / max(8.0, -mvPosition.z));
+                        vColor = color;
+                        vSeed = aSeed;
+                    }
+                `,
+                fragmentShader: `
+                    varying vec3 vColor;
+                    varying float vSeed;
+
+                    void main() {
+                        vec2 uv = gl_PointCoord - 0.5;
+                        float d = length(uv);
+                        float alpha = smoothstep(0.5, 0.08, d) * (0.14 + vSeed * 0.18);
+                        gl_FragColor = vec4(vColor, alpha);
+                    }
+                `,
+                transparent: true,
+                vertexColors: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            fieldMesh = new THREE.Points(geometry, fieldMaterial);
+            scene.add(fieldMesh);
+        }
+
+        function buildSelection() {
+            selectionRing = new THREE.Mesh(
+                new THREE.TorusGeometry(0.68, 0.024, 8, 80),
+                new THREE.MeshBasicMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0.78,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                })
+            );
+            selectionRing.visible = false;
+            scene.add(selectionRing);
+        }
+
+        function bindEvents() {
+            window.addEventListener('resize', onResize);
+            renderer.domElement.addEventListener('pointerdown', onPointerDown);
+            renderer.domElement.addEventListener('pointermove', onPointerMove);
+            renderer.domElement.addEventListener('pointerleave', () => {
+                state.hoveredNode = null;
+                document.body.style.cursor = 'default';
+            });
+
+            ui.modeButtons.forEach((button) => {
+                button.addEventListener('click', () => setMode(Number(button.dataset.mode)));
+            });
+            ui.pulse.addEventListener('click', triggerPulse);
+            ui.knot.addEventListener('click', triggerKnot);
+            ui.unwind.addEventListener('click', unwind);
+            ui.labels.addEventListener('click', toggleLabels);
+            ui.reset.addEventListener('click', resetLoom);
+
+            ui.strandSlider.addEventListener('input', () => {
+                state.strands = Number(ui.strandSlider.value);
+                rebuildStrands();
+                rebuildPackets();
+                updateUi();
+            });
+            ui.tensionSlider.addEventListener('input', () => {
+                state.tension = Number(ui.tensionSlider.value) / 100;
+                updateUi();
+            });
+            ui.gravitySlider.addEventListener('input', () => {
+                state.gravity = Number(ui.gravitySlider.value) / 100;
+                updateUi();
+            });
+            ui.flowSlider.addEventListener('input', () => {
+                state.flow = Number(ui.flowSlider.value) / 100;
+                rebuildPackets();
+                updateUi();
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key >= '1' && event.key <= String(modes.length)) setMode(Number(event.key) - 1);
+                if (event.key.toLowerCase() === 'p') triggerPulse();
+                if (event.key.toLowerCase() === 'k') triggerKnot();
+                if (event.key.toLowerCase() === 'u') unwind();
+                if (event.key.toLowerCase() === 'l') toggleLabels();
+                if (event.key.toLowerCase() === 'r') resetLoom();
+            });
+        }
+
+        function resetLoom() {
+            nodes.length = 0;
+            state.selectedNode = 0;
+            state.hoveredNode = null;
+            state.knotForce = 0;
+
+            nodeSpecs.forEach((spec, index) => {
+                const position = new THREE.Vector3(...spec.home);
+                position.x += randomRange(-0.28, 0.28);
+                position.y += randomRange(-0.24, 0.24);
+                position.z += randomRange(-0.28, 0.28);
+                nodes.push({
+                    index,
+                    spec,
+                    position,
+                    home: new THREE.Vector3(...spec.home),
+                    target: new THREE.Vector3(...spec.home),
+                    velocity: new THREE.Vector3(randomRange(-0.25, 0.25), randomRange(-0.2, 0.2), randomRange(-0.25, 0.25)),
+                    color: new THREE.Color(spec.color),
+                    heat: 0.18 + Math.random() * 0.18,
+                    threadLoad: 0,
+                    phase: Math.random() * Math.PI * 2
+                });
+            });
+
+            rebuildStrands();
+            rebuildPackets();
+            updateNodes(0.016, 0);
+            updateStrands(0);
+            updatePackets(0.016, 0);
+            updateScene(0.016, 0);
+            addLog(`Gravity Loom reset with <strong>${state.strands}</strong> strands.`, 'system');
+            updateUi();
+        }
+
+        function rebuildStrands() {
+            strands.length = 0;
+            nodes.forEach((node) => {
+                node.threadLoad = 0;
+            });
+
+            for (let i = 0; i < state.strands; i += 1) {
+                const source = (i * 5 + Math.floor(hash(i, 11) * nodeSpecs.length)) % nodeSpecs.length;
+                let target = (source + 2 + (i % 5) + Math.floor(hash(i, 23) * 3)) % nodeSpecs.length;
+                if (target === source) target = (target + 1) % nodeSpecs.length;
+                const colorA = new THREE.Color(nodeSpecs[source].color);
+                const colorB = new THREE.Color(nodeSpecs[target].color);
+                const color = colorA.clone().lerp(colorB, 0.42 + hash(i, 41) * 0.28);
+                strands.push({
+                    source,
+                    target,
+                    lane: (hash(i, 31) - 0.5) * 1.8,
+                    sag: 0.25 + hash(i, 47) * 0.95,
+                    phase: hash(i, 59) * Math.PI * 2,
+                    color
+                });
+                nodes[source].threadLoad += 1;
+                nodes[target].threadLoad += 1;
+            }
+            strandMesh.geometry.setDrawRange(0, state.strands * (strandSegments - 1) * 2);
+        }
+
+        function rebuildPackets() {
+            packets.length = 0;
+            const activePackets = Math.min(maxPackets, Math.floor(state.strands * (3.4 + state.flow * 1.3)));
+            for (let i = 0; i < activePackets; i += 1) {
+                packets.push(createPacket(i));
+            }
+            packetMesh.geometry.setDrawRange(0, packets.length);
+        }
+
+        function createPacket(index) {
+            return {
+                strand: index % Math.max(1, strands.length),
+                t: hash(index, 71),
+                speed: 0.08 + hash(index, 83) * 0.18,
+                size: 0.8 + hash(index, 97) * 1.8,
+                offset: (hash(index, 109) - 0.5) * 0.08,
+                phase: hash(index, 127) * Math.PI * 2
+            };
+        }
+
+        function setMode(index) {
+            if (index === state.mode || !modes[index]) return;
+            state.mode = index;
+            bloomPass.strength = modes[index].bloom;
+            addLog(`Mode changed to <strong>${modes[index].name}</strong>.`, 'system');
+            updateUi();
+        }
+
+        function triggerPulse() {
+            nodes.forEach((node) => {
+                tempVec.copy(node.position).normalize();
+                if (tempVec.lengthSq() < 0.001) tempVec.set(0, 1, 0);
+                node.velocity.addScaledVector(tempVec, 2.4 + node.spec.pull * 0.8);
+                node.heat = Math.min(1, node.heat + 0.34);
+            });
+            addLog('Pulse sent through every suspended mass.', 'energy');
+        }
+
+        function triggerKnot() {
+            state.knotForce = 1.3;
+            const selected = nodes[state.selectedNode] || nodes[0];
+            nodes.forEach((node) => {
+                if (node === selected) return;
+                tempVec.subVectors(selected.position, node.position);
+                const distance = Math.max(0.8, tempVec.length());
+                node.velocity.addScaledVector(tempVec.normalize(), 2.4 / distance);
+                node.heat = Math.min(1, node.heat + 0.28);
+            });
+            selected.heat = 1;
+            addLog(`Knot pull centered on <strong>${selected.spec.name}</strong>.`, 'energy');
+        }
+
+        function unwind() {
+            nodes.forEach((node) => {
+                node.velocity.multiplyScalar(0.38);
+                node.heat *= 0.38;
+            });
+            state.knotForce = 0;
+            addLog('The loom unwound; mass velocities damped.', 'system');
+        }
+
+        function toggleLabels() {
+            state.labels = !state.labels;
+            ui.labels.classList.toggle('active', state.labels);
+            ui.labels.setAttribute('aria-pressed', String(state.labels));
+            updateLabels();
+        }
+
+        function onPointerDown(event) {
+            const hit = getNodeHit(event);
+            if (!hit) {
+                state.selectedNode = null;
+                updateUi();
+                return;
+            }
+            state.selectedNode = hit.instanceId;
+            const node = nodes[state.selectedNode];
+            if (node) {
+                node.heat = Math.min(1, node.heat + 0.22);
+                node.velocity.y += 0.8;
+                addLog(`<strong>${node.spec.name}</strong> selected.`, 'system');
+            }
+            updateUi();
+        }
+
+        function onPointerMove(event) {
+            const hit = getNodeHit(event);
+            state.hoveredNode = hit ? hit.instanceId : null;
+            document.body.style.cursor = hit ? 'pointer' : 'default';
+        }
+
+        function getNodeHit(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(pointer, camera);
+            const hits = raycaster.intersectObject(nodeMesh, false);
+            return hits.find((hit) => hit.instanceId !== undefined && hit.instanceId < nodes.length) || null;
+        }
+
+        function animate() {
+            const dt = Math.min(clock.getDelta(), 0.033);
+            state.time += dt;
+            state.knotForce = Math.max(0, state.knotForce - dt * 0.55);
+
+            updateNodes(dt, state.time);
+            updateStrands(state.time);
+            updatePackets(dt, state.time);
+            updateScene(dt, state.time);
+            updateUi();
+
+            controls.update();
+            composer.render();
+        }
+
+        function updateNodes(dt, elapsed) {
+            const mode = modes[state.mode];
+            state.energy = 0;
+            const tension = state.tension * mode.tension;
+
+            nodes.forEach((node) => {
+                computeModeTarget(node, elapsed, node.target);
+            });
+
+            for (let i = 0; i < nodes.length; i += 1) {
+                const node = nodes[i];
+                tempVec.subVectors(node.target, node.position);
+                node.velocity.addScaledVector(tempVec, dt * (0.7 + tension * 1.35));
+                node.velocity.y -= dt * state.gravity * mode.gravity * (0.8 + node.spec.pull * 0.42);
+
+                const swirl = mode.swirl + state.knotForce * 0.45;
+                node.velocity.x += -node.position.z * swirl * dt * 0.34;
+                node.velocity.z += node.position.x * swirl * dt * 0.34;
+
+                const turbulence = mode.turbulence * (0.55 + state.flow * 0.4);
+                node.velocity.x += Math.sin(elapsed * 1.4 + node.phase) * turbulence * dt;
+                node.velocity.y += Math.cos(elapsed * 1.1 + node.phase * 0.7) * turbulence * dt;
+                node.velocity.z += Math.sin(elapsed * 1.2 + node.phase * 1.3) * turbulence * dt;
+
+                if (state.knotForce > 0) {
+                    const selected = nodes[state.selectedNode] || nodes[0];
+                    if (selected && selected !== node) {
+                        tempVecB.subVectors(selected.position, node.position);
+                        const distance = Math.max(0.9, tempVecB.length());
+                        node.velocity.addScaledVector(tempVecB.normalize(), state.knotForce * dt * 1.5 / distance);
+                    }
+                }
+
+                node.velocity.multiplyScalar(Math.pow(0.91 - Math.min(0.18, tension * 0.06), dt * 60));
+                node.position.addScaledVector(node.velocity, dt);
+                node.heat = Math.max(0, node.heat - dt * 0.24);
+                state.energy += node.velocity.lengthSq() * node.spec.pull;
+            }
+
+            state.cohesion = THREE.MathUtils.clamp(1 - state.energy / 42, 0.18, 1);
+        }
+
+        function computeModeTarget(node, elapsed, target) {
+            const base = node.home;
+            const index = node.index;
+            if (state.mode === 0) {
+                target.copy(base);
+                target.y += Math.sin(elapsed * 0.35 + node.phase) * 0.12;
+                return target;
+            }
+            if (state.mode === 1) {
+                const angle = Math.atan2(base.z, base.x) + elapsed * 0.1 + index * 0.18;
+                const radius = Math.max(2.5, Math.sqrt(base.x * base.x + base.z * base.z));
+                target.set(Math.cos(angle) * radius, base.y * 0.82 + Math.sin(index * 1.7) * 0.8, Math.sin(angle) * radius);
+                return target;
+            }
+            if (state.mode === 2) {
+                const cluster = index % 3;
+                target.set(
+                    base.x * 0.62 + (cluster - 1) * 0.7,
+                    base.y * 0.58 + Math.sin(elapsed * 0.55 + index) * 0.65,
+                    base.z * 0.62 + Math.cos(cluster * 2.2) * 0.8
+                );
+                return target;
+            }
+            target.set(
+                base.x * 0.72 + Math.sin(index * 2.1) * 0.42,
+                Math.sin(index * 1.35) * 4.6,
+                base.z * 0.72 + Math.cos(index * 1.6) * 0.42
+            );
+            return target;
+        }
+
+        function updateStrands(elapsed) {
+            const mode = modes[state.mode];
+            const tension = state.tension * mode.tension;
+            const sagScale = (1.25 - Math.min(1, tension)) * 1.8 + state.gravity * 0.9;
+            const activePairs = state.strands * (strandSegments - 1);
+
+            for (let i = 0; i < activePairs * 2 * 3; i += 1) {
+                strandPositions[i] = 0;
+                strandColors[i] = 0;
+            }
+
+            for (let i = 0; i < state.strands; i += 1) {
+                const strand = strands[i];
+                if (!strand) continue;
+                for (let s = 0; s < strandSegments - 1; s += 1) {
+                    const t0 = s / (strandSegments - 1);
+                    const t1 = (s + 1) / (strandSegments - 1);
+                    const vertexIndex = (i * (strandSegments - 1) + s) * 2 * 3;
+                    computeStrandPoint(strand, t0, elapsed, tempVec);
+                    computeStrandPoint(strand, t1, elapsed, tempVecB);
+                    strandPositions[vertexIndex] = tempVec.x;
+                    strandPositions[vertexIndex + 1] = tempVec.y;
+                    strandPositions[vertexIndex + 2] = tempVec.z;
+                    strandPositions[vertexIndex + 3] = tempVecB.x;
+                    strandPositions[vertexIndex + 4] = tempVecB.y;
+                    strandPositions[vertexIndex + 5] = tempVecB.z;
+
+                    const wave = 0.32 + Math.sin(elapsed * mode.flow + strand.phase + t0 * Math.PI * 3) * 0.12;
+                    const heat = Math.max(nodes[strand.source].heat, nodes[strand.target].heat) * 0.55;
+                    tempColor.copy(strand.color).lerp(white, heat);
+                    const intensity = 0.46 + tension * 0.28 + wave + heat + strand.sag * sagScale * 0.035;
+                    strandColors[vertexIndex] = tempColor.r * intensity;
+                    strandColors[vertexIndex + 1] = tempColor.g * intensity;
+                    strandColors[vertexIndex + 2] = tempColor.b * intensity;
+                    strandColors[vertexIndex + 3] = tempColor.r * (intensity + 0.04);
+                    strandColors[vertexIndex + 4] = tempColor.g * (intensity + 0.04);
+                    strandColors[vertexIndex + 5] = tempColor.b * (intensity + 0.04);
+                }
+            }
+
+            strandMesh.material.opacity = 0.24 + Math.min(0.28, state.strands / maxStrands * 0.22) + state.tension * 0.06;
+            strandMesh.geometry.attributes.position.needsUpdate = true;
+            strandMesh.geometry.attributes.color.needsUpdate = true;
+        }
+
+        function computeStrandPoint(strand, t, elapsed, target) {
+            const a = nodes[strand.source];
+            const b = nodes[strand.target];
+            target.copy(a.position).lerp(b.position, t);
+
+            tempVecC.subVectors(b.position, a.position);
+            const length = Math.max(0.001, tempVecC.length());
+            tempVecC.normalize();
+            const side = tempSide.set(-tempVecC.z, 0, tempVecC.x);
+            if (side.lengthSq() < 0.001) side.set(1, 0, 0);
+            side.normalize();
+
+            const arch = Math.sin(t * Math.PI);
+            const sag = arch * strand.sag * (0.6 + state.gravity * 1.2) * (1.12 - Math.min(0.92, state.tension * 0.65));
+            const weave = Math.sin(elapsed * (0.8 + state.flow * 0.5) + strand.phase + t * Math.PI * 6) * arch;
+            target.y -= sag;
+            target.addScaledVector(side, strand.lane * arch * 0.22 + weave * 0.12);
+            target.addScaledVector(tempVecC, Math.sin(elapsed * 0.5 + strand.phase) * arch * 0.08 * length / 8);
+            return target;
+        }
+
+        function updatePackets(dt, elapsed) {
+            const mode = modes[state.mode];
+
+            for (let i = 0; i < maxPackets; i += 1) {
+                const p = i * 3;
+                if (i >= packets.length || !strands.length) {
+                    packetPositions[p] = 0;
+                    packetPositions[p + 1] = 9999;
+                    packetPositions[p + 2] = 0;
+                    packetLife[i] = 0;
+                    continue;
+                }
+
+                const packet = packets[i];
+                packet.t += dt * packet.speed * mode.flow * (0.55 + state.flow * 1.25);
+                if (packet.t > 1) {
+                    packet.t -= 1;
+                    packet.strand = Math.floor(hash(i + Math.floor(elapsed * 10), 151) * strands.length) % strands.length;
+                    packet.speed = 0.08 + hash(i + Math.floor(elapsed * 17), 163) * 0.18;
+                }
+
+                const strand = strands[packet.strand % strands.length];
+                computeStrandPoint(strand, packet.t, elapsed + packet.phase, tempVec);
+                packetPositions[p] = tempVec.x;
+                packetPositions[p + 1] = tempVec.y;
+                packetPositions[p + 2] = tempVec.z;
+
+                const life = Math.sin(packet.t * Math.PI);
+                tempColor.copy(strand.color).lerp(white, 0.25 + life * 0.32);
+                packetColors[p] = tempColor.r;
+                packetColors[p + 1] = tempColor.g;
+                packetColors[p + 2] = tempColor.b;
+                packetLife[i] = 0.25 + life * 0.75;
+                packetSizes[i] = packet.size * (0.8 + state.flow * 0.25);
+            }
+
+            packetMesh.geometry.attributes.position.needsUpdate = true;
+            packetMesh.geometry.attributes.color.needsUpdate = true;
+            packetMesh.geometry.attributes.aLife.needsUpdate = true;
+            packetMesh.geometry.attributes.aSize.needsUpdate = true;
+        }
+
+        function updateScene(dt, elapsed) {
+            frameGroup.rotation.y += dt * (0.035 + modes[state.mode].swirl * 0.025);
+            frameGroup.rotation.x = Math.sin(elapsed * 0.1) * 0.04;
+
+            fieldMaterial.uniforms.uTime.value = elapsed;
+            fieldMaterial.uniforms.uEnergy.value = 0.72 + state.flow * 0.18 + (1 - state.cohesion) * 0.22;
+            packetMaterial.uniforms.uPixelRatio.value = Math.min(window.devicePixelRatio, 2);
+            bloomPass.strength = modes[state.mode].bloom + (1 - state.cohesion) * 0.18 + state.knotForce * 0.05;
+            nodeMaterial.emissiveIntensity = 0.18 + (1 - state.cohesion) * 0.24;
+
+            syncNodeInstances(elapsed);
+            updateSelection(elapsed);
+            updateLabels();
+        }
+
+        function syncNodeInstances(elapsed) {
+            for (let i = 0; i < nodes.length; i += 1) {
+                const node = nodes[i];
+                const selected = i === state.selectedNode ? 0.16 : 0;
+                const hovered = i === state.hoveredNode ? 0.12 : 0;
+                const scale = 0.72 + node.spec.pull * 0.18 + node.heat * 0.18 + selected + hovered;
+                tempObject.position.copy(node.position);
+                tempObject.scale.setScalar(scale);
+                tempObject.rotation.set(elapsed * 0.18 + node.phase, elapsed * 0.12, elapsed * 0.08);
+                tempObject.updateMatrix();
+                nodeMesh.setMatrixAt(i, tempObject.matrix);
+                tempColor.copy(node.color).lerp(white, node.heat * 0.42 + selected * 0.8);
+                nodeMesh.setColorAt(i, tempColor);
+            }
+            nodeMesh.instanceMatrix.needsUpdate = true;
+            if (nodeMesh.instanceColor) nodeMesh.instanceColor.needsUpdate = true;
+        }
+
+        function updateSelection(elapsed) {
+            if (state.selectedNode === null || !nodes[state.selectedNode]) {
+                selectionRing.visible = false;
+                return;
+            }
+            const node = nodes[state.selectedNode];
+            selectionRing.visible = true;
+            selectionRing.position.copy(node.position);
+            selectionRing.scale.setScalar(1.05 + node.heat * 0.2);
+            selectionRing.rotation.x = Math.PI / 2 + Math.sin(elapsed * 1.3) * 0.16;
+            selectionRing.rotation.z += 0.026;
+            selectionRing.material.color.copy(node.color).lerp(white, 0.34);
+        }
+
+        function updateLabels() {
+            if (!state.labels || state.selectedNode === null || !nodes[state.selectedNode]) {
+                ui.selectedLabel.style.display = 'none';
+                return;
+            }
+
+            const node = nodes[state.selectedNode];
+            tempVec.copy(node.position).project(camera);
+            if (tempVec.z < -1 || tempVec.z > 1) {
+                ui.selectedLabel.style.display = 'none';
+                return;
+            }
+
+            const x = (tempVec.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-tempVec.y * 0.5 + 0.5) * window.innerHeight;
+            ui.selectedLabel.style.display = 'block';
+            ui.selectedLabel.style.left = `${x}px`;
+            ui.selectedLabel.style.top = `${y}px`;
+            ui.selectedLabel.textContent = `${node.spec.name} | ${node.velocity.length().toFixed(1)} u/s`;
+        }
+
+        function updateUi() {
+            const mode = modes[state.mode];
+            ui.nodeCount.textContent = String(nodes.length);
+            ui.strandCount.textContent = String(state.strands);
+            ui.flowCount.textContent = packets.length.toLocaleString();
+            ui.energyCount.textContent = state.energy.toFixed(1);
+            ui.modeTitle.textContent = mode.name;
+            ui.modeCopy.textContent = mode.copy;
+
+            const cohesionPct = Math.round(state.cohesion * 100);
+            ui.cohesionFill.style.width = `${cohesionPct}%`;
+            ui.cohesionLabel.textContent = `${cohesionPct}%`;
+
+            ui.tensionReadout.textContent = `${Math.round(state.tension * 100)}%`;
+            ui.gravityReadout.textContent = `${Math.round(state.gravity * 100)}%`;
+            ui.packetReadout.textContent = packets.length.toLocaleString();
+            ui.bloomReadout.textContent = bloomPass.strength.toFixed(2);
+
+            ui.strandLabel.textContent = String(state.strands);
+            ui.tensionLabel.textContent = String(Math.round(state.tension * 100));
+            ui.gravityLabel.textContent = String(Math.round(state.gravity * 100));
+            ui.flowLabel.textContent = String(Math.round(state.flow * 100));
+
+            ui.modeButtons.forEach((button, index) => {
+                const active = index === state.mode;
+                button.classList.toggle('active', active);
+                button.setAttribute('aria-selected', String(active));
+            });
+
+            updateSelectionUi();
+        }
+
+        function updateSelectionUi() {
+            if (state.selectedNode === null || !nodes[state.selectedNode]) {
+                ui.selectionTitle.textContent = 'No Mass Selected';
+                ui.selectionCopy.textContent = 'Click a suspended mass to inspect its pull, speed, heat, and active thread load.';
+                ui.selectedSpeed.textContent = '-';
+                ui.selectedPull.textContent = '-';
+                ui.selectedThreads.textContent = '-';
+                ui.selectedHeat.textContent = '-';
+                return;
+            }
+
+            const node = nodes[state.selectedNode];
+            ui.selectionTitle.textContent = node.spec.name;
+            ui.selectionCopy.textContent = `${node.threadLoad} strands are anchored here. Current vector is ${formatVector(node.velocity)}.`;
+            ui.selectedSpeed.textContent = node.velocity.length().toFixed(2);
+            ui.selectedPull.textContent = node.spec.pull.toFixed(2);
+            ui.selectedThreads.textContent = String(node.threadLoad);
+            ui.selectedHeat.textContent = `${Math.round(node.heat * 100)}%`;
+        }
+
+        function addLog(message, type = '') {
+            state.log.unshift({ message, type });
+            state.log = state.log.slice(0, 6);
+            ui.eventLog.innerHTML = state.log
+                .map((entry) => `<div class="log-entry ${entry.type}">${entry.message}</div>`)
+                .join('');
+        }
+
+        function onResize() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+            composer.setSize(width, height);
+            bloomPass.setSize(width, height);
+            fieldMaterial.uniforms.uPixelRatio.value = Math.min(window.devicePixelRatio, 2);
+            packetMaterial.uniforms.uPixelRatio.value = Math.min(window.devicePixelRatio, 2);
+        }
+
+        function randomRange(min, max) {
+            return min + Math.random() * (max - min);
+        }
+
+        function hash(index, seed) {
+            return fract(Math.sin(index * 127.1 + seed * 311.7) * 43758.5453123);
+        }
+
+        function fract(value) {
+            return value - Math.floor(value);
+        }
+
+        function formatVector(vector) {
+            return `${vector.x.toFixed(1)}, ${vector.y.toFixed(1)}, ${vector.z.toFixed(1)}`;
+        }
+    </script>
+</body>
+</html>
