@@ -3,6 +3,8 @@ A simple repository of WebGL games, prototypes and experiments.
 
 The strategic direction is to use small, self-contained WebGL experiments to explore richer interactive systems: audio-reactive instruments, generative visual engines, simulation-driven interfaces, and polished single-page prototypes. Each experiment is meant to be immediately runnable, easy to inspect, and useful as a stepping stone for more ambitious real-time creative tools.
 
+See [DESIGN.md](DESIGN.md) for the shared design philosophy, quality rubric, and current lessons from these experiments.
+
 ## games
 
 - [3D Audio Meter](https://josh-english-2k18.github.io/webgl-games/3d-audio-meter.html) (`3d-audio-meter.html`)
