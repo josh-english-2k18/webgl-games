@@ -16,6 +16,7 @@ Examples:
 - `Causal Field`, not just neural network visualization.
 - `Signal City`, not just system map.
 - `Kinetic Containment`, not just ball physics v2.
+- `Barycentric Dawn`, not just a three-body demo.
 
 The name, visual language, controls, readouts, and motion should reinforce the same idea.
 
@@ -38,6 +39,19 @@ Use:
 - HUD metrics that reveal what the system is doing.
 
 Avoid visual noise that looks impressive only for a second and then becomes indistinct.
+
+### Particle Sprite Hygiene
+
+Never use raw textureless `PointsMaterial` for visible glowing particles in polished experiments. It renders square sprites, and with additive blending or bloom those squares can collapse into the recurring giant fixed glowing-square failure.
+
+For visible particle fields:
+
+- Use shader particles or a sprite texture with circular alpha.
+- Hard-cap `gl_PointSize`.
+- Discard fragments outside the intended particle circle.
+- Initialize particle buffers offscreen or into valid first-frame positions before rendering.
+- If a custom shader point field still renders as squares after circular discard and point-size caps, remove `THREE.Points` from the affected scene and use textured scene geometry instead.
+- Treat a single fixed glowing square as a blocker, not a cosmetic issue.
 
 ### Feel Before Feature Count
 
@@ -157,6 +171,39 @@ Current design constraints:
 - Bodies should remain small enough for density to read.
 - Collisions should be visibly physical, not decorative.
 
+### Barycentric Dawn
+
+Barycentric Dawn is the current test for realistic simulation as an expressive artifact. It should read as a gravity-driven two-star one-planet system first, then as a beautiful particle scene second.
+
+Current design constraints:
+
+- Keep the body motion tied to scaled Newtonian gravity.
+- Preserve visible barycentric motion and orbital trails.
+- Use stellar flux, solar wind, atmosphere, and magnetosphere particle-flow layers to clarify cause and effect.
+- Use gravity-particle effects to make spacetime distortion dynamic, but keep them bounded and readable.
+- Do not keep a mesh or line surrogate for spacetime distortion when the design calls for particles. The particles themselves must be visible, simulated, and responsible for the effect.
+- A particle effect that is only technically present is a failed particle effect. Default particle size, opacity, count, seeding, and render order must make the effect obvious in the first viewport.
+- If particles represent gravity wells, they need coherent per-body structure and continuous flow. A random cloud falling toward one body, or particles orbiting like satellites, does not communicate spacetime curvature.
+- Keep gravity-well particle flow source-body-local. The barycenter can be labeled and connected, but it should not become the default particle sink unless the design explicitly asks for barycentric accretion.
+- For moving celestial bodies, compute gravity-well particle stream targets in body-local coordinates each frame. Free world-space particles will visually chase the bodies and read as fog, not as a replacement for the old body-local mesh.
+- Do not remove unrelated readability layers while replacing a failed layer. Celestial connection lines, orbital trails, magnetosphere particle flow, and gravity-particle distortion each have separate jobs.
+- When a planet-local force layer is requested as particles, remove the line proxy for that layer and build a local-frame birth/death stream. Static curves with particles added on top are not a real replacement.
+- Keep the force layers readable rather than letting particles hide the bodies.
+- Treat presets as orbital regimes with distinct dynamics, not only camera or color changes.
+
+Lessons from the successful iteration:
+
+- Define each force layer's visual job before implementing it. Orbital trails show history, connection lines show current body relationships, solar wind shows stellar flux, magnetosphere flow shows planet-local shielding, and gravity particles show spacetime-well distortion. If two layers do the same job, one will read as clutter.
+- A particle replacement must actually replace the old representation. Leaving a mesh or line proxy in place while adding particles nearby produces conceptual drift and makes debugging harder.
+- "Particles are present" is not enough. They must be visible in the default camera, have a clean footprint, preserve frame rate, and communicate their physical role within seconds.
+- For gravity wells, avoid three failed shapes: random dust piles, orbiting moth swarms, and barycenter rain. The useful shape is a continuous birth/death flow that remains local to each body while being perturbed by the other bodies.
+- Moving sources require body-local particle targets. World-space particles tied loosely to a moving body read as fog chasing the object, even if the math is technically updating.
+- Interaction should be bounded. Other bodies and nearby particles can bend, brighten, or offset a local stream, but they should not steal the stream's identity or collapse the scene into one attractor.
+- Particle population should follow the meaning of the field. In Barycentric Dawn, gravity-particle counts scale by visual gravity-well size, so the primary sun gets the most, the companion gets fewer, and the planet gets the least while remaining visible.
+- Visual hierarchy matters after the physics works. Red gravity particles, cyan/green magnetosphere flow, a dimmed starfield, transparent panels, and distinct trail colors make the separate systems readable instead of merely colorful.
+- Performance is part of visual design. One bounded shader-particle field with typed arrays was better than stacked instanced halos, oversized geometry, and expensive overdraw.
+- Manual playtesting exposed failures that static correctness missed: the fixed square, invisible particles, haystack arrows, spiderweb lines, dust piles, moth orbits, barycenter rain, and chasing fog. Treat those visual readings as primary evidence.
+
 ## Quality Rubric
 
 Before calling an experiment good, check:
@@ -193,5 +240,6 @@ Avoid:
 - Rewriting older experiments destructively.
 - Adding generic UI panels that do not affect the scene.
 - Letting bloom, trails, or particles hide structure.
+- Using textureless square point sprites for visible glowing particles.
 - Building feature lists before the core interaction feels good.
 - Treating a working implementation as finished when the identity is still generic.

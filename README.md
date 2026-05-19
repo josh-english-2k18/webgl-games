@@ -3,7 +3,7 @@ A simple repository of WebGL games, prototypes and experiments.
 
 The strategic direction is to use small, self-contained WebGL experiments to explore richer interactive systems: audio-reactive instruments, generative visual engines, simulation-driven interfaces, and polished single-page prototypes. Each experiment is meant to be immediately runnable, easy to inspect, and useful as a stepping stone for more ambitious real-time creative tools.
 
-See [DESIGN.md](DESIGN.md) for the shared design philosophy, quality rubric, and current lessons from these experiments.
+See [DESIGN.md](DESIGN.md) for the shared design philosophy, quality rubric, and current lessons from these experiments. See [DEV_LOG.md](DEV_LOG.md) for the running record of experiments, iterations, and playtesting lessons.
 
 ## games
 
@@ -30,6 +30,7 @@ See [DESIGN.md](DESIGN.md) for the shared design philosophy, quality rubric, and
 - [Causal Field](https://josh-english-2k18.github.io/webgl-games/causal-field.html) (`causal-field.html`)
 - [Signal City](https://josh-english-2k18.github.io/webgl-games/signal-city.html) (`signal-city.html`)
 - [Gravity Loom](https://josh-english-2k18.github.io/webgl-games/gravity-loom.html) (`gravity-loom.html`)
+- [Barycentric Dawn](https://josh-english-2k18.github.io/webgl-games/barycentric-dawn.html) (`barycentric-dawn.html`)
 
 ## notes
 
@@ -38,6 +39,8 @@ See [DESIGN.md](DESIGN.md) for the shared design philosophy, quality rubric, and
 `ball-physics-simulation-v2.html` is Kinetic Containment, a polished v2 built with the newer Three.js module/import-map pattern used by the recent experiments. It keeps the simulation self-contained and currently defaults to 320 small blue bodies, max 640 bodies, gravity 0, substepped collision resolution, spatial-hash broadphase checks, raycast body inspection, shader field particles, event sparks, and HUD diagnostics. Use manual playtesting as the source of truth for visual and physics feel unless browser automation is explicitly requested.
 
 `gravity-loom.html` is Gravity Loom, a process test for the shared design philosophy. It is visually strong, graphically solid, and has a strong UI, but playtesting showed that the concept itself is not as exciting as the best particle engines. Keep that distinction visible when evaluating future experiments: polished execution is necessary, but not the same as concept strength.
+
+`barycentric-dawn.html` is Barycentric Dawn, a scaled Newtonian three-body simulation with two stars and one terrestrial planet. It layers orbital trails, particle-only gravity distortion, procedural starfield, instanced solar wind, stellar corona embers, ecliptic dust, ion sparks, mutually attracting gravity particles, troposphere scattering, cloud bands, aurora rings, and a bow-shock magnetosphere with continuous planet-local particle flow around the live body integration.
 
 ## License
 
