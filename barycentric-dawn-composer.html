@@ -1,0 +1,3523 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Barycentric Dawn Composer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #010208;
+            --ink: #f8f5ef;
+            --muted: rgba(248, 245, 239, 0.58);
+            --line: rgba(248, 245, 239, 0.07);
+            --line-glow: rgba(255, 214, 158, 0.22);
+            --panel: rgba(4, 6, 12, 0.06);
+            --panel-edge: rgba(255, 214, 158, 0.06);
+            --gold: #ffe4b0;
+            --amber: #ffb06a;
+            --cyan: #8aefff;
+            --blue: #6eb4ff;
+            --green: #9ef8d0;
+            --rose: #ff85a8;
+            --violet: #c9b4ff;
+            --radius: 7px;
+            --display: "Cormorant Garamond", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+            --ui: "DM Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: var(--ui);
+            letter-spacing: 0.01em;
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        button {
+            color: inherit;
+        }
+
+        #stage {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background:
+                radial-gradient(ellipse 90% 60% at 14% 18%, rgba(255, 176, 106, 0.06), transparent 42%),
+                radial-gradient(ellipse 70% 50% at 82% 62%, rgba(138, 239, 255, 0.05), transparent 38%),
+                linear-gradient(180deg, #040610 0%, #020308 58%, #010106 100%);
+        }
+
+        #stage canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .grain,
+        .vignette,
+        .ecliptic-scrim,
+        .film-leader,
+        .letterbox {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .grain {
+            opacity: 0.035;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+            mix-blend-mode: overlay;
+            animation: filmGrain 8s steps(6) infinite;
+        }
+
+        @keyframes filmGrain {
+            0%, 100% { transform: translate3d(0, 0, 0); }
+            20% { transform: translate3d(-1.5%, 1%, 0); }
+            40% { transform: translate3d(1%, -0.5%, 0); }
+            60% { transform: translate3d(-0.5%, -1%, 0); }
+            80% { transform: translate3d(1.5%, 0.5%, 0); }
+        }
+
+        .ecliptic-scrim {
+            opacity: 0.2;
+            background:
+                linear-gradient(8.5deg, transparent 44.5%, rgba(138, 239, 255, 0.09) 49.2%, rgba(255, 228, 176, 0.07) 50.8%, transparent 55.5%);
+            mix-blend-mode: screen;
+        }
+
+        .vignette {
+            background:
+                radial-gradient(ellipse 78% 64% at 50% 46%, transparent 52%, rgba(0, 0, 0, 0.38) 100%),
+                linear-gradient(to right, rgba(0, 0, 0, 0.52), transparent 16%, transparent 84%, rgba(0, 0, 0, 0.48)),
+                linear-gradient(to bottom, rgba(0, 0, 0, 0.38), transparent 18%, transparent 76%, rgba(0, 0, 0, 0.58));
+        }
+
+        .letterbox::before,
+        .letterbox::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: clamp(10px, 2.4vh, 28px);
+            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.52));
+        }
+
+        .letterbox::before {
+            top: 0;
+        }
+
+        .letterbox::after {
+            bottom: 0;
+            transform: rotate(180deg);
+        }
+
+        .film-leader {
+            top: auto;
+            bottom: clamp(18px, 4.2vh, 52px);
+            height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(255, 228, 176, 0.18) 12%, rgba(138, 239, 255, 0.22) 50%, rgba(255, 228, 176, 0.18) 88%, transparent);
+            opacity: 0.72;
+        }
+
+        .hud {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            z-index: 20;
+            max-width: 300px;
+            pointer-events: none;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            color: var(--muted);
+            font-size: 8px;
+            font-weight: 600;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+        }
+
+        .mark {
+            position: relative;
+            width: 22px;
+            height: 22px;
+            border: 1px solid rgba(255, 228, 176, 0.42);
+            border-radius: 50%;
+            box-shadow: 0 0 16px rgba(255, 176, 106, 0.12);
+        }
+
+        .mark::before,
+        .mark::after {
+            content: "";
+            position: absolute;
+            border-radius: 50%;
+        }
+
+        .mark::before {
+            inset: 4px;
+            border: 1px solid rgba(138, 239, 255, 0.38);
+            transform: rotate(32deg) scaleX(1.48);
+        }
+
+        .mark::after {
+            inset: 8px;
+            background: linear-gradient(135deg, var(--gold), var(--amber));
+            box-shadow: 0 0 10px rgba(255, 228, 176, 0.36);
+        }
+
+        h1 {
+            margin: 0;
+            font-family: var(--display);
+            font-size: clamp(20px, 2.8vw, 30px);
+            font-weight: 500;
+            font-style: italic;
+            line-height: 0.96;
+            letter-spacing: -0.01em;
+            text-shadow: 0 0 24px rgba(255, 228, 176, 0.1);
+        }
+
+        .subtitle {
+            margin: 4px 0 0;
+            color: rgba(248, 245, 239, 0.42);
+            font-size: 8px;
+            font-weight: 600;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+
+        .readout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 10px;
+            margin-top: 8px;
+            color: rgba(248, 245, 239, 0.46);
+            font-size: 8px;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .readout strong {
+            color: rgba(248, 245, 239, 0.82);
+        }
+
+        .timeline {
+            position: relative;
+            height: 2px;
+            max-width: 180px;
+            margin-top: 8px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: rgba(248, 245, 239, 0.05);
+        }
+
+        .timeline-fill {
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 0%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--cyan), var(--gold));
+            box-shadow: 0 0 8px rgba(255, 228, 176, 0.22);
+            transition: width 240ms ease;
+        }
+
+        .side-panel {
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            z-index: 22;
+            display: grid;
+            gap: 8px;
+            width: 228px;
+            pointer-events: none;
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(8px) saturate(115%);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            pointer-events: auto;
+        }
+
+        .panel-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 8px 10px 0;
+        }
+
+        .panel h2 {
+            margin: 0;
+            font-family: var(--display);
+            font-size: 15px;
+            font-weight: 500;
+            font-style: italic;
+            letter-spacing: -0.01em;
+            line-height: 1;
+        }
+
+        .badge {
+            align-self: start;
+            padding: 2px 6px;
+            border: 1px solid rgba(255, 228, 176, 0.14);
+            border-radius: 999px;
+            color: rgba(255, 228, 176, 0.72);
+            font-size: 7px;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .panel p {
+            min-height: 0;
+            margin: 6px 10px 8px;
+            color: rgba(248, 245, 239, 0.44);
+            font-size: 10px;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1px;
+            overflow: hidden;
+            border-top: 1px solid var(--line);
+            border-radius: 0 0 var(--radius) var(--radius);
+            background: var(--line);
+        }
+
+        .stat-cell {
+            min-width: 0;
+            padding: 6px 8px;
+            background: rgba(4, 6, 12, 0.04);
+        }
+
+        .stat-cell span,
+        .slider label span {
+            display: block;
+            color: rgba(248, 245, 239, 0.42);
+            font-size: 7px;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .stat-cell strong {
+            display: block;
+            margin-top: 2px;
+            overflow: hidden;
+            color: rgba(248, 245, 239, 0.82);
+            font-size: 12px;
+            font-variant-numeric: tabular-nums;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .log {
+            display: grid;
+            gap: 5px;
+            max-height: 72px;
+            overflow: hidden;
+            padding: 8px 10px 9px;
+            color: rgba(248, 245, 239, 0.44);
+            font-size: 9px;
+            line-height: 1.3;
+        }
+
+        .log-entry {
+            display: grid;
+            grid-template-columns: 44px 1fr;
+            gap: 6px;
+        }
+
+        .log-entry strong {
+            color: rgba(138, 239, 255, 0.72);
+            font-size: 7px;
+            text-transform: uppercase;
+        }
+
+        .controls {
+            position: fixed;
+            right: 12px;
+            bottom: 14px;
+            left: 12px;
+            z-index: 24;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            max-width: 980px;
+            margin: 0 auto;
+            pointer-events: none;
+        }
+
+        .control-panel {
+            display: grid;
+            gap: 6px;
+            padding: 8px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(8px) saturate(115%);
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.1);
+            pointer-events: auto;
+        }
+
+        .control-panel-sliders {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            column-gap: 10px;
+        }
+
+        .control-panel-sliders .control-title {
+            grid-column: 1 / -1;
+        }
+
+        .control-title {
+            color: rgba(248, 245, 239, 0.42);
+            font-size: 7px;
+            font-weight: 600;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 5px;
+        }
+
+        .button-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        button {
+            min-height: 26px;
+            padding: 0 6px;
+            border: 1px solid rgba(248, 245, 239, 0.08);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.018);
+            cursor: pointer;
+            font-size: 8px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+        }
+
+        button:hover {
+            border-color: rgba(138, 239, 255, 0.32);
+            background: rgba(138, 239, 255, 0.04);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button.active {
+            border-color: rgba(255, 228, 176, 0.42);
+            background: rgba(255, 228, 176, 0.06);
+            box-shadow: inset 0 0 12px rgba(255, 228, 176, 0.04);
+        }
+
+        .slider {
+            display: grid;
+            gap: 3px;
+        }
+
+        .slider label {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .slider label strong {
+            color: rgba(248, 245, 239, 0.78);
+            font-size: 9px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 14px;
+            accent-color: var(--gold);
+        }
+
+        .labels {
+            position: fixed;
+            inset: 0;
+            z-index: 18;
+            pointer-events: none;
+        }
+
+        .label {
+            position: absolute;
+            min-width: 58px;
+            padding: 3px 6px;
+            border: 1px solid rgba(248, 245, 239, 0.08);
+            border-radius: 5px;
+            background: rgba(4, 6, 12, 0.12);
+            color: rgba(248, 245, 239, 0.68);
+            font-size: 7px;
+            font-weight: 600;
+            letter-spacing: 0.1em;
+            text-align: center;
+            text-transform: uppercase;
+            transform: translate(-50%, -50%);
+            backdrop-filter: blur(6px);
+        }
+
+        .label.barycenter {
+            color: var(--green);
+        }
+
+        @media (max-width: 1180px) {
+            .controls {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                max-width: 640px;
+            }
+        }
+
+        @media (max-width: 980px) {
+            .side-panel {
+                top: auto;
+                right: 10px;
+                bottom: 120px;
+                width: min(220px, calc(100vw - 20px));
+            }
+
+            .controls {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 6px;
+                max-width: none;
+            }
+
+            .control-panel {
+                gap: 5px;
+                padding: 7px;
+            }
+
+            .button-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 720px) {
+            .hud {
+                top: 10px;
+                left: 10px;
+                max-width: calc(100vw - 20px);
+            }
+
+            h1 {
+                max-width: 220px;
+                font-size: 18px;
+            }
+
+            .subtitle {
+                display: none;
+            }
+
+            .readout {
+                gap: 4px 8px;
+                font-size: 7px;
+            }
+
+            .side-panel {
+                display: none;
+            }
+
+            .controls {
+                right: 8px;
+                bottom: 8px;
+                left: 8px;
+                grid-template-columns: 1fr;
+            }
+
+            .control-panel-sliders {
+                grid-template-columns: 1fr;
+            }
+
+            .button-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .button-row button {
+                flex: 1 1 72px;
+            }
+
+            button {
+                min-height: 24px;
+                font-size: 7px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main id="stage" aria-label="Barycentric Dawn Composer three-body simulation"></main>
+    <div class="grain" aria-hidden="true"></div>
+    <div class="ecliptic-scrim" aria-hidden="true"></div>
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="letterbox" aria-hidden="true"></div>
+    <div class="film-leader" aria-hidden="true"></div>
+    <div id="labels" class="labels" aria-hidden="true"></div>
+
+    <section class="hud" aria-label="Barycentric Dawn Composer status">
+        <div class="brand"><span class="mark" aria-hidden="true"></span><span>Cinematic Orbital Suite</span></div>
+        <h1>Barycentric Dawn Composer</h1>
+        <p class="subtitle">Newtonian three-body cinematography</p>
+        <div class="readout">
+            <span>Regime <strong id="mode-readout">Twin Dawn</strong></span>
+            <span>Days <strong id="day-readout">0</strong></span>
+            <span>Flux <strong id="flux-readout">0.00</strong></span>
+            <span>Energy <strong id="energy-readout">0.00</strong></span>
+            <span>Shot <strong id="shot-readout">Wide</strong></span>
+        </div>
+        <div class="timeline" aria-hidden="true"><div id="timeline-fill" class="timeline-fill"></div></div>
+    </section>
+
+    <aside class="side-panel">
+        <section class="panel" aria-label="Body inspection">
+            <div class="panel-head">
+                <h2 id="selected-name">Planet Aurelia</h2>
+                <span id="selected-kind" class="badge">Troposphere Online</span>
+            </div>
+            <p id="selected-copy">A cinematic Newtonian three-body suite: two luminous stars and one magnetized terrestrial world, scored with atmosphere, magnetosphere flow, solar wind, gravity streamlines, and orbital memory.</p>
+            <div class="stat-grid">
+                <div class="stat-cell"><span>Binary Span</span><strong id="binary-readout">0.0 AU</strong></div>
+                <div class="stat-cell"><span>Planet Speed</span><strong id="speed-readout">0.0 km/s</strong></div>
+                <div class="stat-cell"><span>Magnetopause</span><strong id="mag-readout">0.0 Rp</strong></div>
+                <div class="stat-cell"><span>Atmosphere</span><strong id="atmo-readout">0%</strong></div>
+            </div>
+        </section>
+        <section class="panel" aria-label="Simulation log">
+            <div class="panel-head">
+                <h2>Score Log</h2>
+                <span class="badge">Live Forces</span>
+            </div>
+            <div id="log" class="log"></div>
+        </section>
+    </aside>
+
+    <nav class="controls" aria-label="Barycentric Dawn Composer controls">
+        <section class="control-panel">
+            <div class="control-title">Orbital Regimes</div>
+            <div class="button-grid">
+                <button class="active" type="button" data-preset="dawn">Twin Dawn</button>
+                <button type="button" data-preset="resonance">Resonance</button>
+                <button type="button" data-preset="close">Close Binary</button>
+                <button type="button" data-preset="wander">Chaotic Pass</button>
+            </div>
+        </section>
+        <section class="control-panel">
+            <div class="control-title">Camera Shots</div>
+            <div class="button-grid">
+                <button class="active" type="button" data-shot="wide">Wide</button>
+                <button type="button" data-shot="binary">Binary</button>
+                <button type="button" data-shot="planet">Planet</button>
+                <button type="button" data-shot="drift">Drift</button>
+            </div>
+        </section>
+        <section class="control-panel">
+            <div class="control-title">Simulation</div>
+            <div class="button-row">
+                <button id="pause-btn" type="button">Pause</button>
+                <button id="flare-btn" type="button">Flare</button>
+                <button id="reset-btn" type="button">Reset</button>
+                <button id="labels-btn" class="active" type="button">Labels</button>
+                <button id="trails-btn" class="active" type="button">Trails</button>
+                <button id="field-btn" class="active" type="button">Fields</button>
+            </div>
+        </section>
+        <section class="control-panel control-panel-sliders">
+            <div class="control-title">Force Layers</div>
+            <div class="slider">
+                <label for="time-slider"><span>Time Scale</span><strong id="time-label">7.0x</strong></label>
+                <input id="time-slider" type="range" min="0" max="18" value="7" step="0.1">
+            </div>
+            <div class="slider">
+                <label for="gravity-slider"><span>Gravity</span><strong id="gravity-label">1.00</strong></label>
+                <input id="gravity-slider" type="range" min="0.55" max="1.6" value="1" step="0.01">
+            </div>
+            <div class="slider">
+                <label for="atmo-slider"><span>Troposphere</span><strong id="atmo-label">78%</strong></label>
+                <input id="atmo-slider" type="range" min="0" max="100" value="78" step="1">
+            </div>
+            <div class="slider">
+                <label for="mag-slider"><span>Magnetosphere</span><strong id="mag-label">82%</strong></label>
+                <input id="mag-slider" type="range" min="0" max="100" value="82" step="1">
+            </div>
+            <div class="slider">
+                <label for="flux-slider"><span>Solar Wind</span><strong id="flux-label">64%</strong></label>
+                <input id="flux-slider" type="range" min="12" max="100" value="64" step="1">
+            </div>
+            <div class="slider">
+                <label for="bloom-slider"><span>Bloom</span><strong id="bloom-label">40%</strong></label>
+                <input id="bloom-slider" type="range" min="20" max="120" value="40" step="1">
+            </div>
+            <div class="slider">
+                <label for="grade-slider"><span>Grade</span><strong id="grade-label">24%</strong></label>
+                <input id="grade-slider" type="range" min="0" max="100" value="24" step="1">
+            </div>
+        </section>
+    </nav>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.174.0/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from "three";
+        import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+        import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+        import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+        import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+        import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+        import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+
+        const stage = document.getElementById("stage");
+        const labelsLayer = document.getElementById("labels");
+        const isCompact = window.matchMedia("(max-width: 720px)").matches;
+        const tmpVector = new THREE.Vector3();
+        const tmpVectorB = new THREE.Vector3();
+        const tmpVectorC = new THREE.Vector3();
+        const tmpVectorD = new THREE.Vector3();
+        const cameraTarget = new THREE.Vector3(0, 1.5, 0);
+        const cameraPosition = new THREE.Vector3(0, 48, isCompact ? 112 : 96);
+        const desiredCameraPosition = new THREE.Vector3();
+        const desiredCameraTarget = new THREE.Vector3();
+        const localXAxis = new THREE.Vector3(1, 0, 0);
+        const clock = new THREE.Clock();
+        const instanceDummy = new THREE.Object3D();
+
+        const ui = {
+            modeReadout: document.getElementById("mode-readout"),
+            dayReadout: document.getElementById("day-readout"),
+            fluxReadout: document.getElementById("flux-readout"),
+            energyReadout: document.getElementById("energy-readout"),
+            selectedName: document.getElementById("selected-name"),
+            selectedKind: document.getElementById("selected-kind"),
+            selectedCopy: document.getElementById("selected-copy"),
+            binaryReadout: document.getElementById("binary-readout"),
+            speedReadout: document.getElementById("speed-readout"),
+            magReadout: document.getElementById("mag-readout"),
+            atmoReadout: document.getElementById("atmo-readout"),
+            log: document.getElementById("log"),
+            pauseBtn: document.getElementById("pause-btn"),
+            flareBtn: document.getElementById("flare-btn"),
+            resetBtn: document.getElementById("reset-btn"),
+            labelsBtn: document.getElementById("labels-btn"),
+            trailsBtn: document.getElementById("trails-btn"),
+            fieldBtn: document.getElementById("field-btn"),
+            timeSlider: document.getElementById("time-slider"),
+            gravitySlider: document.getElementById("gravity-slider"),
+            atmoSlider: document.getElementById("atmo-slider"),
+            magSlider: document.getElementById("mag-slider"),
+            fluxSlider: document.getElementById("flux-slider"),
+            timeLabel: document.getElementById("time-label"),
+            gravityLabel: document.getElementById("gravity-label"),
+            atmoLabel: document.getElementById("atmo-label"),
+            magLabel: document.getElementById("mag-label"),
+            fluxLabel: document.getElementById("flux-label"),
+            bloomSlider: document.getElementById("bloom-slider"),
+            gradeSlider: document.getElementById("grade-slider"),
+            bloomLabel: document.getElementById("bloom-label"),
+            gradeLabel: document.getElementById("grade-label"),
+            shotReadout: document.getElementById("shot-readout"),
+            timelineFill: document.getElementById("timeline-fill")
+        };
+
+        const shotModes = {
+            wide: {
+                name: "Wide",
+                offset: new THREE.Vector3(0, 52, 108),
+                target: new THREE.Vector3(0, 2, 0),
+                fov: 52,
+                drift: 0.18
+            },
+            binary: {
+                name: "Binary",
+                offset: new THREE.Vector3(18, 22, 54),
+                target: new THREE.Vector3(0, 0, 0),
+                fov: 46,
+                drift: 0.24
+            },
+            planet: {
+                name: "Planet",
+                offset: new THREE.Vector3(-14, 8, 22),
+                target: new THREE.Vector3(0, 0, 0),
+                fov: 42,
+                drift: 0.12
+            },
+            drift: {
+                name: "Drift",
+                offset: new THREE.Vector3(36, 18, 88),
+                target: new THREE.Vector3(0, 1, 0),
+                fov: 58,
+                drift: 0.42
+            }
+        };
+
+        const colorGradeShader = {
+            uniforms: {
+                tDiffuse: { value: null },
+                grade: { value: 0.24 },
+                time: { value: 0 }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform float grade;
+                uniform float time;
+                varying vec2 vUv;
+
+                void main() {
+                    vec2 uv = vUv;
+                    vec2 offset = (uv - 0.5) * grade * 0.0012;
+                    vec3 color = vec3(
+                        texture2D(tDiffuse, uv + offset).r,
+                        texture2D(tDiffuse, uv).g,
+                        texture2D(tDiffuse, uv - offset).b
+                    );
+
+                    float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+                    vec3 warm = vec3(1.04, 0.99, 0.94);
+                    vec3 cool = vec3(0.94, 0.97, 1.04);
+                    color *= mix(vec3(1.0), mix(cool, warm, smoothstep(0.28, 0.88, luma)), grade * 0.28);
+
+                    color = mix(vec3(luma), color, 1.0 + grade * 0.04);
+                    color = (color - 0.5) * (1.0 + grade * 0.06) + 0.5;
+
+                    gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+                }
+            `
+        };
+
+        const presets = {
+            dawn: {
+                name: "Twin Dawn",
+                separation: 24,
+                planetDistance: 58,
+                planetAngle: 0.82,
+                eccentricity: 0.04,
+                tilt: 0.08,
+                copy: "A broad circumbinary orbit with a terrestrial planet riding the combined gravity well of two suns."
+            },
+            resonance: {
+                name: "Resonance",
+                separation: 28,
+                planetDistance: 50,
+                planetAngle: 1.45,
+                eccentricity: 0.17,
+                tilt: 0.16,
+                copy: "A tighter resonant orbit where the planet samples stronger tides and visible magnetopause breathing."
+            },
+            close: {
+                name: "Close Binary",
+                separation: 17,
+                planetDistance: 44,
+                planetAngle: 0.42,
+                eccentricity: 0.11,
+                tilt: 0.24,
+                copy: "A compact binary with brighter flux, faster stellar motion, and compressed particle flow around the planet."
+            },
+            wander: {
+                name: "Chaotic Pass",
+                separation: 22,
+                planetDistance: 38,
+                planetAngle: 2.1,
+                eccentricity: 0.34,
+                tilt: 0.36,
+                copy: "A deliberately unstable flyby-like configuration that lets the three-body dynamics become visibly unruly."
+            }
+        };
+
+        const state = {
+            preset: "dawn",
+            shot: "wide",
+            paused: false,
+            labels: true,
+            trails: true,
+            fields: true,
+            timeScale: 7,
+            gravityScale: 1,
+            atmosphere: 0.78,
+            magnetosphere: 0.82,
+            flux: 0.64,
+            bloom: 0.4,
+            grade: 0.24,
+            flare: 0,
+            simDays: 0,
+            frame: 0,
+            selectedId: "planet",
+            energyBaseline: 0,
+            cameraManual: false,
+            cameraManualTimer: 0
+        };
+
+        const colors = {
+            starA: new THREE.Color(0xffcf7c),
+            starB: new THREE.Color(0x8fdfff),
+            starAHot: new THREE.Color(0xffffff),
+            starBHot: new THREE.Color(0xdff8ff),
+            planet: new THREE.Color(0x2f74c7),
+            atmo: new THREE.Color(0x82dcff),
+            magnet: new THREE.Color(0x7fffd4),
+            gravity: new THREE.Color(0xffd17a),
+            green: new THREE.Color(0x8ff4c5),
+            cyan: new THREE.Color(0x7fe7ff),
+            violet: new THREE.Color(0xbda7ff),
+            rose: new THREE.Color(0xff6f98),
+            gravityParticle: new THREE.Color(0xff2f2f)
+        };
+
+        const BASE_G = 78;
+        const SOFTENING = 1.2;
+        const TRAIL_LENGTH = isCompact ? 320 : 560;
+        const WIND_COUNT = isCompact ? 920 : 1800;
+        const STAR_COUNT = isCompact ? 2800 : 6400;
+        const EMBER_COUNT = isCompact ? 520 : 980;
+        const DUST_COUNT = isCompact ? 640 : 1180;
+        const ION_COUNT = isCompact ? 320 : 620;
+        const GRAVITY_PARTICLE_COUNT = isCompact ? 640 : 1120;
+        const MAGNETOSPHERE_FLOW_COUNT = isCompact ? 520 : 960;
+        const GRAVITY_PARTICLE_G = 14.0;
+        const GRAVITY_PARTICLE_SOFTENING = 18.0;
+        const GRAVITY_PARTICLE_OPACITY = 0.4;
+
+        let renderer;
+        let scene;
+        let camera;
+        let controls;
+        let composer;
+        let bloomPass;
+        let gradePass;
+        let nebulaDome;
+        let bodies = [];
+        let bodyById = new Map();
+        let accelerations = [];
+        let gravityLines;
+        let gravityLinePositions;
+        let barycenterMarker;
+        let eclipticField;
+        let starfield;
+        let windSystem;
+        let emberSystem;
+        let dustSystem;
+        let ionSystem;
+        let gravityParticleSystem;
+        let magnetosphere;
+        let raycaster;
+        let pointer;
+        let labelMap = new Map();
+        let shaderMaterials = [];
+
+        init();
+        animate();
+
+        function init() {
+            scene = new THREE.Scene();
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, isCompact ? 1.35 : 1.8));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 0.96;
+            stage.appendChild(renderer.domElement);
+
+            camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 1800);
+            camera.position.copy(cameraPosition);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.048;
+            controls.minDistance = 28;
+            controls.maxDistance = 260;
+            controls.target.copy(cameraTarget);
+            controls.addEventListener("start", () => {
+                state.cameraManual = true;
+                state.cameraManualTimer = 0;
+            });
+            controls.addEventListener("change", () => {
+                if (state.cameraManual) {
+                    state.cameraManualTimer = 0;
+                }
+            });
+
+            composer = new EffectComposer(renderer);
+            composer.addPass(new RenderPass(scene, camera));
+            bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.58, 0.5, 0.18);
+            composer.addPass(bloomPass);
+            gradePass = new ShaderPass(colorGradeShader);
+            composer.addPass(gradePass);
+            composer.addPass(new OutputPass());
+
+            scene.add(new THREE.AmbientLight(0x283248, 0.18));
+
+            createNebulaDome();
+            createStarfield();
+            createEclipticField();
+            createGravityLines();
+            createBarycenterMarker();
+            createMagnetosphere();
+            createSolarWind();
+            createStellarEmbers();
+            createEclipticDust();
+            createIonSparks();
+            createGravityParticles();
+            resetSystem("dawn");
+            bindEvents();
+            applyShot("wide", true);
+            addLog("Init", "Composer frame and color pipeline online.");
+
+            window.__barycentricDawnComposerReady = true;
+        }
+
+        function createNebulaDome() {
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 }
+                },
+                vertexShader: `
+                    varying vec3 vDirection;
+                    void main() {
+                        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                        vDirection = normalize(worldPosition.xyz);
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    varying vec3 vDirection;
+
+                    void main() {
+                        vec3 dir = normalize(vDirection);
+                        float horizon = smoothstep(-0.08, 0.42, dir.y);
+                        float gold = smoothstep(0.18, 0.92, sin(dir.x * 4.2 + time * 0.08) * 0.5 + 0.5);
+                        float cyan = smoothstep(0.22, 0.88, sin(dir.z * 5.1 - time * 0.06) * 0.5 + 0.5);
+                        vec3 color = mix(vec3(0.01, 0.015, 0.04), vec3(0.08, 0.05, 0.12), horizon);
+                        color += vec3(0.18, 0.08, 0.03) * gold * 0.16 * (1.0 - horizon);
+                        color += vec3(0.03, 0.12, 0.18) * cyan * 0.14 * (1.0 - horizon);
+                        gl_FragColor = vec4(color, 0.24);
+                    }
+                `,
+                transparent: true,
+                depthWrite: false,
+                side: THREE.BackSide
+            });
+            shaderMaterials.push(material);
+            nebulaDome = new THREE.Mesh(new THREE.SphereGeometry(880, 48, 24), material);
+            nebulaDome.renderOrder = -2;
+            scene.add(nebulaDome);
+        }
+
+        function bindEvents() {
+            document.querySelectorAll("[data-preset]").forEach((button) => {
+                button.addEventListener("click", () => {
+                    document.querySelectorAll("[data-preset]").forEach((candidate) => candidate.classList.toggle("active", candidate === button));
+                    resetSystem(button.dataset.preset);
+                });
+            });
+
+            document.querySelectorAll("[data-shot]").forEach((button) => {
+                button.addEventListener("click", () => {
+                    document.querySelectorAll("[data-shot]").forEach((candidate) => candidate.classList.toggle("active", candidate === button));
+                    applyShot(button.dataset.shot);
+                    addLog("Shot", `${shotModes[button.dataset.shot].name} composition engaged.`);
+                });
+            });
+
+            ui.pauseBtn.addEventListener("click", () => {
+                state.paused = !state.paused;
+                ui.pauseBtn.classList.toggle("active", state.paused);
+                ui.pauseBtn.textContent = state.paused ? "Resume" : "Pause";
+                addLog("Clock", state.paused ? "Simulation clock held." : "Simulation clock released.");
+            });
+
+            ui.flareBtn.addEventListener("click", () => {
+                state.flare = Math.min(1.8, state.flare + 0.9);
+                addLog("Flare", "Stellar wind density and corona bloom surged.");
+            });
+
+            ui.resetBtn.addEventListener("click", () => resetSystem(state.preset));
+
+            ui.labelsBtn.addEventListener("click", () => {
+                state.labels = !state.labels;
+                ui.labelsBtn.classList.toggle("active", state.labels);
+                labelsLayer.style.display = state.labels ? "block" : "none";
+            });
+
+            ui.trailsBtn.addEventListener("click", () => {
+                state.trails = !state.trails;
+                ui.trailsBtn.classList.toggle("active", state.trails);
+                bodies.forEach((body) => {
+                    if (body.trailLine) {
+                        body.trailLine.visible = state.trails;
+                    }
+                    if (body.trailGlowLine) {
+                        body.trailGlowLine.visible = state.trails;
+                    }
+                });
+            });
+
+            ui.fieldBtn.addEventListener("click", () => {
+                state.fields = !state.fields;
+                ui.fieldBtn.classList.toggle("active", state.fields);
+                gravityLines.visible = state.fields;
+                magnetosphere.group.visible = state.fields;
+                windSystem.mesh.visible = state.fields;
+                emberSystem.mesh.visible = state.fields;
+                dustSystem.mesh.visible = state.fields;
+                ionSystem.mesh.visible = state.fields;
+                if (gravityParticleSystem) {
+                    gravityParticleSystem.points.visible = state.fields;
+                }
+            });
+
+            ui.timeSlider.addEventListener("input", () => {
+                state.timeScale = Number(ui.timeSlider.value);
+                ui.timeLabel.textContent = `${state.timeScale.toFixed(1)}x`;
+            });
+
+            ui.gravitySlider.addEventListener("input", () => {
+                state.gravityScale = Number(ui.gravitySlider.value);
+                ui.gravityLabel.textContent = state.gravityScale.toFixed(2);
+                if (bodies.length > 0) {
+                    accelerations = computeAccelerations();
+                }
+            });
+
+            ui.atmoSlider.addEventListener("input", () => {
+                state.atmosphere = Number(ui.atmoSlider.value) / 100;
+                ui.atmoLabel.textContent = `${Math.round(state.atmosphere * 100)}%`;
+            });
+
+            ui.magSlider.addEventListener("input", () => {
+                state.magnetosphere = Number(ui.magSlider.value) / 100;
+                ui.magLabel.textContent = `${Math.round(state.magnetosphere * 100)}%`;
+            });
+
+            ui.fluxSlider.addEventListener("input", () => {
+                state.flux = Number(ui.fluxSlider.value) / 100;
+                ui.fluxLabel.textContent = `${Math.round(state.flux * 100)}%`;
+            });
+
+            ui.bloomSlider.addEventListener("input", () => {
+                state.bloom = Number(ui.bloomSlider.value) / 100;
+                ui.bloomLabel.textContent = `${Math.round(state.bloom * 100)}%`;
+            });
+
+            ui.gradeSlider.addEventListener("input", () => {
+                state.grade = Number(ui.gradeSlider.value) / 100;
+                ui.gradeLabel.textContent = `${Math.round(state.grade * 100)}%`;
+            });
+
+            raycaster = new THREE.Raycaster();
+            pointer = new THREE.Vector2();
+            renderer.domElement.addEventListener("pointerdown", onPointerDown);
+            window.addEventListener("resize", onResize);
+        }
+
+        function resetSystem(presetKey = state.preset) {
+            state.preset = presetKey;
+            state.simDays = 0;
+            state.flare = 0;
+            state.selectedId = "planet";
+
+            bodies.forEach((body) => {
+                scene.remove(body.group);
+                if (body.trailLine) {
+                    scene.remove(body.trailLine);
+                }
+                if (body.trailGlowLine) {
+                    scene.remove(body.trailGlowLine);
+                }
+            });
+            bodies = [];
+            bodyById = new Map();
+            labelMap.forEach((label) => label.remove());
+            labelMap = new Map();
+
+            const preset = presets[presetKey];
+            const m1 = 1.16;
+            const m2 = 0.82;
+            const mp = 0.0055;
+            const separation = preset.separation;
+            const r1 = separation * m2 / (m1 + m2);
+            const r2 = separation * m1 / (m1 + m2);
+            const g = BASE_G * state.gravityScale;
+            const omega = Math.sqrt(g * (m1 + m2) / Math.pow(separation, 3));
+            const planetAngle = preset.planetAngle;
+            const planetDistance = preset.planetDistance;
+            const planetSpeed = Math.sqrt(g * (m1 + m2) / planetDistance) * (0.96 + preset.eccentricity * 0.42);
+            const tangent = new THREE.Vector3(-Math.sin(planetAngle), preset.tilt * 0.22, Math.cos(planetAngle)).normalize();
+
+            bodies.push(createBody({
+                id: "star-a",
+                name: "Saffron Primary",
+                kind: "G-Type Star",
+                copy: "The warmer primary anchors most of the binary mass and throws a gold corona through the ecliptic.",
+                mass: m1,
+                radius: 4.15,
+                position: new THREE.Vector3(-r1, 0, 0),
+                velocity: new THREE.Vector3(0, 0, -omega * r1),
+                color: colors.starA,
+                hotColor: colors.starAHot,
+                trailColor: new THREE.Color(0xffa95f),
+                fieldColor: new THREE.Color(0xffd17a),
+                type: "star"
+            }));
+
+            bodies.push(createBody({
+                id: "star-b",
+                name: "Blue Companion",
+                kind: "F-Type Star",
+                copy: "The blue-white companion whips around the barycenter, modulating the planet's tides and upper-atmosphere flux.",
+                mass: m2,
+                radius: 3.35,
+                position: new THREE.Vector3(r2, 0, 0),
+                velocity: new THREE.Vector3(0, 0, omega * r2),
+                color: colors.starB,
+                hotColor: colors.starBHot,
+                trailColor: new THREE.Color(0x65dfff),
+                fieldColor: new THREE.Color(0x7fe7ff),
+                type: "star"
+            }));
+
+            bodies.push(createBody({
+                id: "planet",
+                name: "Planet Aurelia",
+                kind: "Magnetized Terrestrial",
+                copy: "A small terrestrial world with procedural oceans, cloud bands, troposphere scattering, aurora, and a bow-shock magnetosphere.",
+                mass: mp,
+                radius: 2.35,
+                position: new THREE.Vector3(Math.cos(planetAngle) * planetDistance, preset.tilt * 8, Math.sin(planetAngle) * planetDistance),
+                velocity: tangent.multiplyScalar(planetSpeed),
+                color: colors.planet,
+                trailColor: new THREE.Color(0x82ffbd),
+                fieldColor: new THREE.Color(0x8ff4c5),
+                type: "planet"
+            }));
+
+            centerBarycentricFrame();
+            removeBarycentricVelocity();
+            accelerations = computeAccelerations();
+            bodies.forEach((body) => {
+                createTrail(body);
+                updateBodyVisual(body, 0);
+                createLabel(body.id, body.name);
+                bodyById.set(body.id, body);
+            });
+
+            createLabel("barycenter", "Barycenter", true);
+            if (windSystem) {
+                updateSolarWind(0);
+            }
+            if (gravityParticleSystem) {
+                seedGravityParticles();
+            }
+            state.energyBaseline = computeTotalEnergy();
+            ui.modeReadout.textContent = preset.name;
+            setSelected("planet");
+            applyShot(state.shot, false);
+            addLog("Regime", `${preset.name} loaded.`);
+        }
+
+        function createBody(spec) {
+            const body = {
+                ...spec,
+                position: spec.position.clone(),
+                velocity: spec.velocity.clone(),
+                group: new THREE.Group(),
+                trailHistory: [],
+                selectable: []
+            };
+
+            body.group.name = spec.name;
+
+            if (spec.type === "star") {
+                buildStar(body);
+            } else {
+                buildPlanet(body);
+            }
+
+            scene.add(body.group);
+            return body;
+        }
+
+        function buildStar(body) {
+            const sphere = new THREE.Mesh(
+                new THREE.SphereGeometry(body.radius, 72, 72),
+                createStarMaterial(body.color, body.hotColor)
+            );
+            sphere.userData.bodyId = body.id;
+            body.selectable.push(sphere);
+
+            const corona = new THREE.Mesh(
+                new THREE.SphereGeometry(body.radius * 1.68, 72, 72),
+                createCoronaMaterial(body.color, 0.3)
+            );
+            corona.userData.corona = true;
+
+            const outer = new THREE.Mesh(
+                new THREE.SphereGeometry(body.radius * 2.45, 72, 72),
+                createCoronaMaterial(body.color, 0.1)
+            );
+            outer.userData.corona = true;
+
+            const streak = new THREE.Mesh(
+                new THREE.PlaneGeometry(body.radius * 8.4, body.radius * 0.42),
+                createLensStreakMaterial(body.color)
+            );
+            streak.rotation.y = Math.PI / 2;
+            streak.userData.corona = true;
+            body.lensStreak = streak;
+
+            const light = new THREE.PointLight(body.color, body.id === "star-a" ? 8.2 : 6.6, 240, 1.4);
+            light.position.set(0, 0, 0);
+
+            body.group.add(sphere, corona, outer, streak, light);
+            body.mesh = sphere;
+            body.corona = corona;
+            body.outerCorona = outer;
+            body.light = light;
+        }
+
+        function buildPlanet(body) {
+            const planetMap = createPlanetTexture();
+            const bumpMap = createPlanetBumpTexture();
+            const cloudMap = createCloudTexture();
+
+            const surface = new THREE.Mesh(
+                new THREE.SphereGeometry(body.radius, 96, 96),
+                new THREE.MeshStandardMaterial({
+                    map: planetMap,
+                    bumpMap,
+                    bumpScale: 0.08,
+                    roughness: 0.88,
+                    metalness: 0.02
+                })
+            );
+            surface.userData.bodyId = body.id;
+            body.selectable.push(surface);
+
+            const clouds = new THREE.Mesh(
+                new THREE.SphereGeometry(body.radius * 1.018, 96, 96),
+                new THREE.MeshStandardMaterial({
+                    map: cloudMap,
+                    transparent: true,
+                    opacity: 0.38,
+                    depthWrite: false,
+                    roughness: 1,
+                    metalness: 0
+                })
+            );
+
+            const atmosphere = new THREE.Mesh(
+                new THREE.SphereGeometry(body.radius * 1.09, 96, 96),
+                createAtmosphereMaterial(colors.atmo, 0.62)
+            );
+
+            const highAtmo = new THREE.Mesh(
+                new THREE.SphereGeometry(body.radius * 1.32, 96, 96),
+                createAtmosphereMaterial(new THREE.Color(0x4f9dff), 0.22)
+            );
+
+            const auroraNorth = createAuroraRing(body.radius, 1);
+            const auroraSouth = createAuroraRing(body.radius, -1);
+
+            body.group.add(surface, clouds, atmosphere, highAtmo, auroraNorth, auroraSouth);
+            body.mesh = surface;
+            body.clouds = clouds;
+            body.atmosphereShell = atmosphere;
+            body.highAtmo = highAtmo;
+            body.auroraNorth = auroraNorth;
+            body.auroraSouth = auroraSouth;
+        }
+
+        function createStarMaterial(baseColor, hotColor) {
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    flare: { value: 0 },
+                    baseColor: { value: baseColor },
+                    hotColor: { value: hotColor }
+                },
+                vertexShader: `
+                    varying vec3 vWorld;
+                    varying vec3 vNormal;
+
+                    void main() {
+                        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                        vWorld = worldPosition.xyz;
+                        vNormal = normalize(mat3(modelMatrix) * normal);
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform float flare;
+                    uniform vec3 baseColor;
+                    uniform vec3 hotColor;
+                    varying vec3 vWorld;
+                    varying vec3 vNormal;
+
+                    void main() {
+                        float boil = sin(vWorld.x * 1.7 + time * 1.8)
+                            + sin(vWorld.y * 2.4 - time * 1.2)
+                            + sin((vWorld.z + vWorld.x) * 2.1 + time * 1.5);
+                        boil = 0.5 + 0.5 * sin(boil + time * 0.8);
+                        float spots = smoothstep(0.18, 0.96, boil);
+                        vec3 color = mix(baseColor, hotColor, spots * 0.58 + flare * 0.18);
+                        gl_FragColor = vec4(color, 1.0);
+                    }
+                `
+            });
+            shaderMaterials.push(material);
+            return material;
+        }
+
+        function createCoronaMaterial(color, opacity) {
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    flare: { value: 0 },
+                    color: { value: color },
+                    opacity: { value: opacity }
+                },
+                vertexShader: `
+                    varying vec3 vWorldPosition;
+                    varying vec3 vWorldNormal;
+
+                    void main() {
+                        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                        vWorldPosition = worldPosition.xyz;
+                        vWorldNormal = normalize(mat3(modelMatrix) * normal);
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform float flare;
+                    uniform vec3 color;
+                    uniform float opacity;
+                    varying vec3 vWorldPosition;
+                    varying vec3 vWorldNormal;
+
+                    void main() {
+                        vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
+                        float rim = pow(1.0 - max(dot(normalize(vWorldNormal), viewDirection), 0.0), 1.65);
+                        float pulse = 0.74 + 0.26 * sin(time * 2.2 + vWorldPosition.y * 0.28);
+                        float alpha = rim * opacity * pulse * (1.0 + flare * 0.55);
+                        gl_FragColor = vec4(color, alpha);
+                    }
+                `,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                side: THREE.BackSide
+            });
+            shaderMaterials.push(material);
+            return material;
+        }
+
+        function createLensStreakMaterial(color) {
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    flare: { value: 0 },
+                    color: { value: color },
+                    opacity: { value: 0.05 }
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    void main() {
+                        vUv = uv;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform float flare;
+                    uniform vec3 color;
+                    uniform float opacity;
+                    varying vec2 vUv;
+
+                    void main() {
+                        float x = abs(vUv.x - 0.5) * 2.0;
+                        float y = abs(vUv.y - 0.5) * 2.0;
+                        float streak = exp(-x * 6.0) * exp(-y * 28.0);
+                        float pulse = 0.82 + 0.18 * sin(time * 1.6);
+                        float alpha = streak * opacity * pulse * (1.0 + flare * 0.65);
+                        gl_FragColor = vec4(color, alpha);
+                    }
+                `,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                side: THREE.DoubleSide
+            });
+            shaderMaterials.push(material);
+            return material;
+        }
+
+        function createAtmosphereMaterial(color, opacity) {
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    color: { value: color },
+                    opacity: { value: opacity },
+                    atmo: { value: state.atmosphere }
+                },
+                vertexShader: `
+                    varying vec3 vWorldPosition;
+                    varying vec3 vWorldNormal;
+
+                    void main() {
+                        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                        vWorldPosition = worldPosition.xyz;
+                        vWorldNormal = normalize(mat3(modelMatrix) * normal);
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform vec3 color;
+                    uniform float opacity;
+                    uniform float atmo;
+                    varying vec3 vWorldPosition;
+                    varying vec3 vWorldNormal;
+
+                    void main() {
+                        vec3 viewDirection = normalize(cameraPosition - vWorldPosition);
+                        float rim = pow(1.0 - max(dot(normalize(vWorldNormal), viewDirection), 0.0), 2.05);
+                        float glow = smoothstep(0.02, 1.0, rim);
+                        gl_FragColor = vec4(color, glow * opacity * atmo);
+                    }
+                `,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                side: THREE.BackSide
+            });
+            shaderMaterials.push(material);
+            return material;
+        }
+
+        function createPlanetTexture() {
+            const canvas = document.createElement("canvas");
+            canvas.width = 1024;
+            canvas.height = 512;
+            const context = canvas.getContext("2d");
+            const image = context.createImageData(canvas.width, canvas.height);
+            const oceanA = [18, 60, 118];
+            const oceanB = [29, 116, 190];
+            const landA = [43, 111, 78];
+            const landB = [186, 155, 98];
+            const ice = [225, 239, 238];
+
+            for (let y = 0; y < canvas.height; y += 1) {
+                const v = y / canvas.height;
+                const lat = (v - 0.5) * Math.PI;
+                for (let x = 0; x < canvas.width; x += 1) {
+                    const u = x / canvas.width;
+                    const lon = u * Math.PI * 2;
+                    const ridge = Math.sin(lon * 2.2 + Math.sin(lat * 2.8) * 1.4)
+                        + 0.62 * Math.sin(lon * 5.1 - lat * 3.6)
+                        + 0.38 * Math.sin(lon * 10.6 + lat * 8.3);
+                    const cells = Math.sin((u * 31.0 + Math.sin(v * 18.0)) * 1.7) * Math.sin((v * 22.0 + Math.cos(u * 21.0)) * 1.3);
+                    const land = ridge + cells * 0.34 > 0.44 - Math.cos(lat) * 0.12;
+                    const polar = smoothstep(1.04, 1.38, Math.abs(lat));
+                    const coast = Math.abs(ridge - 0.48) < 0.08 ? 1 : 0;
+                    let color;
+
+                    if (polar > 0.42) {
+                        color = mixColor(land ? landB : ice, ice, polar);
+                    } else if (land) {
+                        color = mixColor(landA, landB, clamp((ridge + 1.6) / 3.2, 0, 1));
+                    } else {
+                        color = mixColor(oceanA, oceanB, clamp(0.35 + Math.sin(lat * 4.0) * 0.12 + ridge * 0.12, 0, 1));
+                    }
+
+                    if (coast && !land) {
+                        color = mixColor(color, [94, 178, 178], 0.28);
+                    }
+
+                    const shade = 0.88 + 0.12 * Math.sin(lon * 18.0 + lat * 7.0);
+                    const index = (y * canvas.width + x) * 4;
+                    image.data[index] = Math.round(color[0] * shade);
+                    image.data[index + 1] = Math.round(color[1] * shade);
+                    image.data[index + 2] = Math.round(color[2] * shade);
+                    image.data[index + 3] = 255;
+                }
+            }
+
+            context.putImageData(image, 0, 0);
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.colorSpace = THREE.SRGBColorSpace;
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.ClampToEdgeWrapping;
+            return texture;
+        }
+
+        function createPlanetBumpTexture() {
+            const canvas = document.createElement("canvas");
+            canvas.width = 512;
+            canvas.height = 256;
+            const context = canvas.getContext("2d");
+            const image = context.createImageData(canvas.width, canvas.height);
+
+            for (let y = 0; y < canvas.height; y += 1) {
+                const v = y / canvas.height;
+                for (let x = 0; x < canvas.width; x += 1) {
+                    const u = x / canvas.width;
+                    const n = Math.sin(u * 38.0) * 0.24
+                        + Math.sin((u + v) * 85.0) * 0.1
+                        + Math.sin(v * 42.0 + Math.cos(u * 24.0)) * 0.18;
+                    const value = Math.round(116 + n * 52);
+                    const index = (y * canvas.width + x) * 4;
+                    image.data[index] = value;
+                    image.data[index + 1] = value;
+                    image.data[index + 2] = value;
+                    image.data[index + 3] = 255;
+                }
+            }
+
+            context.putImageData(image, 0, 0);
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.ClampToEdgeWrapping;
+            return texture;
+        }
+
+        function createCloudTexture() {
+            const canvas = document.createElement("canvas");
+            canvas.width = 1024;
+            canvas.height = 512;
+            const context = canvas.getContext("2d");
+            const image = context.createImageData(canvas.width, canvas.height);
+
+            for (let y = 0; y < canvas.height; y += 1) {
+                const v = y / canvas.height;
+                const lat = (v - 0.5) * Math.PI;
+                for (let x = 0; x < canvas.width; x += 1) {
+                    const u = x / canvas.width;
+                    const bands = Math.sin(lat * 12.0 + Math.sin(u * 9.0) * 0.8);
+                    const swirls = Math.sin(u * 46.0 + Math.sin(v * 18.0) * 2.2) + Math.sin((u + v) * 71.0);
+                    const density = smoothstep(0.54, 1.16, bands * 0.45 + swirls * 0.28 + 0.45);
+                    const index = (y * canvas.width + x) * 4;
+                    image.data[index] = 245;
+                    image.data[index + 1] = 251;
+                    image.data[index + 2] = 255;
+                    image.data[index + 3] = Math.round(density * 215);
+                }
+            }
+
+            context.putImageData(image, 0, 0);
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.colorSpace = THREE.SRGBColorSpace;
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.ClampToEdgeWrapping;
+            return texture;
+        }
+
+        function createAuroraRing(radius, direction) {
+            const ring = new THREE.Mesh(
+                new THREE.TorusGeometry(radius * 0.72, 0.035, 10, 160),
+                new THREE.MeshBasicMaterial({
+                    color: direction > 0 ? 0x7fffd4 : 0xbda7ff,
+                    transparent: true,
+                    opacity: 0.56,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                })
+            );
+            ring.position.y = direction * radius * 0.86;
+            ring.rotation.x = Math.PI / 2;
+            ring.scale.set(1.25, 0.54, 1);
+            return ring;
+        }
+
+        function createStarfield() {
+            const texture = createStarfieldTexture();
+            const geometry = new THREE.SphereGeometry(900, 72, 36);
+            const material = new THREE.MeshBasicMaterial({
+                map: texture,
+                transparent: true,
+                opacity: 0.32,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                side: THREE.BackSide
+            });
+
+            starfield = new THREE.Mesh(geometry, material);
+            scene.add(starfield);
+        }
+
+        function createStarfieldTexture() {
+            const canvas = document.createElement("canvas");
+            canvas.width = 2048;
+            canvas.height = 1024;
+            const context = canvas.getContext("2d");
+            context.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (let i = 0; i < STAR_COUNT; i += 1) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const size = Math.random() < 0.965 ? 0.45 + Math.random() * 1.15 : 1.8 + Math.random() * 2.2;
+                const alpha = Math.random() < 0.965 ? 0.35 + Math.random() * 0.42 : 0.7 + Math.random() * 0.28;
+                const tint = Math.random();
+                const color = tint < 0.18
+                    ? "255,214,160"
+                    : tint > 0.82
+                        ? "184,220,255"
+                        : "248,251,255";
+                const gradient = context.createRadialGradient(x, y, 0, x, y, size * 2.6);
+                gradient.addColorStop(0, `rgba(${color},${alpha})`);
+                gradient.addColorStop(0.4, `rgba(${color},${alpha * 0.35})`);
+                gradient.addColorStop(1, `rgba(${color},0)`);
+                context.fillStyle = gradient;
+                context.beginPath();
+                context.arc(x, y, size * 2.6, 0, Math.PI * 2);
+                context.fill();
+
+                if (Math.random() > 0.985) {
+                    context.strokeStyle = `rgba(${color},${alpha * 0.42})`;
+                    context.lineWidth = 0.6;
+                    context.beginPath();
+                    context.moveTo(x - size * 4.2, y);
+                    context.lineTo(x + size * 4.2, y);
+                    context.moveTo(x, y - size * 4.2);
+                    context.lineTo(x, y + size * 4.2);
+                    context.stroke();
+                }
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.colorSpace = THREE.SRGBColorSpace;
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.ClampToEdgeWrapping;
+            return texture;
+        }
+
+        function createEclipticField() {
+            const group = new THREE.Group();
+            group.rotation.x = 0.03;
+
+            const discMaterial = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    opacity: { value: 0.48 }
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    varying vec3 vWorld;
+
+                    void main() {
+                        vUv = uv;
+                        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                        vWorld = worldPosition.xyz;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform float opacity;
+                    varying vec2 vUv;
+                    varying vec3 vWorld;
+
+                    void main() {
+                        vec2 centered = vUv - 0.5;
+                        float radius = length(centered) * 2.0;
+                        float angle = atan(centered.y, centered.x);
+
+                        if (radius > 1.0) {
+                            discard;
+                        }
+
+                        float edge = smoothstep(0.94, 0.72, radius) * smoothstep(0.04, 0.16, radius);
+                        float harmonics = sin(radius * 34.0 - time * 0.55) * 0.5 + 0.5;
+                        harmonics *= sin(radius * 11.0 + time * 0.22) * 0.35 + 0.65;
+                        float spiral = sin(angle * 2.0 + radius * 18.0 - time * 0.34) * 0.5 + 0.5;
+                        float pulse = 0.9 + sin(time * 0.7 + radius * 8.0) * 0.1;
+
+                        vec3 gold = vec3(1.0, 0.82, 0.48);
+                        vec3 cyan = vec3(0.48, 0.9, 1.0);
+                        vec3 violet = vec3(0.72, 0.62, 1.0);
+                        vec3 color = mix(gold, cyan, smoothstep(0.08, 0.72, radius));
+                        color = mix(color, violet, spiral * 0.18);
+
+                        float alpha = edge * (harmonics * 0.06 + spiral * 0.025) * pulse * opacity;
+                        gl_FragColor = vec4(color, alpha);
+                    }
+                `,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                side: THREE.DoubleSide
+            });
+            shaderMaterials.push(discMaterial);
+
+            const disc = new THREE.Mesh(new THREE.CircleGeometry(96, 128), discMaterial);
+            disc.rotation.x = -Math.PI / 2;
+            disc.renderOrder = 1;
+            group.add(disc);
+
+            const ringRadii = [
+                { radius: 24, tint: 0xffe4b0, strength: 0.24 },
+                { radius: 38, tint: 0x8aefff, strength: 0.2 },
+                { radius: 54, tint: 0xc9b4ff, strength: 0.16 },
+                { radius: 72, tint: 0x8aefff, strength: 0.13 },
+                { radius: 88, tint: 0xffe4b0, strength: 0.1 }
+            ];
+            const rings = [];
+
+            ringRadii.forEach((spec, index) => {
+                const ringMaterial = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { value: 0 },
+                        color: { value: new THREE.Color(spec.tint) },
+                        strength: { value: spec.strength },
+                        phase: { value: index * 1.37 }
+                    },
+                    vertexShader: `
+                        varying vec3 vWorld;
+                        varying vec3 vNormal;
+
+                        void main() {
+                            vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+                            vWorld = worldPosition.xyz;
+                            vNormal = normalize(mat3(modelMatrix) * normal);
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform float time;
+                        uniform vec3 color;
+                        uniform float strength;
+                        uniform float phase;
+                        varying vec3 vWorld;
+                        varying vec3 vNormal;
+
+                        void main() {
+                            vec3 viewDirection = normalize(cameraPosition - vWorld);
+                            float rim = pow(1.0 - abs(dot(normalize(vNormal), viewDirection)), 2.4);
+                            float wave = sin(vWorld.x * 0.18 + vWorld.z * 0.14 + time * 0.8 + phase) * 0.5 + 0.5;
+                            float alpha = rim * strength * (0.72 + wave * 0.28);
+                            gl_FragColor = vec4(color, alpha);
+                        }
+                    `,
+                    transparent: true,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false,
+                    side: THREE.DoubleSide
+                });
+                shaderMaterials.push(ringMaterial);
+
+                const ring = new THREE.Mesh(
+                    new THREE.TorusGeometry(spec.radius, 0.045, 8, 220),
+                    ringMaterial
+                );
+                ring.rotation.x = Math.PI / 2;
+                ring.renderOrder = 2;
+                group.add(ring);
+                rings.push(ring);
+            });
+
+            const arcCount = 6;
+            const arcMaterial = new THREE.LineBasicMaterial({
+                color: 0xffe4b0,
+                transparent: true,
+                opacity: 0.07,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            const arcs = [];
+
+            for (let i = 0; i < arcCount; i += 1) {
+                const baseAngle = i / arcCount * Math.PI * 2;
+                const arcSpan = Math.PI * 0.22;
+                const segments = 48;
+                const points = [];
+
+                for (let s = 0; s <= segments; s += 1) {
+                    const t = s / segments;
+                    const angle = baseAngle - arcSpan * 0.5 + arcSpan * t;
+                    const wobble = Math.sin(t * Math.PI) * 1.6;
+                    const radius = 90 + wobble;
+                    points.push(new THREE.Vector3(Math.cos(angle) * radius, 0, Math.sin(angle) * radius));
+                }
+
+                const arc = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), arcMaterial.clone());
+                arc.renderOrder = 3;
+                group.add(arc);
+                arcs.push(arc);
+            }
+
+            eclipticField = { group, disc, rings, arcs, discMaterial };
+            scene.add(group);
+        }
+
+        function createGravityLines() {
+            gravityLinePositions = new Float32Array(3 * 2 * 3);
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute("position", new THREE.BufferAttribute(gravityLinePositions, 3));
+            const material = new THREE.LineBasicMaterial({
+                color: 0xffd17a,
+                transparent: true,
+                opacity: 0.24,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                depthTest: false
+            });
+            gravityLines = new THREE.LineSegments(geometry, material);
+            gravityLines.renderOrder = 5;
+            scene.add(gravityLines);
+        }
+
+        function createBarycenterMarker() {
+            barycenterMarker = new THREE.Group();
+            const material = new THREE.MeshBasicMaterial({
+                color: 0x8ff4c5,
+                transparent: true,
+                opacity: 0.76,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            const ringA = new THREE.Mesh(new THREE.TorusGeometry(1.05, 0.018, 8, 72), material);
+            const ringB = new THREE.Mesh(new THREE.TorusGeometry(1.05, 0.018, 8, 72), material);
+            const core = new THREE.Mesh(new THREE.SphereGeometry(0.08, 16, 16), material);
+            ringB.rotation.x = Math.PI / 2;
+            barycenterMarker.add(ringA, ringB, core);
+            scene.add(barycenterMarker);
+        }
+
+        function createMagnetosphere() {
+            const group = new THREE.Group();
+            const flow = createMagnetosphereFlow();
+            group.add(flow.points);
+
+            const shockCount = isCompact ? 320 : 620;
+            const shockGeometry = new THREE.IcosahedronGeometry(0.075, 1);
+            const shockMaterial = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.62,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            const shock = new THREE.InstancedMesh(shockGeometry, shockMaterial, shockCount);
+            shock.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+            for (let i = 0; i < shockCount; i += 1) {
+                const angle = Math.random() * Math.PI * 2;
+                const spread = Math.sqrt(Math.random());
+                instanceDummy.position.set(
+                    -8.8 - spread * spread * 3.2 + THREE.MathUtils.randFloatSpread(0.8),
+                    Math.cos(angle) * spread * 8.0,
+                    Math.sin(angle) * spread * 5.4
+                );
+                instanceDummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+                instanceDummy.scale.setScalar(0.7 + Math.random() * 0.9);
+                instanceDummy.updateMatrix();
+                shock.setMatrixAt(i, instanceDummy.matrix);
+
+                const color = i % 3 === 0 ? colors.green : i % 3 === 1 ? colors.cyan : colors.violet;
+                shock.setColorAt(i, color);
+            }
+
+            if (shock.instanceColor) {
+                shock.instanceColor.needsUpdate = true;
+            }
+            group.add(shock);
+
+            magnetosphere = { group, flow, shock };
+            scene.add(group);
+        }
+
+        function createMagnetosphereFlow() {
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(MAGNETOSPHERE_FLOW_COUNT * 3);
+            const particleColors = new Float32Array(MAGNETOSPHERE_FLOW_COUNT * 3);
+            const sizes = new Float32Array(MAGNETOSPHERE_FLOW_COUNT);
+            const flowAlphas = new Float32Array(MAGNETOSPHERE_FLOW_COUNT);
+            const phases = new Float32Array(MAGNETOSPHERE_FLOW_COUNT);
+            const lanes = new Float32Array(MAGNETOSPHERE_FLOW_COUNT);
+            const shells = new Float32Array(MAGNETOSPHERE_FLOW_COUNT);
+            const speeds = new Float32Array(MAGNETOSPHERE_FLOW_COUNT);
+            const ripples = new Float32Array(MAGNETOSPHERE_FLOW_COUNT);
+            const palette = [colors.magnet, colors.cyan, colors.green, colors.violet];
+
+            const positionAttribute = new THREE.BufferAttribute(positions, 3);
+            const colorAttribute = new THREE.BufferAttribute(particleColors, 3);
+            const sizeAttribute = new THREE.BufferAttribute(sizes, 1);
+            const alphaAttribute = new THREE.BufferAttribute(flowAlphas, 1);
+            positionAttribute.setUsage(THREE.DynamicDrawUsage);
+            colorAttribute.setUsage(THREE.DynamicDrawUsage);
+            sizeAttribute.setUsage(THREE.DynamicDrawUsage);
+            alphaAttribute.setUsage(THREE.DynamicDrawUsage);
+            geometry.setAttribute("position", positionAttribute);
+            geometry.setAttribute("particleColor", colorAttribute);
+            geometry.setAttribute("particleSize", sizeAttribute);
+            geometry.setAttribute("flowAlpha", alphaAttribute);
+
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    opacity: { value: 0.58 },
+                    pointScale: { value: isCompact ? 560 : 700 },
+                    maxPointSize: { value: isCompact ? 15 : 20 }
+                },
+                vertexShader: `
+                    uniform float pointScale;
+                    uniform float maxPointSize;
+                    attribute vec3 particleColor;
+                    attribute float particleSize;
+                    attribute float flowAlpha;
+                    varying vec3 vColor;
+                    varying float vAlpha;
+
+                    void main() {
+                        vColor = particleColor;
+                        vAlpha = flowAlpha;
+                        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                        float perspective = pointScale / max(20.0, -mvPosition.z);
+                        gl_PointSize = clamp(particleSize * perspective, 3.0, maxPointSize);
+                        gl_Position = projectionMatrix * mvPosition;
+                    }
+                `,
+                fragmentShader: `
+                    uniform float opacity;
+                    uniform float time;
+                    varying vec3 vColor;
+                    varying float vAlpha;
+
+                    void main() {
+                        vec2 uv = gl_PointCoord * 2.0 - 1.0;
+                        float radius = length(uv);
+                        if (radius > 1.0) {
+                            discard;
+                        }
+
+                        float core = smoothstep(0.34, 0.02, radius);
+                        float halo = smoothstep(1.0, 0.12, radius);
+                        float pulse = 0.88 + sin(time * 2.3 + vAlpha * 5.0) * 0.12;
+                        vec3 color = vColor * (0.82 + halo * 0.9) + vec3(0.86, 1.0, 0.92) * core * 0.62;
+                        float alpha = opacity * vAlpha * pulse * (core * 0.86 + halo * 0.38);
+                        gl_FragColor = vec4(color, alpha);
+                    }
+                `,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                depthTest: false,
+                toneMapped: false
+            });
+
+            for (let i = 0; i < MAGNETOSPHERE_FLOW_COUNT; i += 1) {
+                const base = i * 3;
+                const color = palette[i % palette.length].clone().lerp(new THREE.Color(0xffffff), Math.random() * 0.18);
+                positions[base] = 10000;
+                positions[base + 1] = 10000;
+                positions[base + 2] = 10000;
+                particleColors[base] = color.r;
+                particleColors[base + 1] = color.g;
+                particleColors[base + 2] = color.b;
+                phases[i] = Math.random();
+                lanes[i] = (i * 2.3999632297 + THREE.MathUtils.randFloatSpread(0.22)) % (Math.PI * 2);
+                shells[i] = 0.74 + Math.random() * 0.76;
+                speeds[i] = 0.36 + Math.random() * 0.56;
+                ripples[i] = Math.random() * Math.PI * 2;
+                sizes[i] = 1.05 + Math.random() * 0.9;
+                flowAlphas[i] = 0;
+            }
+
+            const points = new THREE.Points(geometry, material);
+            points.frustumCulled = false;
+            points.renderOrder = 9;
+            points.name = "magnetosphere-particle-flow";
+
+            return {
+                count: MAGNETOSPHERE_FLOW_COUNT,
+                positions,
+                colors: particleColors,
+                sizes,
+                flowAlphas,
+                phases,
+                lanes,
+                shells,
+                speeds,
+                ripples,
+                geometry,
+                material,
+                points
+            };
+        }
+
+        function createSolarWind() {
+            const geometry = new THREE.IcosahedronGeometry(0.055, 1);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.56,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            const mesh = new THREE.InstancedMesh(geometry, material, WIND_COUNT);
+            mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            const particles = [];
+
+            for (let i = 0; i < WIND_COUNT; i += 1) {
+                const source = Math.random() > 0.47 ? "star-a" : "star-b";
+                const color = source === "star-a" ? colors.starA : colors.starB;
+                particles.push({
+                    source,
+                    phase: Math.random(),
+                    speed: 0.62 + Math.random() * 1.15,
+                    spread: 0.5 + Math.random() * 1.7,
+                    spin: Math.random() * Math.PI * 2,
+                    size: 0.65 + Math.random() * 0.75
+                });
+
+                instanceDummy.position.set(10000, 10000, 10000);
+                instanceDummy.scale.setScalar(0.01);
+                instanceDummy.updateMatrix();
+                mesh.setMatrixAt(i, instanceDummy.matrix);
+                mesh.setColorAt(i, color);
+            }
+
+            if (mesh.instanceColor) {
+                mesh.instanceColor.needsUpdate = true;
+            }
+            windSystem = { particles, mesh };
+            scene.add(mesh);
+        }
+
+        function createStellarEmbers() {
+            const geometry = new THREE.TetrahedronGeometry(0.09, 0);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.58,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            const mesh = new THREE.InstancedMesh(geometry, material, EMBER_COUNT);
+            mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            const particles = [];
+
+            for (let i = 0; i < EMBER_COUNT; i += 1) {
+                const source = Math.random() > 0.52 ? "star-a" : "star-b";
+                const color = source === "star-a"
+                    ? colors.starA.clone().lerp(colors.starAHot, Math.random() * 0.55)
+                    : colors.starB.clone().lerp(colors.starBHot, Math.random() * 0.52);
+                particles.push({
+                    source,
+                    phase: Math.random(),
+                    orbit: Math.random() * Math.PI * 2,
+                    lift: THREE.MathUtils.randFloatSpread(1),
+                    speed: 0.16 + Math.random() * 0.42,
+                    shell: 1.45 + Math.random() * 1.7,
+                    size: 0.45 + Math.random() * 1.1
+                });
+
+                instanceDummy.position.set(10000, 10000, 10000);
+                instanceDummy.scale.setScalar(0.01);
+                instanceDummy.updateMatrix();
+                mesh.setMatrixAt(i, instanceDummy.matrix);
+                mesh.setColorAt(i, color);
+            }
+
+            if (mesh.instanceColor) {
+                mesh.instanceColor.needsUpdate = true;
+            }
+            emberSystem = { particles, mesh };
+            scene.add(mesh);
+        }
+
+        function createEclipticDust() {
+            const geometry = new THREE.OctahedronGeometry(0.045, 0);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.34,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            const mesh = new THREE.InstancedMesh(geometry, material, DUST_COUNT);
+            mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            const particles = [];
+
+            for (let i = 0; i < DUST_COUNT; i += 1) {
+                const radius = 16 + Math.random() * 82;
+                const color = Math.random() > 0.56
+                    ? colors.cyan.clone().lerp(colors.gravity, Math.random() * 0.5)
+                    : colors.violet.clone().lerp(colors.green, Math.random() * 0.42);
+                particles.push({
+                    radius,
+                    angle: Math.random() * Math.PI * 2,
+                    height: THREE.MathUtils.randFloatSpread(4.8),
+                    speed: (0.012 + Math.random() * 0.028) * (Math.random() > 0.5 ? 1 : -1),
+                    wobble: Math.random() * Math.PI * 2,
+                    size: 0.45 + Math.random() * 1.2
+                });
+
+                instanceDummy.position.set(10000, 10000, 10000);
+                instanceDummy.scale.setScalar(0.01);
+                instanceDummy.updateMatrix();
+                mesh.setMatrixAt(i, instanceDummy.matrix);
+                mesh.setColorAt(i, color);
+            }
+
+            if (mesh.instanceColor) {
+                mesh.instanceColor.needsUpdate = true;
+            }
+            dustSystem = { particles, mesh };
+            scene.add(mesh);
+        }
+
+        function createIonSparks() {
+            const geometry = new THREE.TetrahedronGeometry(0.07, 0);
+            const material = new THREE.MeshBasicMaterial({
+                color: 0xffffff,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.52,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            const mesh = new THREE.InstancedMesh(geometry, material, ION_COUNT);
+            mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            const particles = [];
+
+            for (let i = 0; i < ION_COUNT; i += 1) {
+                const band = Math.random() > 0.5 ? 1 : -1;
+                const color = band > 0
+                    ? colors.green.clone().lerp(colors.cyan, Math.random() * 0.48)
+                    : colors.violet.clone().lerp(colors.rose, Math.random() * 0.34);
+                particles.push({
+                    band,
+                    phase: Math.random(),
+                    angle: Math.random() * Math.PI * 2,
+                    speed: 0.18 + Math.random() * 0.44,
+                    offset: THREE.MathUtils.randFloatSpread(0.5),
+                    size: 0.5 + Math.random() * 1.1
+                });
+
+                instanceDummy.position.set(10000, 10000, 10000);
+                instanceDummy.scale.setScalar(0.01);
+                instanceDummy.updateMatrix();
+                mesh.setMatrixAt(i, instanceDummy.matrix);
+                mesh.setColorAt(i, color);
+            }
+
+            if (mesh.instanceColor) {
+                mesh.instanceColor.needsUpdate = true;
+            }
+            ionSystem = { particles, mesh };
+            scene.add(mesh);
+        }
+
+        function createGravityParticles() {
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(GRAVITY_PARTICLE_COUNT * 3);
+            const targets = new Float32Array(GRAVITY_PARTICLE_COUNT * 3);
+            const offsets = new Float32Array(GRAVITY_PARTICLE_COUNT * 3);
+            const velocities = new Float32Array(GRAVITY_PARTICLE_COUNT * 3);
+            const accelerations = new Float32Array(GRAVITY_PARTICLE_COUNT * 3);
+            const masses = new Float32Array(GRAVITY_PARTICLE_COUNT);
+            const sizes = new Float32Array(GRAVITY_PARTICLE_COUNT);
+            const fieldStrengths = new Float32Array(GRAVITY_PARTICLE_COUNT);
+            const particleColors = new Float32Array(GRAVITY_PARTICLE_COUNT * 3);
+            const anchors = new Uint8Array(GRAVITY_PARTICLE_COUNT);
+            const anchorSlots = new Uint8Array(GRAVITY_PARTICLE_COUNT);
+            const ages = new Float32Array(GRAVITY_PARTICLE_COUNT);
+            const lifetimes = new Float32Array(GRAVITY_PARTICLE_COUNT);
+            const streamAngles = new Float32Array(GRAVITY_PARTICLE_COUNT);
+            const spawnRadii = new Float32Array(GRAVITY_PARTICLE_COUNT);
+            const flowSpeeds = new Float32Array(GRAVITY_PARTICLE_COUNT);
+            const streamOffsets = new Float32Array(GRAVITY_PARTICLE_COUNT);
+
+            const streamTurns = new Float32Array(GRAVITY_PARTICLE_COUNT);
+            const streamProgress = new Float32Array(GRAVITY_PARTICLE_COUNT);
+            const streamAlphas = new Float32Array(GRAVITY_PARTICLE_COUNT);
+
+            const positionAttribute = new THREE.BufferAttribute(positions, 3);
+            const colorAttribute = new THREE.BufferAttribute(particleColors, 3);
+            const sizeAttribute = new THREE.BufferAttribute(sizes, 1);
+            const fieldAttribute = new THREE.BufferAttribute(fieldStrengths, 1);
+            const progressAttribute = new THREE.BufferAttribute(streamProgress, 1);
+            const alphaAttribute = new THREE.BufferAttribute(streamAlphas, 1);
+            positionAttribute.setUsage(THREE.DynamicDrawUsage);
+            colorAttribute.setUsage(THREE.DynamicDrawUsage);
+            sizeAttribute.setUsage(THREE.DynamicDrawUsage);
+            fieldAttribute.setUsage(THREE.DynamicDrawUsage);
+            progressAttribute.setUsage(THREE.DynamicDrawUsage);
+            alphaAttribute.setUsage(THREE.DynamicDrawUsage);
+            geometry.setAttribute("position", positionAttribute);
+            geometry.setAttribute("particleColor", colorAttribute);
+            geometry.setAttribute("particleSize", sizeAttribute);
+            geometry.setAttribute("fieldStrength", fieldAttribute);
+            geometry.setAttribute("streamProgress", progressAttribute);
+            geometry.setAttribute("streamAlpha", alphaAttribute);
+
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    opacity: { value: GRAVITY_PARTICLE_OPACITY },
+                    pointScale: { value: isCompact ? 680 : 860 },
+                    maxPointSize: { value: isCompact ? 20 : 26 }
+                },
+                vertexShader: `
+                    uniform float pointScale;
+                    uniform float maxPointSize;
+                    attribute vec3 particleColor;
+                    attribute float particleSize;
+                    attribute float fieldStrength;
+                    attribute float streamProgress;
+                    attribute float streamAlpha;
+                    varying vec3 vColor;
+                    varying float vField;
+                    varying float vProgress;
+                    varying float vAlpha;
+
+                    void main() {
+                        vColor = particleColor;
+                        vField = fieldStrength;
+                        vProgress = streamProgress;
+                        vAlpha = streamAlpha;
+                        vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                        float perspective = pointScale / max(20.0, -mvPosition.z);
+                        float wellSize = particleSize * (0.82 + fieldStrength * 0.55) * (0.72 + streamAlpha * 0.28);
+                        gl_PointSize = clamp(wellSize * perspective, 3.5, maxPointSize);
+                        gl_Position = projectionMatrix * mvPosition;
+                    }
+                `,
+                fragmentShader: `
+                    uniform float opacity;
+                    uniform float time;
+                    varying vec3 vColor;
+                    varying float vField;
+                    varying float vProgress;
+                    varying float vAlpha;
+
+                    void main() {
+                        vec2 uv = gl_PointCoord * 2.0 - 1.0;
+                        float radius = length(uv);
+                        if (radius > 1.0) {
+                            discard;
+                        }
+
+                        float stretch = 0.18 + vField * 0.24;
+                        vec2 streakUv = vec2(uv.x * (1.0 + stretch), uv.y * (1.0 - stretch * 0.35));
+                        float streakRadius = length(streakUv);
+                        float core = smoothstep(0.42, 0.02, streakRadius);
+                        float halo = smoothstep(1.0, 0.2, radius);
+                        float contour = 1.0 - smoothstep(0.42, 0.58, abs(radius - (0.34 + vProgress * 0.18)));
+                        float pulse = 0.94 + sin(time * 1.4 + vProgress * 12.0) * 0.06;
+                        vec3 hot = vec3(1.0, 0.42, 0.18);
+                        vec3 bend = vec3(1.0, 0.12, 0.08);
+                        vec3 color = mix(vColor, hot, vField * 0.42);
+                        color = mix(color, bend, core * 0.36);
+                        color *= 0.78 + halo * 0.42 + vField * 0.55;
+                        float alpha = opacity * vAlpha * pulse * (core * 0.92 + halo * 0.24 + contour * vField * 0.18);
+                        gl_FragColor = vec4(color, alpha);
+                    }
+                `,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                depthTest: false,
+                toneMapped: false
+            });
+            const points = new THREE.Points(geometry, material);
+            points.frustumCulled = false;
+            points.renderOrder = 12;
+            points.name = "gravity-particle-field";
+            const palette = [
+                new THREE.Color(0xff2020),
+                new THREE.Color(0xe01822),
+                new THREE.Color(0xff3838),
+                new THREE.Color(0xc9131b)
+            ];
+
+            for (let i = 0; i < GRAVITY_PARTICLE_COUNT; i += 1) {
+                const color = palette[i % palette.length].clone().lerp(colors.gravityParticle, Math.random() * 0.35);
+                const base = i * 3;
+                positions[base] = 10000;
+                positions[base + 1] = 10000;
+                positions[base + 2] = 10000;
+                masses[i] = 0.018 + Math.random() * 0.04;
+                sizes[i] = 1.15 + Math.random() * 0.85;
+                particleColors[base] = color.r;
+                particleColors[base + 1] = color.g;
+                particleColors[base + 2] = color.b;
+            }
+
+            gravityParticleSystem = {
+                count: GRAVITY_PARTICLE_COUNT,
+                positions,
+                targets,
+                offsets,
+                velocities,
+                accelerations,
+                masses,
+                sizes,
+                fieldStrengths,
+                colors: particleColors,
+                anchors,
+                anchorSlots,
+                anchorCounts: [],
+                ages,
+                lifetimes,
+                streamAngles,
+                spawnRadii,
+                flowSpeeds,
+                streamOffsets,
+                streamTurns,
+                streamProgress,
+                streamAlphas,
+                respawns: 0,
+                geometry,
+                material,
+                points
+            };
+            scene.add(points);
+        }
+
+        function seedGravityParticles() {
+            if (!gravityParticleSystem || bodies.length === 0) {
+                return;
+            }
+
+            gravityParticleSystem.respawns = 0;
+            configureGravityParticleAnchors(gravityParticleSystem);
+            for (let i = 0; i < gravityParticleSystem.count; i += 1) {
+                spawnGravityParticle(gravityParticleSystem, i, true);
+            }
+
+            gravityParticleSystem.geometry.attributes.position.needsUpdate = true;
+            gravityParticleSystem.geometry.attributes.particleColor.needsUpdate = true;
+            gravityParticleSystem.geometry.attributes.particleSize.needsUpdate = true;
+            gravityParticleSystem.geometry.attributes.fieldStrength.needsUpdate = true;
+            gravityParticleSystem.geometry.attributes.streamProgress.needsUpdate = true;
+            gravityParticleSystem.geometry.attributes.streamAlpha.needsUpdate = true;
+            updateGravityParticles(0, 0);
+            publishGravityParticleDebug();
+        }
+
+        function configureGravityParticleAnchors(system) {
+            const weights = bodies.map((body) => body.radius * Math.cbrt(Math.max(body.mass, 0.000001)));
+            const weightTotal = weights.reduce((sum, weight) => sum + weight, 0);
+            const exactCounts = weights.map((weight) => weight / weightTotal * system.count);
+            const counts = exactCounts.map(Math.floor);
+            let assigned = counts.reduce((sum, count) => sum + count, 0);
+
+            while (assigned < system.count) {
+                let bestIndex = 0;
+                let bestRemainder = -1;
+                for (let i = 0; i < exactCounts.length; i += 1) {
+                    const remainder = exactCounts[i] - counts[i];
+                    if (remainder > bestRemainder) {
+                        bestRemainder = remainder;
+                        bestIndex = i;
+                    }
+                }
+                counts[bestIndex] += 1;
+                assigned += 1;
+            }
+
+            let cursor = 0;
+            counts.forEach((count, bodyIndex) => {
+                for (let i = 0; i < count; i += 1) {
+                    system.anchorSlots[cursor] = bodyIndex;
+                    cursor += 1;
+                }
+            });
+
+            for (let i = system.anchorSlots.length - 1; i > 0; i -= 1) {
+                const j = Math.floor(Math.random() * (i + 1));
+                const temp = system.anchorSlots[i];
+                system.anchorSlots[i] = system.anchorSlots[j];
+                system.anchorSlots[j] = temp;
+            }
+
+            system.anchorCounts = counts;
+        }
+
+        function spawnGravityParticle(system, index, scatterAlongStream = false) {
+            const anchorIndex = system.anchorSlots[index] ?? (index % bodies.length);
+            const anchor = bodies[anchorIndex];
+            if (!anchor) {
+                return;
+            }
+
+            const base = index * 3;
+            const isPlanet = anchor.type === "planet";
+            const outerRadius = anchor.radius * (isPlanet ? 4.4 + Math.random() * 3.2 : 3.4 + Math.random() * 5.2);
+            const innerRadius = anchor.radius * (isPlanet ? 1.52 : 1.34);
+            const streamT = scatterAlongStream ? Math.random() : 0;
+            const radius = outerRadius - (outerRadius - innerRadius) * streamT;
+            const lane = (index * 1.6180339887 + anchorIndex * 0.73) % (Math.PI * 2);
+            const dirX = Math.cos(lane);
+            const dirZ = Math.sin(lane);
+            const offsetY = THREE.MathUtils.randFloatSpread(anchor.radius * (isPlanet ? 0.48 : 0.36));
+            const px = anchor.position.x + dirX * radius;
+            const pz = anchor.position.z + dirZ * radius;
+            const py = anchor.position.y + computeGravityWellDepression(px, anchor.position.y, pz, anchor) + offsetY;
+            const inwardSpeed = (isPlanet ? 0.58 : 0.74) + Math.random() * 0.32;
+            const baseRed = isPlanet ? 0xc01822 : 0xff2020;
+            const color = new THREE.Color(baseRed).lerp(
+                new THREE.Color(isPlanet ? 0xff4848 : 0xff6a3a),
+                Math.random() * 0.42 + streamT * 0.18
+            );
+
+            system.anchors[index] = anchorIndex;
+            system.ages[index] = scatterAlongStream ? streamT * (7.2 + Math.random() * 5.2) : 0;
+            system.lifetimes[index] = isPlanet ? 5.4 + Math.random() * 3.2 : 4.6 + Math.random() * 3.4;
+            system.streamAngles[index] = lane;
+            system.streamTurns[index] = (isPlanet ? 0.82 : 1.18) + Math.random() * 0.48;
+            system.spawnRadii[index] = outerRadius;
+            system.flowSpeeds[index] = inwardSpeed;
+            system.streamOffsets[index] = offsetY;
+            system.streamProgress[index] = streamT;
+            system.streamAlphas[index] = scatterAlongStream
+                ? smoothstep(0, 0.14, streamT) * (1 - smoothstep(0.84, 1, streamT))
+                : 0;
+            system.positions[base] = px;
+            system.positions[base + 1] = py;
+            system.positions[base + 2] = pz;
+            system.targets[base] = px;
+            system.targets[base + 1] = py;
+            system.targets[base + 2] = pz;
+            system.offsets[base] = 0;
+            system.offsets[base + 1] = 0;
+            system.offsets[base + 2] = 0;
+            system.velocities[base] = 0;
+            system.velocities[base + 1] = 0;
+            system.velocities[base + 2] = 0;
+            system.accelerations[base] = 0;
+            system.accelerations[base + 1] = 0;
+            system.accelerations[base + 2] = 0;
+            system.masses[index] = 0.022 + Math.random() * 0.06;
+            system.sizes[index] = isPlanet ? 1.08 + Math.random() * 0.62 : 0.96 + Math.random() * 0.58;
+            system.fieldStrengths[index] = 0.18 + streamT * 0.28;
+            system.colors[base] = color.r;
+            system.colors[base + 1] = color.g;
+            system.colors[base + 2] = color.b;
+        }
+
+        function computeGravityWellDepression(x, y, z, primaryBody = null) {
+            let depression = 0;
+
+            bodies.forEach((body) => {
+                const dx = x - body.position.x;
+                const dy = y - body.position.y;
+                const dz = z - body.position.z;
+                const horizontal = Math.sqrt(dx * dx + dz * dz + body.radius * body.radius * 0.35);
+                const distance = Math.sqrt(dx * dx + dy * dy + dz * dz + body.radius * body.radius * 0.35);
+                const isPrimary = body === primaryBody;
+                const visualMass = body.type === "star" ? body.mass * 42 : body.mass * 140;
+                const cap = body.type === "star" ? (isPrimary ? 8.4 : 5.6) : (isPrimary ? 4.2 : 2.8);
+                const emphasis = isPrimary ? 1.22 : 0.72;
+                depression -= Math.min(cap, visualMass * emphasis / Math.max(3.8, distance));
+                depression -= Math.min(cap * 0.42, visualMass * emphasis * 0.38 / Math.max(2.8, horizontal));
+            });
+
+            return depression;
+        }
+
+        function computeGravityParticleSag(x, y, z) {
+            return computeGravityWellDepression(x, y, z, null);
+        }
+
+        function createTrail(body) {
+            const geometry = new THREE.BufferGeometry();
+            const positions = new Float32Array(TRAIL_LENGTH * 3);
+            const trailColor = body.trailColor || body.color;
+            geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+            geometry.setDrawRange(0, 0);
+            const material = new THREE.LineBasicMaterial({
+                color: trailColor,
+                transparent: true,
+                opacity: body.type === "planet" ? 0.84 : 0.68,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            const glowMaterial = new THREE.LineBasicMaterial({
+                color: trailColor,
+                transparent: true,
+                opacity: body.type === "planet" ? 0.22 : 0.16,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            body.trailGeometry = geometry;
+            body.trailLine = new THREE.Line(geometry, material);
+            body.trailGlowLine = new THREE.Line(geometry, glowMaterial);
+            body.trailLine.visible = state.trails;
+            body.trailGlowLine.visible = state.trails;
+            body.trailLine.renderOrder = 4;
+            body.trailGlowLine.renderOrder = 3;
+            body.trailGlowLine.scale.setScalar(1.006);
+            scene.add(body.trailGlowLine);
+            scene.add(body.trailLine);
+        }
+
+        function createLabel(id, text, barycenter = false) {
+            const label = document.createElement("div");
+            label.className = barycenter ? "label barycenter" : "label";
+            label.textContent = text;
+            labelsLayer.appendChild(label);
+            labelMap.set(id, label);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const rawDt = Math.min(clock.getDelta(), 0.04);
+            const simDt = state.paused ? 0 : rawDt * state.timeScale;
+            const time = clock.elapsedTime;
+            state.frame += 1;
+
+            shaderMaterials.forEach((material) => {
+                if (material.uniforms.time) {
+                    material.uniforms.time.value = time;
+                }
+                if (material.uniforms.flare) {
+                    material.uniforms.flare.value = state.flare;
+                }
+                if (material.uniforms.atmo) {
+                    material.uniforms.atmo.value = state.atmosphere;
+                }
+            });
+
+            if (!state.paused && state.timeScale > 0) {
+                const substeps = Math.max(1, Math.ceil(simDt / 0.06));
+                const stepDt = simDt / substeps;
+                for (let i = 0; i < substeps; i += 1) {
+                    integrate(stepDt);
+                    state.simDays += stepDt * 12.5;
+                }
+                state.flare *= Math.exp(-rawDt * 1.15);
+            }
+
+            updateVisuals(rawDt, time);
+            updateCinematicCamera(rawDt, time);
+            controls.update();
+            composer.render();
+        }
+
+        function applyShot(shotKey, immediate = false) {
+            state.shot = shotKey;
+            const shot = shotModes[shotKey];
+            if (!shot) {
+                return;
+            }
+
+            ui.shotReadout.textContent = shot.name;
+            state.cameraManual = false;
+            state.cameraManualTimer = 0;
+            computeShotFrame(desiredCameraPosition, desiredCameraTarget, shot);
+
+            if (immediate) {
+                camera.position.copy(desiredCameraPosition);
+                cameraTarget.copy(desiredCameraTarget);
+                controls.target.copy(desiredCameraTarget);
+                camera.fov = shot.fov;
+                camera.updateProjectionMatrix();
+            }
+        }
+
+        function computeShotFrame(outPosition, outTarget, shot) {
+            const planet = bodyById.get("planet");
+            const starA = bodyById.get("star-a");
+            const starB = bodyById.get("star-b");
+            const bary = new THREE.Vector3(0, 0, 0);
+
+            if (state.shot === "planet" && planet) {
+                outTarget.copy(planet.position);
+                outPosition.copy(planet.position).add(shot.offset);
+            } else if (state.shot === "binary" && starA && starB) {
+                outTarget.copy(starA.position).lerp(starB.position, 0.5);
+                outPosition.copy(outTarget).add(shot.offset);
+            } else {
+                outTarget.copy(bary).add(shot.target);
+                outPosition.copy(bary).add(shot.offset);
+            }
+        }
+
+        function updateCinematicCamera(rawDt, time) {
+            if (state.cameraManual) {
+                state.cameraManualTimer += rawDt;
+                if (state.cameraManualTimer > 8) {
+                    state.cameraManual = false;
+                }
+                return;
+            }
+
+            const shot = shotModes[state.shot];
+            if (!shot) {
+                return;
+            }
+
+            computeShotFrame(desiredCameraPosition, desiredCameraTarget, shot);
+
+            const drift = shot.drift;
+            desiredCameraPosition.x += Math.sin(time * 0.11) * drift * 4.2;
+            desiredCameraPosition.y += Math.cos(time * 0.08) * drift * 2.4;
+            desiredCameraPosition.z += Math.sin(time * 0.09 + 1.2) * drift * 3.6;
+            desiredCameraTarget.y += Math.sin(time * 0.07) * drift * 0.8;
+
+            const blend = 1 - Math.exp(-rawDt * (state.shot === "drift" ? 0.55 : 1.35));
+            camera.position.lerp(desiredCameraPosition, blend);
+            cameraTarget.lerp(desiredCameraTarget, blend);
+            controls.target.lerp(desiredCameraTarget, blend);
+            camera.fov = THREE.MathUtils.lerp(camera.fov, shot.fov, blend);
+            camera.updateProjectionMatrix();
+        }
+
+        function integrate(dt) {
+            if (dt <= 0) {
+                return;
+            }
+
+            for (let i = 0; i < bodies.length; i += 1) {
+                bodies[i].velocity.addScaledVector(accelerations[i], dt * 0.5);
+                bodies[i].position.addScaledVector(bodies[i].velocity, dt);
+            }
+
+            centerBarycentricFrame();
+            accelerations = computeAccelerations();
+
+            for (let i = 0; i < bodies.length; i += 1) {
+                bodies[i].velocity.addScaledVector(accelerations[i], dt * 0.5);
+            }
+
+            removeBarycentricVelocity();
+        }
+
+        function computeAccelerations() {
+            const acc = bodies.map(() => new THREE.Vector3());
+            const g = BASE_G * state.gravityScale;
+
+            for (let i = 0; i < bodies.length; i += 1) {
+                for (let j = i + 1; j < bodies.length; j += 1) {
+                    const delta = tmpVector.subVectors(bodies[j].position, bodies[i].position);
+                    const distSq = delta.lengthSq() + SOFTENING;
+                    const dist = Math.sqrt(distSq);
+                    const invDist3 = 1 / (distSq * dist);
+                    const scale = g * invDist3;
+                    acc[i].addScaledVector(delta, bodies[j].mass * scale);
+                    acc[j].addScaledVector(delta, -bodies[i].mass * scale);
+                }
+            }
+
+            return acc;
+        }
+
+        function centerBarycentricFrame() {
+            const barycenter = computeBarycenter();
+            bodies.forEach((body) => body.position.sub(barycenter));
+        }
+
+        function removeBarycentricVelocity() {
+            let totalMass = 0;
+            const momentum = new THREE.Vector3();
+
+            bodies.forEach((body) => {
+                totalMass += body.mass;
+                momentum.addScaledVector(body.velocity, body.mass);
+            });
+
+            momentum.multiplyScalar(1 / totalMass);
+            bodies.forEach((body) => body.velocity.sub(momentum));
+        }
+
+        function computeBarycenter() {
+            let totalMass = 0;
+            const center = new THREE.Vector3();
+
+            bodies.forEach((body) => {
+                totalMass += body.mass;
+                center.addScaledVector(body.position, body.mass);
+            });
+
+            return center.multiplyScalar(1 / totalMass);
+        }
+
+        function computeTotalEnergy() {
+            let kinetic = 0;
+            let potential = 0;
+            const g = BASE_G * state.gravityScale;
+
+            bodies.forEach((body) => {
+                kinetic += 0.5 * body.mass * body.velocity.lengthSq();
+            });
+
+            for (let i = 0; i < bodies.length; i += 1) {
+                for (let j = i + 1; j < bodies.length; j += 1) {
+                    const dist = bodies[i].position.distanceTo(bodies[j].position) + 0.001;
+                    potential -= g * bodies[i].mass * bodies[j].mass / dist;
+                }
+            }
+
+            return kinetic + potential;
+        }
+
+        function updateVisuals(rawDt, time) {
+            const planet = bodyById.get("planet");
+            const starA = bodyById.get("star-a");
+            const starB = bodyById.get("star-b");
+
+            bodies.forEach((body) => {
+                updateBodyVisual(body, rawDt);
+                if (state.frame % 2 === 0) {
+                    updateTrail(body);
+                }
+            });
+
+            updateGravityLines();
+            updateBarycenterMarker();
+            updateGravityParticles(rawDt, time);
+            updateSolarWind(rawDt);
+            updateMagnetosphere(rawDt, time);
+            updateStellarEmbers(rawDt, time);
+            updateEclipticDust(rawDt, time);
+            updateIonSparks(rawDt, time);
+            updateLabels();
+            updateSelectionReadout();
+
+            if (starfield) {
+                starfield.rotation.y += rawDt * 0.004;
+                starfield.rotation.x = Math.sin(time * 0.028) * 0.014;
+            }
+
+            if (nebulaDome) {
+                nebulaDome.rotation.y += rawDt * 0.002;
+            }
+
+            if (eclipticField) {
+                eclipticField.group.rotation.y += rawDt * 0.008;
+                eclipticField.discMaterial.uniforms.time.value = time;
+                eclipticField.rings.forEach((ring) => {
+                    ring.material.uniforms.time.value = time;
+                });
+            }
+
+            if (bloomPass) {
+                const bloomBase = 0.46 + state.bloom * 0.22;
+                bloomPass.strength = bloomBase + state.flare * 0.2 + state.flux * 0.05;
+                bloomPass.radius = 0.48 + state.bloom * 0.08;
+                bloomPass.threshold = 0.16 + state.bloom * 0.12;
+            }
+
+            if (gradePass) {
+                gradePass.uniforms.grade.value = state.grade;
+                gradePass.uniforms.time.value = time;
+            }
+
+            if (ui.timelineFill) {
+                ui.timelineFill.style.width = `${Math.min(100, (state.simDays % 2400) / 24)}%`;
+            }
+
+            if (state.frame % 12 === 0 && planet && starA && starB) {
+                updateReadouts();
+            }
+        }
+
+        function updateBodyVisual(body, rawDt) {
+            body.group.position.copy(body.position);
+
+            if (body.type === "star") {
+                body.mesh.rotation.y += rawDt * 0.18 * (body.id === "star-a" ? 1 : -1);
+                body.corona.scale.setScalar(1 + state.flare * 0.12 + Math.sin(clock.elapsedTime * 1.7 + body.mass) * 0.018);
+                body.outerCorona.scale.setScalar(1 + state.flare * 0.18 + Math.sin(clock.elapsedTime * 1.3 + body.mass) * 0.02);
+                body.light.intensity = (body.id === "star-a" ? 8.2 : 6.6) * (1 + state.flare * 0.38);
+                if (body.lensStreak) {
+                    const toCamera = tmpVectorD.subVectors(camera.position, body.group.position).normalize();
+                    body.lensStreak.quaternion.setFromUnitVectors(localXAxis, toCamera);
+                    body.lensStreak.material.uniforms.opacity.value = 0.03 + state.flare * 0.08 + state.bloom * 0.02;
+                }
+            } else {
+                body.mesh.rotation.y += rawDt * 0.32;
+                body.clouds.rotation.y += rawDt * 0.43;
+                body.clouds.material.opacity = 0.18 + state.atmosphere * 0.34;
+                body.auroraNorth.material.opacity = (0.22 + state.magnetosphere * 0.48) * (0.7 + state.flare * 0.28);
+                body.auroraSouth.material.opacity = (0.18 + state.magnetosphere * 0.38) * (0.7 + state.flare * 0.28);
+                body.auroraNorth.rotation.z += rawDt * 0.42;
+                body.auroraSouth.rotation.z -= rawDt * 0.38;
+            }
+        }
+
+        function updateTrail(body) {
+            body.trailHistory.push(body.position.clone());
+            if (body.trailHistory.length > TRAIL_LENGTH) {
+                body.trailHistory.shift();
+            }
+
+            const attr = body.trailGeometry.attributes.position;
+            for (let i = 0; i < body.trailHistory.length; i += 1) {
+                const point = body.trailHistory[i];
+                const index = i * 3;
+                attr.array[index] = point.x;
+                attr.array[index + 1] = point.y;
+                attr.array[index + 2] = point.z;
+            }
+            body.trailGeometry.setDrawRange(0, body.trailHistory.length);
+            attr.needsUpdate = true;
+        }
+
+        function updateGravityLines() {
+            const pairs = [
+                ["star-a", "star-b"],
+                ["star-a", "planet"],
+                ["star-b", "planet"]
+            ];
+
+            pairs.forEach((pair, pairIndex) => {
+                const a = bodyById.get(pair[0]);
+                const b = bodyById.get(pair[1]);
+                const base = pairIndex * 6;
+                gravityLinePositions[base] = a.position.x;
+                gravityLinePositions[base + 1] = a.position.y;
+                gravityLinePositions[base + 2] = a.position.z;
+                gravityLinePositions[base + 3] = b.position.x;
+                gravityLinePositions[base + 4] = b.position.y;
+                gravityLinePositions[base + 5] = b.position.z;
+            });
+
+            gravityLines.geometry.attributes.position.needsUpdate = true;
+            gravityLines.material.opacity = state.fields ? 0.28 + state.gravityScale * 0.18 : 0;
+            gravityLines.visible = state.fields;
+        }
+
+        function updateBarycenterMarker() {
+            barycenterMarker.rotation.x += 0.01;
+            barycenterMarker.rotation.y += 0.015;
+            barycenterMarker.scale.setScalar(0.9 + Math.sin(clock.elapsedTime * 1.6) * 0.08);
+        }
+
+        function updateGravityParticles(rawDt, time) {
+            if (!gravityParticleSystem || !state.fields) {
+                if (gravityParticleSystem) {
+                    gravityParticleSystem.points.visible = state.fields;
+                }
+                return;
+            }
+
+            const system = gravityParticleSystem;
+            const count = system.count;
+            const positions = system.positions;
+            const targets = system.targets;
+            const offsets = system.offsets;
+            const velocities = system.velocities;
+            const accelerations = system.accelerations;
+            const masses = system.masses;
+            const sizes = system.sizes;
+            const fieldStrengths = system.fieldStrengths;
+            const anchors = system.anchors;
+            const ages = system.ages;
+            const lifetimes = system.lifetimes;
+            const streamOffsets = system.streamOffsets;
+            const flowSpeeds = system.flowSpeeds;
+            const streamTurns = system.streamTurns;
+            const streamProgress = system.streamProgress;
+            const streamAlphas = system.streamAlphas;
+            const particleColors = system.colors;
+            const dt = state.paused || state.timeScale <= 0
+                ? 0
+                : Math.min(0.026, rawDt * Math.max(0.16, state.timeScale * 0.18));
+            const ageDt = state.paused || state.timeScale <= 0
+                ? 0
+                : rawDt * Math.max(0.65, state.timeScale * 0.16);
+            const g = state.gravityScale;
+
+            accelerations.fill(0);
+            fieldStrengths.fill(0);
+
+            for (let i = 0; i < count; i += 1) {
+                const base = i * 3;
+                const anchor = bodies[anchors[i]];
+                if (!anchor) {
+                    spawnGravityParticle(system, i, false);
+                    continue;
+                }
+
+                ages[i] += ageDt * flowSpeeds[i] * 0.86;
+                const tx = targets[base] || positions[base];
+                const ty = targets[base + 1] || positions[base + 1];
+                const tz = targets[base + 2] || positions[base + 2];
+                const toAnchorX = anchor.position.x - tx;
+                const toAnchorY = anchor.position.y - ty;
+                const toAnchorZ = anchor.position.z - tz;
+                const anchorDistance = Math.sqrt(toAnchorX * toAnchorX + toAnchorY * toAnchorY + toAnchorZ * toAnchorZ);
+                const innerRadius = anchor.radius * (anchor.type === "planet" ? 1.52 : 1.34);
+                const outerLimit = system.spawnRadii[i] * 1.22;
+
+                if (ages[i] > lifetimes[i] || anchorDistance < innerRadius || anchorDistance > outerLimit) {
+                    system.respawns += 1;
+                    spawnGravityParticle(system, i, false);
+                }
+            }
+
+            for (let i = 0; i < count; i += 1) {
+                const base = i * 3;
+                const anchor = bodies[anchors[i]];
+                const t = clamp(ages[i] / Math.max(0.001, lifetimes[i]), 0, 1);
+                const innerRadius = anchor.radius * (anchor.type === "planet" ? 1.52 : 1.34);
+                const streamEase = t * t * (3 - 2 * t);
+                const radius = system.spawnRadii[i] - (system.spawnRadii[i] - innerRadius) * streamEase;
+                const orbitPhase = system.streamAngles[i] + t * Math.PI * 2 * system.streamTurns[i];
+                const flatten = anchor.type === "planet" ? 0.86 : 0.94;
+                const wobble = Math.sin(t * Math.PI * 2 + system.streamAngles[i] * 1.7) * anchor.radius * 0.08;
+                let targetX = anchor.position.x + Math.cos(orbitPhase) * (radius + wobble);
+                let targetZ = anchor.position.z + Math.sin(orbitPhase) * (radius + wobble) * flatten;
+                let targetY = anchor.position.y
+                    + computeGravityWellDepression(targetX, anchor.position.y, targetZ, anchor)
+                    + streamOffsets[i] * (1 - t * 0.82);
+                let field = 0;
+                let overlapField = 0;
+                let bendStrength = 0;
+
+                bodies.forEach((body) => {
+                    const dx = body.position.x - targetX;
+                    const dy = body.position.y - targetY;
+                    const dz = body.position.z - targetZ;
+                    const distSq = dx * dx + dy * dy + dz * dz + body.radius * body.radius * 2.2 + GRAVITY_PARTICLE_SOFTENING;
+                    const dist = Math.sqrt(distSq);
+                    const invDist = 1 / dist;
+                    const isAnchor = body === anchor;
+                    const overlapRadius = system.spawnRadii[i] + body.radius * (body.type === "star" ? 6.4 : 8.4);
+                    const overlap = isAnchor ? 0 : clamp((overlapRadius - dist) / Math.max(1, overlapRadius), 0, 1);
+                    const bend = isAnchor ? 0 : overlap * overlap * body.mass * (body.type === "star" ? 9.6 : 5.4) * invDist;
+                    field += body.mass / distSq;
+                    overlapField += overlap;
+                    bendStrength += overlap * body.mass;
+                    targetX += dx * invDist * bend;
+                    targetY += dy * invDist * bend * 0.42;
+                    targetZ += dz * invDist * bend;
+                });
+
+                targets[base] = targetX;
+                targets[base + 1] = targetY;
+                targets[base + 2] = targetZ;
+                positions[base] = targetX + offsets[base];
+                positions[base + 1] = targetY + offsets[base + 1];
+                positions[base + 2] = targetZ + offsets[base + 2];
+                fieldStrengths[i] = Math.min(1, 0.14 + field * 760 + Math.min(0.38, overlapField * 0.22 + bendStrength * 0.08));
+                streamProgress[i] = t;
+                streamAlphas[i] = smoothstep(0, 0.1, t) * (1 - smoothstep(0.86, 1, t));
+
+                const heat = clamp(fieldStrengths[i] * 0.92 + (1 - t) * 0.12, 0, 1);
+                const baseColor = anchor.type === "planet"
+                    ? new THREE.Color(0xc01822)
+                    : new THREE.Color(0xff2020);
+                const hotColor = new THREE.Color(0xff7a38);
+                const bendColor = new THREE.Color(0xff1a14);
+                const tint = baseColor.clone().lerp(hotColor, heat * 0.58).lerp(bendColor, bendStrength * 0.04);
+                particleColors[base] = tint.r;
+                particleColors[base + 1] = tint.g;
+                particleColors[base + 2] = tint.b;
+                sizes[i] = (anchor.type === "planet" ? 1.02 : 0.92) + heat * 0.48 + streamAlphas[i] * 0.22;
+            }
+
+            for (let i = 0; i < count; i += 1) {
+                const ia = i * 3;
+                const ix = positions[ia];
+                const iy = positions[ia + 1];
+                const iz = positions[ia + 2];
+
+                for (let j = i + 1; j < count; j += 1) {
+                    const ja = j * 3;
+                    const dx = positions[ja] - ix;
+                    const dy = positions[ja + 1] - iy;
+                    const dz = positions[ja + 2] - iz;
+                    const distSq = dx * dx + dy * dy + dz * dz + GRAVITY_PARTICLE_SOFTENING;
+                    const invDist = 1 / Math.sqrt(distSq);
+                    const differentWells = anchors[i] !== anchors[j];
+                    const overlapBoost = differentWells ? 1.45 : 0.45;
+                    const force = GRAVITY_PARTICLE_G * g * overlapBoost * invDist * invDist * invDist;
+                    const ax = dx * force * masses[j];
+                    const ay = dy * force * masses[j];
+                    const az = dz * force * masses[j];
+                    const pairGlow = Math.min(differentWells ? 0.18 : 0.06, (masses[i] + masses[j]) * (differentWells ? 66 : 22) / distSq);
+
+                    accelerations[ia] += ax;
+                    accelerations[ia + 1] += ay;
+                    accelerations[ia + 2] += az;
+                    accelerations[ja] -= dx * force * masses[i];
+                    accelerations[ja + 1] -= dy * force * masses[i];
+                    accelerations[ja + 2] -= dz * force * masses[i];
+                    fieldStrengths[i] += pairGlow;
+                    fieldStrengths[j] += pairGlow;
+                }
+            }
+
+            for (let i = 0; i < count; i += 1) {
+                const base = i * 3;
+                fieldStrengths[i] = Math.min(1, fieldStrengths[i]);
+                velocities[base] = (velocities[base] + accelerations[base] * dt) * 0.986;
+                velocities[base + 1] = (velocities[base + 1] + accelerations[base + 1] * dt) * 0.986;
+                velocities[base + 2] = (velocities[base + 2] + accelerations[base + 2] * dt) * 0.986;
+                offsets[base] = (offsets[base] + velocities[base] * dt) * 0.94;
+                offsets[base + 1] = (offsets[base + 1] + velocities[base + 1] * dt) * 0.94;
+                offsets[base + 2] = (offsets[base + 2] + velocities[base + 2] * dt) * 0.94;
+
+                const offsetLength = Math.sqrt(
+                    offsets[base] * offsets[base] +
+                    offsets[base + 1] * offsets[base + 1] +
+                    offsets[base + 2] * offsets[base + 2]
+                );
+                const maxOffset = bodies[anchors[i]].radius * 0.78;
+                if (offsetLength > maxOffset && offsetLength > 0) {
+                    const scale = maxOffset / offsetLength;
+                    offsets[base] *= scale;
+                    offsets[base + 1] *= scale;
+                    offsets[base + 2] *= scale;
+                }
+
+                positions[base] = targets[base] + offsets[base];
+                positions[base + 1] = targets[base + 1] + offsets[base + 1];
+                positions[base + 2] = targets[base + 2] + offsets[base + 2];
+            }
+
+            system.geometry.attributes.position.needsUpdate = true;
+            system.geometry.attributes.particleColor.needsUpdate = true;
+            system.geometry.attributes.particleSize.needsUpdate = true;
+            system.geometry.attributes.fieldStrength.needsUpdate = true;
+            system.geometry.attributes.streamProgress.needsUpdate = true;
+            system.geometry.attributes.streamAlpha.needsUpdate = true;
+            system.material.uniforms.time.value = time;
+            system.material.uniforms.opacity.value = state.fields ? GRAVITY_PARTICLE_OPACITY : 0;
+            system.points.visible = state.fields;
+            publishGravityParticleDebug();
+        }
+
+        function publishGravityParticleDebug() {
+            if (!gravityParticleSystem) {
+                return;
+            }
+
+            const first = gravityParticleSystem.positions;
+            window.__barycentricDawnComposerGravityParticles = {
+                count: gravityParticleSystem.count,
+                renderer: "shader-points",
+                visible: gravityParticleSystem.points.visible,
+                opacity: gravityParticleSystem.material.uniforms.opacity.value,
+                respawns: gravityParticleSystem.respawns,
+                allocation: bodies.map((body, index) => ({
+                    id: body.id,
+                    count: gravityParticleSystem.anchorCounts[index] || 0
+                })),
+                firstPosition: first && first.length >= 3
+                    ? {
+                        x: Number(first[0].toFixed(2)),
+                        y: Number(first[1].toFixed(2)),
+                        z: Number(first[2].toFixed(2))
+                    }
+                    : null
+            };
+        }
+
+        function updateMagnetosphere(rawDt, time) {
+            const planet = bodyById.get("planet");
+            if (!planet || !magnetosphere) {
+                return;
+            }
+
+            const windDir = getSolarWindDirection();
+            magnetosphere.group.position.copy(planet.position);
+            magnetosphere.group.quaternion.setFromUnitVectors(localXAxis, windDir);
+            const flux = computeStellarFlux();
+            const compression = THREE.MathUtils.clamp(1.28 - flux * 0.18, 0.72, 1.34);
+            const strength = 0.58 + state.magnetosphere * 0.82;
+            magnetosphere.group.scale.set(strength * compression, strength, strength * (1.04 + state.flare * 0.08));
+            magnetosphere.group.visible = state.fields;
+
+            updateMagnetosphereFlow(rawDt, time, flux, planet);
+            magnetosphere.shock.material.opacity = (0.12 + state.magnetosphere * 0.34) * (1 + state.flare * 0.22);
+            magnetosphere.shock.rotation.x += 0.006;
+        }
+
+        function updateMagnetosphereFlow(rawDt, time, flux, planet) {
+            const flow = magnetosphere.flow;
+            if (!flow) {
+                return;
+            }
+
+            const advance = state.paused || state.timeScale <= 0
+                ? 0
+                : rawDt * (0.12 + state.flux * 0.12 + state.flare * 0.16) * Math.max(1, state.timeScale * 0.16);
+            const liveFlux = state.flux * (1 + state.flare * 1.35);
+            const planetRadius = planet.radius;
+            const noseX = -planetRadius * (2.55 + liveFlux * 0.72);
+            const tailX = planetRadius * (6.6 + state.magnetosphere * 2.8 + liveFlux * 0.8);
+
+            for (let i = 0; i < flow.count; i += 1) {
+                const base = i * 3;
+                flow.phases[i] = (flow.phases[i] + advance * flow.speeds[i]) % 1;
+
+                const t = flow.phases[i];
+                const shell = flow.shells[i];
+                const lane = flow.lanes[i];
+                const flank = smoothstep(0.03, 0.34, t);
+                const tail = smoothstep(0.42, 1.0, t);
+                const fadeIn = smoothstep(0.0, 0.08, t);
+                const fadeOut = 1 - smoothstep(0.88, 1.0, t);
+                const sideBias = Math.sin(t * Math.PI);
+                const streamX = noseX + (tailX - noseX) * Math.pow(t, 0.78);
+                const radiusBase = planetRadius * (0.68 + shell * 0.3);
+                const flankRadius = planetRadius * (1.2 + state.magnetosphere * 0.95) * flank * (1 - tail * 0.48);
+                const tailRadius = planetRadius * (0.34 + shell * 0.24) * tail;
+                const radius = radiusBase + flankRadius + tailRadius + sideBias * planetRadius * 0.22;
+                const twist = lane + t * (0.82 + shell * 0.28) + Math.sin(time * 0.22 + flow.ripples[i]) * 0.06;
+                const wave = Math.sin(time * (0.72 + flow.speeds[i] * 0.28) + flow.ripples[i] + t * 18.0);
+                const y = Math.cos(twist) * radius + wave * planetRadius * 0.055;
+                const z = Math.sin(twist) * radius * (0.66 + shell * 0.12) + Math.cos(wave + lane) * planetRadius * 0.05;
+
+                flow.positions[base] = streamX + wave * planetRadius * 0.08;
+                flow.positions[base + 1] = y;
+                flow.positions[base + 2] = z;
+                flow.flowAlphas[i] = fadeIn * fadeOut * (0.5 + state.magnetosphere * 0.45) * (0.84 + liveFlux * 0.22);
+            }
+
+            flow.geometry.attributes.position.needsUpdate = true;
+            flow.geometry.attributes.flowAlpha.needsUpdate = true;
+            flow.material.uniforms.time.value = time;
+            flow.material.uniforms.opacity.value = state.fields ? 0.48 + state.magnetosphere * 0.2 : 0;
+            flow.points.visible = state.fields;
+        }
+
+        function updateSolarWind(rawDt) {
+            const planet = bodyById.get("planet");
+            const starA = bodyById.get("star-a");
+            const starB = bodyById.get("star-b");
+
+            if (!planet || !starA || !starB) {
+                return;
+            }
+
+            const liveFlux = state.flux * (1 + state.flare * 1.45);
+
+            windSystem.particles.forEach((particle, i) => {
+                const source = particle.source === "star-a" ? starA : starB;
+                particle.phase = (particle.phase + rawDt * (0.045 + liveFlux * 0.11) * particle.speed * Math.max(1, state.timeScale * 0.18)) % 1;
+                const t = particle.phase;
+                const sourcePos = source.position;
+                const targetPos = planet.position;
+                const direction = tmpVector.subVectors(targetPos, sourcePos).normalize();
+                const basisA = tmpVectorB.crossVectors(direction, Math.abs(direction.y) < 0.82 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0)).normalize();
+                const basisB = tmpVectorC.crossVectors(direction, basisA).normalize();
+                const cone = (1 - t) * source.radius * 0.44 + t * (2.0 + state.magnetosphere * 2.8);
+                const spiral = particle.spin + t * Math.PI * 7.0 + clock.elapsedTime * 0.8;
+                const deflect = smoothstep(0.72, 1.0, t) * state.magnetosphere * 5.2;
+                const base = sourcePos.clone().lerp(targetPos, t);
+                base.addScaledVector(basisA, Math.cos(spiral) * cone * particle.spread + deflect * Math.sin(spiral * 0.7));
+                base.addScaledVector(basisB, Math.sin(spiral) * cone * particle.spread * 0.7 + deflect * Math.cos(spiral * 0.62));
+                base.addScaledVector(direction, -smoothstep(0.84, 1.0, t) * state.magnetosphere * 2.4);
+
+                const scale = particle.size * (0.45 + liveFlux * 0.18);
+                instanceDummy.position.copy(base);
+                instanceDummy.rotation.set(spiral * 0.13, spiral * 0.21, spiral * 0.08);
+                instanceDummy.scale.setScalar(scale);
+                instanceDummy.updateMatrix();
+                windSystem.mesh.setMatrixAt(i, instanceDummy.matrix);
+            });
+
+            windSystem.mesh.instanceMatrix.needsUpdate = true;
+            windSystem.mesh.material.opacity = state.fields ? 0.24 + liveFlux * 0.32 : 0;
+        }
+
+        function updateStellarEmbers(rawDt, time) {
+            const starA = bodyById.get("star-a");
+            const starB = bodyById.get("star-b");
+
+            if (!starA || !starB || !emberSystem) {
+                return;
+            }
+
+            const liveFlux = state.flux * (1 + state.flare * 1.25);
+            emberSystem.particles.forEach((particle, i) => {
+                const source = particle.source === "star-a" ? starA : starB;
+                particle.phase = (particle.phase + rawDt * particle.speed * Math.max(1, state.timeScale * 0.16)) % 1;
+                const shell = source.radius * (particle.shell + particle.phase * 0.78 + state.flare * 0.16);
+                const angle = particle.orbit + particle.phase * Math.PI * 2.7 + time * (0.38 + particle.speed);
+                const y = Math.sin(angle * 1.37 + particle.lift) * shell * 0.33 + particle.lift * source.radius * 0.42;
+                const radial = Math.cos(particle.phase * Math.PI) * 0.24 + 1;
+                const scale = particle.size * (0.42 + liveFlux * 0.16) * (1 - particle.phase * 0.38);
+
+                instanceDummy.position.set(
+                    source.position.x + Math.cos(angle) * shell * radial,
+                    source.position.y + y,
+                    source.position.z + Math.sin(angle) * shell * radial
+                );
+                instanceDummy.rotation.set(angle * 0.7, angle * 0.31, angle * 0.19);
+                instanceDummy.scale.setScalar(Math.max(0.08, scale));
+                instanceDummy.updateMatrix();
+                emberSystem.mesh.setMatrixAt(i, instanceDummy.matrix);
+            });
+
+            emberSystem.mesh.instanceMatrix.needsUpdate = true;
+            emberSystem.mesh.material.opacity = state.fields ? 0.26 + liveFlux * 0.22 : 0;
+        }
+
+        function updateEclipticDust(rawDt, time) {
+            if (!dustSystem) {
+                return;
+            }
+
+            const gravityPulse = 0.7 + state.gravityScale * 0.22;
+            dustSystem.particles.forEach((particle, i) => {
+                particle.angle += rawDt * particle.speed * Math.max(1, state.timeScale * 0.12) * gravityPulse;
+                const wave = Math.sin(time * 0.5 + particle.wobble + particle.radius * 0.08);
+                const radius = particle.radius + wave * 1.8;
+                const scale = particle.size * (0.34 + state.flux * 0.12);
+
+                instanceDummy.position.set(
+                    Math.cos(particle.angle) * radius,
+                    particle.height + wave * 0.9,
+                    Math.sin(particle.angle) * radius
+                );
+                instanceDummy.rotation.set(particle.angle * 0.21, time * 0.13 + particle.wobble, particle.angle * 0.34);
+                instanceDummy.scale.setScalar(scale);
+                instanceDummy.updateMatrix();
+                dustSystem.mesh.setMatrixAt(i, instanceDummy.matrix);
+            });
+
+            dustSystem.mesh.instanceMatrix.needsUpdate = true;
+            dustSystem.mesh.material.opacity = state.fields ? 0.18 + state.flux * 0.14 : 0;
+        }
+
+        function updateIonSparks(rawDt, time) {
+            const planet = bodyById.get("planet");
+
+            if (!planet || !ionSystem) {
+                return;
+            }
+
+            const liveFlux = state.flux * (1 + state.flare * 1.5);
+            const radius = planet.radius * (1.45 + state.magnetosphere * 0.55);
+            ionSystem.particles.forEach((particle, i) => {
+                particle.phase = (particle.phase + rawDt * particle.speed * Math.max(1, state.timeScale * 0.18)) % 1;
+                const angle = particle.angle + particle.phase * Math.PI * 2 + time * 0.42 * particle.band;
+                const bandY = particle.band * planet.radius * (0.95 + particle.offset * 0.14);
+                const oval = 1.18 + Math.sin(angle * 2 + time) * 0.08;
+                const scale = particle.size * (0.28 + state.magnetosphere * 0.22 + liveFlux * 0.05);
+
+                instanceDummy.position.set(
+                    planet.position.x + Math.cos(angle) * radius * oval,
+                    planet.position.y + bandY + Math.sin(angle * 3.0) * 0.18,
+                    planet.position.z + Math.sin(angle) * radius * 0.38
+                );
+                instanceDummy.rotation.set(angle * 0.34, angle * 0.6, time * 0.25);
+                instanceDummy.scale.setScalar(scale);
+                instanceDummy.updateMatrix();
+                ionSystem.mesh.setMatrixAt(i, instanceDummy.matrix);
+            });
+
+            ionSystem.mesh.instanceMatrix.needsUpdate = true;
+            ionSystem.mesh.material.opacity = state.fields ? (0.16 + state.magnetosphere * 0.3) * (1 + state.flare * 0.18) : 0;
+        }
+
+        function updateLabels() {
+            if (!state.labels) {
+                return;
+            }
+
+            bodies.forEach((body) => {
+                positionLabel(body.id, body.position);
+            });
+            positionLabel("barycenter", new THREE.Vector3(0, 0, 0));
+        }
+
+        function positionLabel(id, position) {
+            const label = labelMap.get(id);
+            if (!label) {
+                return;
+            }
+
+            const projected = position.clone().project(camera);
+            const visible = projected.z > -1 && projected.z < 1;
+            label.style.display = visible ? "block" : "none";
+            if (!visible) {
+                return;
+            }
+
+            const x = (projected.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-projected.y * 0.5 + 0.5) * window.innerHeight;
+            label.style.transform = `translate(${x}px, ${y}px) translate(-50%, -50%)`;
+        }
+
+        function updateReadouts() {
+            const planet = bodyById.get("planet");
+            const starA = bodyById.get("star-a");
+            const starB = bodyById.get("star-b");
+            const binarySpan = starA.position.distanceTo(starB.position);
+            const speed = planet.velocity.length() * 13.7;
+            const flux = computeStellarFlux();
+            const magnetopause = computeMagnetopause(flux);
+            const energy = computeTotalEnergy();
+            const energyDrift = state.energyBaseline === 0 ? 0 : (energy - state.energyBaseline) / Math.abs(state.energyBaseline);
+
+            ui.dayReadout.textContent = Math.round(state.simDays).toLocaleString();
+            ui.fluxReadout.textContent = flux.toFixed(2);
+            ui.energyReadout.textContent = `${(energyDrift * 100).toFixed(2)}%`;
+            ui.binaryReadout.textContent = `${(binarySpan / 12).toFixed(2)} AU`;
+            ui.speedReadout.textContent = `${speed.toFixed(1)} km/s`;
+            ui.magReadout.textContent = `${magnetopause.toFixed(1)} Rp`;
+            ui.atmoReadout.textContent = `${Math.round(state.atmosphere * 100)}%`;
+        }
+
+        function updateSelectionReadout() {
+            if (state.frame % 16 !== 0) {
+                return;
+            }
+
+            const body = bodyById.get(state.selectedId);
+            if (!body) {
+                return;
+            }
+
+            ui.selectedName.textContent = body.name;
+            ui.selectedKind.textContent = body.kind;
+            ui.selectedCopy.textContent = body.copy;
+        }
+
+        function getSolarWindDirection() {
+            const planet = bodyById.get("planet");
+            const starA = bodyById.get("star-a");
+            const starB = bodyById.get("star-b");
+            const dirA = tmpVector.subVectors(planet.position, starA.position);
+            const dirB = tmpVectorB.subVectors(planet.position, starB.position);
+            const weightA = starA.mass / Math.max(1, dirA.lengthSq());
+            const weightB = starB.mass / Math.max(1, dirB.lengthSq());
+            const combined = tmpVectorC.copy(dirA.normalize()).multiplyScalar(weightA).addScaledVector(dirB.normalize(), weightB);
+            return combined.normalize();
+        }
+
+        function computeStellarFlux() {
+            const planet = bodyById.get("planet");
+            const starA = bodyById.get("star-a");
+            const starB = bodyById.get("star-b");
+            const dA = planet.position.distanceTo(starA.position);
+            const dB = planet.position.distanceTo(starB.position);
+            const flare = 1 + state.flare * 1.45;
+            return ((starA.mass * 24) / (dA * dA) + (starB.mass * 21) / (dB * dB)) * flare * (0.45 + state.flux);
+        }
+
+        function computeMagnetopause(flux) {
+            const pressure = Math.max(0.04, flux);
+            return (3.2 + state.magnetosphere * 6.4) / Math.pow(pressure + 0.2, 0.18);
+        }
+
+        function setSelected(id) {
+            state.selectedId = id;
+            updateSelectionReadout();
+        }
+
+        function onPointerDown(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            raycaster.setFromCamera(pointer, camera);
+
+            const selectable = bodies.flatMap((body) => body.selectable);
+            const hits = raycaster.intersectObjects(selectable, false);
+            if (hits.length > 0) {
+                const bodyId = hits[0].object.userData.bodyId;
+                if (bodyId) {
+                    setSelected(bodyId);
+                    const body = bodyById.get(bodyId);
+                    addLog("Inspect", body.name);
+                }
+            }
+        }
+
+        function addLog(label, message) {
+            const row = document.createElement("div");
+            row.className = "log-entry";
+            row.innerHTML = `<strong>${label}</strong><span>${message}</span>`;
+            ui.log.prepend(row);
+
+            while (ui.log.children.length > 5) {
+                ui.log.lastChild.remove();
+            }
+        }
+
+        function onResize() {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+            composer.setSize(width, height);
+            bloomPass.setSize(width, height);
+        }
+
+        function mixColor(a, b, t) {
+            const k = clamp(t, 0, 1);
+            return [
+                a[0] + (b[0] - a[0]) * k,
+                a[1] + (b[1] - a[1]) * k,
+                a[2] + (b[2] - a[2]) * k
+            ];
+        }
+
+        function clamp(value, min, max) {
+            return Math.min(max, Math.max(min, value));
+        }
+
+        function smoothstep(edge0, edge1, value) {
+            const x = clamp((value - edge0) / (edge1 - edge0), 0, 1);
+            return x * x * (3 - 2 * x);
+        }
+
+        function randomUnitVector() {
+            const z = THREE.MathUtils.randFloatSpread(2);
+            const angle = Math.random() * Math.PI * 2;
+            const radius = Math.sqrt(Math.max(0, 1 - z * z));
+            return new THREE.Vector3(Math.cos(angle) * radius, z, Math.sin(angle) * radius);
+        }
+    </script>
+</body>
+</html>

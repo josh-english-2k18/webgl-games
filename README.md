@@ -31,6 +31,8 @@ See [DESIGN.md](DESIGN.md) for the shared design philosophy, quality rubric, and
 - [Signal City](https://josh-english-2k18.github.io/webgl-games/signal-city.html) (`signal-city.html`)
 - [Gravity Loom](https://josh-english-2k18.github.io/webgl-games/gravity-loom.html) (`gravity-loom.html`)
 - [Barycentric Dawn](https://josh-english-2k18.github.io/webgl-games/barycentric-dawn.html) (`barycentric-dawn.html`)
+- [Barycentric Dawn Composer](https://josh-english-2k18.github.io/webgl-games/barycentric-dawn-composer.html) (`barycentric-dawn-composer.html`)
+- [Barycentric Dawn AGY](https://josh-english-2k18.github.io/webgl-games/barycentric-dawn-agy.html) (`barycentric-dawn-agy.html`)
 
 ## notes
 
@@ -41,6 +43,10 @@ See [DESIGN.md](DESIGN.md) for the shared design philosophy, quality rubric, and
 `gravity-loom.html` is Gravity Loom, a process test for the shared design philosophy. It is visually strong, graphically solid, and has a strong UI, but playtesting showed that the concept itself is not as exciting as the best particle engines. Keep that distinction visible when evaluating future experiments: polished execution is necessary, but not the same as concept strength.
 
 `barycentric-dawn.html` is Barycentric Dawn, a scaled Newtonian three-body simulation with two stars and one terrestrial planet. It layers orbital trails, particle-only gravity distortion, procedural starfield, instanced solar wind, stellar corona embers, ecliptic dust, ion sparks, mutually attracting gravity particles, troposphere scattering, cloud bands, aurora rings, and a bow-shock magnetosphere with continuous planet-local particle flow around the live body integration.
+
+`barycentric-dawn-composer.html` is Barycentric Dawn Composer, a cinematic variant of the same Newtonian three-body suite with camera shot presets, color grading, anamorphic lens streaks, nebula backdrop, film grain, letterboxing, and refined composer-style HUD controls for bloom and grade. Built with Composer 2.5.
+
+`barycentric-dawn-agy.html` is Barycentric Dawn AGY, an observatory-style variant with fixed-timestep Newtonian integration, regime profiles, probe injection, live telemetry, an energy graph, debug force readouts, and a compact Outfit/JetBrains Mono HUD. Built by Gemini 3.5 Flash on Antigravity CLI.
 
 ## License
 
