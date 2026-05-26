@@ -1,0 +1,1875 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Vector Bloom</title>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js"
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg: #03050a;
+            --ink: #f4fbff;
+            --muted: rgba(244, 251, 255, 0.62);
+            --line: rgba(244, 251, 255, 0.15);
+            --panel: rgba(5, 8, 14, 0.58);
+            --panel-strong: rgba(7, 10, 16, 0.78);
+            --cyan: #62eaff;
+            --violet: #bd92ff;
+            --gold: #ffd45f;
+            --rose: #ff5f8d;
+            --green: #8dffb4;
+            --radius: 8px;
+            --bar: #ff5f8d;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            width: 100%; height: 100%; margin: 0; overflow: hidden;
+            background: var(--bg); color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            letter-spacing: 0;
+        }
+
+        button, input { font: inherit; }
+        button { color: inherit; }
+
+        #stage {
+            position: fixed; inset: 0; overflow: hidden;
+            background:
+                radial-gradient(circle at 17% 28%, rgba(98, 234, 255, 0.14), transparent 28%),
+                radial-gradient(circle at 72% 21%, rgba(189, 146, 255, 0.12), transparent 24%),
+                radial-gradient(circle at 70% 78%, rgba(255, 212, 95, 0.09), transparent 29%),
+                linear-gradient(180deg, #07111b 0%, #03050a 72%, #010207 100%);
+        }
+        #stage canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+        #stage canvas.dragging { cursor: grabbing; }
+
+        .field-grid, .scan, .vignette {
+            position: fixed; inset: 0; pointer-events: none;
+        }
+        .field-grid {
+            opacity: 0.11;
+            background-image:
+                linear-gradient(rgba(244, 251, 255, 0.07) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(244, 251, 255, 0.07) 1px, transparent 1px);
+            background-size: 46px 46px;
+            mask-image: radial-gradient(circle at 50% 48%, #000 0%, #000 56%, transparent 88%);
+            animation: gridDrift 28s linear infinite;
+        }
+        .scan {
+            opacity: 0.045;
+            background: repeating-linear-gradient(to bottom, transparent 0, transparent 7px, rgba(255,255,255,0.38) 8px);
+            mix-blend-mode: screen;
+        }
+        .vignette {
+            background:
+                linear-gradient(to right, rgba(0,0,0,0.56), transparent 16%, transparent 82%, rgba(0,0,0,0.60)),
+                linear-gradient(to bottom, rgba(0,0,0,0.30), transparent 22%, transparent 74%, rgba(0,0,0,0.74));
+        }
+        @keyframes gridDrift {
+            from { transform: translate3d(0,0,0); } to { transform: translate3d(46px,46px,0); }
+        }
+
+        .hud {
+            position: fixed; top: 16px; left: 16px; z-index: 20;
+            max-width: 540px; pointer-events: none;
+        }
+        .brand {
+            display: flex; align-items: center; gap: 10px; margin-bottom: 8px;
+            color: var(--muted); font-size: 10px; font-weight: 860; text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .mark {
+            position: relative; width: 28px; height: 28px; border: 1px solid rgba(98,234,255,0.82);
+            border-radius: 50%; box-shadow: 0 0 22px rgba(98,234,255,0.22), inset 0 0 14px rgba(98,234,255,0.12);
+        }
+        .mark::before, .mark::after { content: ""; position: absolute; border-radius: 50%; }
+        .mark::before { inset: 5px; border: 1px solid rgba(255,212,95,0.76); transform: scaleX(1.5) rotate(-22deg); }
+        .mark::after { inset: 11px; background: var(--rose); box-shadow: 0 0 14px rgba(255,95,141,0.65); }
+
+        h1 { margin: 0; font-size: clamp(30px, 5.2vw, 54px); line-height: 0.9; text-transform: uppercase; text-shadow: 0 0 28px rgba(98,234,255,0.2); }
+
+        .readout {
+            display: flex; flex-wrap: wrap; gap: 9px; margin-top: 9px;
+            color: var(--muted); font-size: 11px; font-weight: 820; font-variant-numeric: tabular-nums; text-transform: uppercase;
+        }
+        .readout strong { color: var(--ink); font-size: 12px; }
+        .readout .combo { color: var(--gold); font-weight: 880; transition: transform 120ms ease, color 120ms ease; }
+        #stability-readout { transition: color 120ms ease; }
+
+        .directive {
+            margin-top: 4px; color: var(--cyan); font-size: 10px; font-weight: 850; text-transform: uppercase;
+            letter-spacing: 0.6px; opacity: 0.85; text-shadow: 0 0 12px rgba(98,234,255,0.2);
+        }
+        .best { font-size: 9px; color: var(--gold); margin-left: 3px; opacity: 0.75; }
+
+        .side-panel {
+            position: fixed; top: 16px; right: 16px; z-index: 22;
+            display: grid; gap: 8px; width: 278px; pointer-events: none;
+        }
+        .panel {
+            border: 1px solid var(--line); border-radius: var(--radius);
+            background: var(--panel); backdrop-filter: blur(22px);
+            box-shadow: 0 8px 28px rgba(0,0,0,0.24); pointer-events: auto;
+            opacity: 0.88;
+        }
+        .panel-head {
+            display: flex; justify-content: space-between; gap: 8px; padding: 9px 11px 0;
+        }
+        .panel h2 { margin: 0; font-size: 11px; text-transform: uppercase; }
+        .badge { color: var(--cyan); font-size: 9px; font-weight: 850; text-transform: uppercase; white-space: nowrap; }
+
+        .panel p { min-height: 38px; margin: 5px 11px 8px; color: var(--muted); font-size: 11px; line-height: 1.35; }
+
+        .stat-grid {
+            display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px;
+            overflow: hidden; border-top: 1px solid var(--line); border-radius: 0 0 var(--radius) var(--radius); background: var(--line);
+        }
+        .stat-cell { min-width: 0; padding: 7px 9px; background: rgba(5,8,14,0.78); }
+        .stat-cell span { display: block; color: var(--muted); font-size: 8px; font-weight: 850; text-transform: uppercase; }
+        .stat-cell strong { display: block; margin-top: 1px; color: var(--ink); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+        .pressure-wells { padding: 8px 11px 10px; border-top: 1px solid var(--line); }
+        .pressure-wells .well { display: grid; grid-template-columns: 64px 1fr; align-items: center; gap: 6px; margin-top: 4px; font-size: 9px; }
+        .pressure-wells .well span { color: var(--muted); font-weight: 850; text-transform: uppercase; }
+        .pbar { height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; border: 1px solid var(--line); }
+        .pbar > div { height: 100%; background: var(--rose); transition: width 120ms linear; box-shadow: 0 0 6px rgba(255,95,141,0.5); }
+
+        .log {
+            display: grid; gap: 4px; max-height: 92px; overflow: hidden;
+            padding: 8px 11px 9px; color: var(--muted); font-size: 10px; line-height: 1.28;
+        }
+        .log-entry { display: grid; grid-template-columns: 48px 1fr; gap: 5px; }
+        .log-entry strong { color: var(--gold); font-size: 8px; text-transform: uppercase; }
+
+        .controls {
+            position: fixed; right: 12px; bottom: 12px; left: 12px; z-index: 24;
+            display: grid; grid-template-columns: minmax(238px, 1fr) minmax(210px, 0.78fr) minmax(268px, 1fr);
+            gap: 8px; pointer-events: none;
+        }
+        .control-panel {
+            display: grid; gap: 6px; padding: 8px; border: 1px solid var(--line);
+            border-radius: var(--radius); background: var(--panel); backdrop-filter: blur(22px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.26); pointer-events: auto; opacity: 0.88;
+        }
+        .control-title { color: var(--muted); font-size: 8px; font-weight: 860; text-transform: uppercase; }
+        .button-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+        .button-grid.modes { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+        .button-row { display: flex; flex-wrap: wrap; gap: 4px; }
+
+        button {
+            min-height: 30px; border: 1px solid rgba(244, 251, 255, 0.16); border-radius: 5px;
+            background: rgba(255, 255, 255, 0.04); cursor: pointer; font-size: 9px; font-weight: 850;
+            text-transform: uppercase; transition: border-color 140ms ease, background 140ms ease, transform 120ms ease;
+        }
+        button:hover { border-color: rgba(98, 234, 255, 0.58); background: rgba(98, 234, 255, 0.1); }
+        button:active { transform: translateY(1px); }
+        button.active { border-color: rgba(255, 212, 95, 0.82); background: rgba(255, 212, 95, 0.14); box-shadow: inset 0 0 14px rgba(255, 212, 95, 0.07); }
+        button.small { min-height: 24px; font-size: 8px; padding: 0 6px; }
+
+        .slider { display: grid; gap: 3px; }
+        .slider label { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+        .slider label strong { color: var(--ink); font-size: 10px; font-variant-numeric: tabular-nums; }
+        input[type="range"] { width: 100%; accent-color: var(--cyan); height: 14px; }
+
+        .kbd { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size: 9px; padding: 1px 4px; border: 1px solid var(--line); border-radius: 3px; background: rgba(0,0,0,0.2); }
+
+        .pause-overlay {
+            position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
+            background: rgba(3,5,10,0.82); backdrop-filter: blur(6px);
+        }
+
+        .world-label {
+            position: absolute; font-size: 9px; font-weight: 850; text-transform: uppercase; letter-spacing: 0.5px;
+            color: rgba(244,251,255,0.72); pointer-events: none; white-space: nowrap;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.6); transform: translate(-50%, -110%);
+        }
+        .world-label.hazard { color: rgba(255,95,141,0.75); }
+        .world-label.emitter { color: rgba(98,234,255,0.65); font-size: 8px; }
+        .world-label.node-label {
+            font-size: 9px; letter-spacing: 0.6px; font-weight: 860;
+            color: #e8f4ff; text-transform: uppercase;
+            background: rgba(4, 6, 12, 0.72);
+            border: 1px solid rgba(244, 251, 255, 0.18);
+            padding: 1px 6px 2px;
+            border-radius: 3px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.85);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+            transition: opacity 90ms ease, color 90ms ease, transform 90ms ease, background 90ms ease;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+        .pause-card {
+            border: 1px solid var(--line); border-radius: 10px; background: var(--panel-strong);
+            padding: 22px 28px; text-align: center; box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+        }
+        .pause-card h3 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--cyan); }
+        .pause-card p { margin: 4px 0 14px; color: var(--muted); font-size: 11px; }
+        .pause-card .row { display: flex; gap: 8px; justify-content: center; }
+
+        .primer-overlay {
+            position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+            background: rgba(3,5,10,0.86); backdrop-filter: blur(4px);
+        }
+        .primer-card {
+            border: 1px solid var(--line); border-radius: 10px; background: var(--panel-strong);
+            padding: 18px 22px; max-width: min(520px, 92vw); box-shadow: 0 24px 64px rgba(0,0,0,0.55);
+        }
+        .primer-card h3 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--cyan); }
+        .primer-card .primer-grid { display: grid; gap: 7px; }
+        .primer-row { display: flex; gap: 10px; font-size: 10px; color: var(--muted); }
+        .primer-row strong { color: var(--ink); font-weight: 860; min-width: 92px; display: inline-block; }
+        .primer-card .close { margin-top: 12px; width: 100%; }
+
+        @media (max-width: 1080px) {
+            .controls { grid-template-columns: 1fr; gap: 6px; }
+            .side-panel { top: auto; right: 10px; bottom: 154px; width: min(268px, calc(100vw - 20px)); }
+        }
+        @media (max-width: 720px) {
+            .hud { top: 8px; left: 8px; max-width: calc(100vw - 16px); }
+            h1 { font-size: 24px; }
+            .directive { font-size: 9px; }
+            .readout { gap: 5px; font-size: 9px; }
+            .side-panel { display: none; }
+            .controls { right: 6px; bottom: 6px; left: 6px; }
+            .control-panel { gap: 4px; padding: 6px; }
+            .button-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+            .button-grid.modes { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+            .button-row button { flex: 1 1 64px; }
+            button { min-height: 26px; font-size: 8px; }
+            .slider label strong { font-size: 9px; }
+        }
+    </style>
+</head>
+<body>
+    <main id="stage" aria-label="Vector Bloom evolved particle field"></main>
+    <div class="field-grid" aria-hidden="true"></div>
+    <div class="scan" aria-hidden="true"></div>
+    <div class="vignette" aria-hidden="true"></div>
+    <div id="event-flash" aria-hidden="true" style="position:fixed;inset:0;pointer-events:none;z-index:10;opacity:0;background:radial-gradient(circle at 50% 50%, rgba(255,212,95,0.18), transparent 55%);mix-blend-mode:screen;transition:opacity 120ms ease;"></div>
+    <div id="world-labels" style="position:fixed;inset:0;pointer-events:none;z-index:15;"></div>
+
+    <section class="hud" aria-label="Vector Bloom status">
+        <div class="brand">
+            <span class="mark" aria-hidden="true"></span>
+            <span>Prismalith Protocol • Grok Variant</span>
+            <button id="help-btn" type="button" class="small" style="margin-left:8px;min-height:20px;padding:0 6px;font-size:9px;opacity:0.7;">?</button>
+        </div>
+        <h1>Vector Bloom</h1>
+        <div class="directive" id="directive">Steer the bloom • Open gates • Sustain x4 combos • Protect the lattice</div>
+        <div class="readout">
+            <span>Score <strong id="score-readout">0</strong> <span class="best" id="best-readout"></span></span>
+            <span>Gates <strong id="gates-readout">0</strong></span>
+            <span>Stability <strong id="stability-readout">100%</strong></span>
+            <span>Coherence <strong id="coherence-readout">62%</strong></span>
+            <span class="combo">Combo <strong id="combo-readout">x1</strong></span>
+            <span>Mode <strong id="mode-readout">Bloom</strong></span>
+        </div>
+    </section>
+
+    <aside class="side-panel">
+        <section class="panel" aria-label="Node inspection">
+            <div class="panel-head">
+                <h2 id="selected-name">Attractor Node</h2>
+                <span id="selected-kind" class="badge">Node 01</span>
+            </div>
+            <p id="selected-copy">Local gravity bends the particle stream into a luminous arc while gate pressure builds on the far side of the field.</p>
+            <div class="stat-grid">
+                <div class="stat-cell"><span>Radius</span><strong id="radius-readout">22.0</strong></div>
+                <div class="stat-cell"><span>Strength</span><strong id="strength-readout">0.82</strong></div>
+                <div class="stat-cell"><span>Flux</span><strong id="flux-readout">0.00</strong></div>
+                <div class="stat-cell"><span>Links</span><strong id="links-readout">—</strong></div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Pressure wells">
+            <div class="panel-head">
+                <h2>Pressure Wells</h2>
+                <span class="badge">Live</span>
+            </div>
+            <div class="pressure-wells">
+                <div class="well"><span>Shear</span><div class="pbar"><div id="pbar-0" style="width:18%"></div></div></div>
+                <div class="well"><span>Pressure</span><div class="pbar"><div id="pbar-1" style="width:24%"></div></div></div>
+            </div>
+        </section>
+
+        <section class="panel" aria-label="Signal log">
+            <div class="panel-head">
+                <h2>Signal Log</h2>
+                <span class="badge">Evolved</span>
+            </div>
+            <div id="log" class="log"></div>
+        </section>
+    </aside>
+
+    <nav class="controls" aria-label="Vector Bloom controls">
+        <section class="control-panel">
+            <div class="control-title">Field Nodes <span class="kbd">1-6</span></div>
+            <div class="button-grid" id="type-controls">
+                <button class="active" type="button" data-type="attract">Attract</button>
+                <button type="button" data-type="repel">Repel</button>
+                <button type="button" data-type="split">Split</button>
+                <button type="button" data-type="dampen">Dampen</button>
+                <button type="button" data-type="ignite">Ignite</button>
+                <button type="button" data-type="vortex">Vortex</button>
+            </div>
+            <div class="button-row">
+                <button id="add-btn" type="button">Add</button>
+                <button id="link-btn" type="button">Link</button>
+                <button id="unlink-btn" type="button" title="U clears resonance bridges">Unlink</button>
+                <button id="pulse-btn" type="button">Pulse</button>
+                <button id="vent-btn" type="button">Vent</button>
+                <button id="pause-btn" type="button">Pause</button>
+                <button id="reset-btn" type="button" title="Shift+R or Space">Reset</button>
+            </div>
+        </section>
+
+        <section class="control-panel">
+            <div class="control-title">Flow Mode <span class="kbd">Q-T</span> <span class="kbd" title="Shift+R resets">Shift+R</span></div>
+            <div class="button-grid modes" id="mode-controls">
+                <button class="active" type="button" data-mode="bloom">Bloom</button>
+                <button type="button" data-mode="shear">Shear</button>
+                <button type="button" data-mode="pressure">Pressure</button>
+                <button type="button" data-mode="cascade">Cascade</button>
+                <button type="button" data-mode="resonance">Resonance</button>
+            </div>
+        </section>
+
+        <section class="control-panel">
+            <div class="control-title">Tuning</div>
+            <div class="slider">
+                <label for="flow-slider"><span>Flow</span><strong id="flow-label">1.00</strong></label>
+                <input id="flow-slider" type="range" min="0.42" max="1.82" value="1" step="0.01">
+            </div>
+            <div class="slider">
+                <label for="radius-slider"><span>Field Radius</span><strong id="radius-label">1.00</strong></label>
+                <input id="radius-slider" type="range" min="0.60" max="1.62" value="1" step="0.01">
+            </div>
+            <div class="slider">
+                <label for="threshold-slider"><span>Gate Tension</span><strong id="threshold-label">1.00</strong></label>
+                <input id="threshold-slider" type="range" min="0.58" max="1.82" value="1" step="0.01">
+            </div>
+            <div class="slider">
+                <label for="coherence-slider"><span>Coherence Bias</span><strong id="coherence-label">1.00</strong></label>
+                <input id="coherence-slider" type="range" min="0.5" max="1.6" value="1" step="0.01">
+            </div>
+        </section>
+    </nav>
+
+    <script type="module">
+        // Open: serve the webgl-games repo from its parent experiments/ folder
+        // then visit /webgl-games/vector-bloom-grok.html
+        import * as THREE from "three";
+
+        const stage = document.querySelector("#stage");
+        const scoreReadout = document.querySelector("#score-readout");
+        const gatesReadout = document.querySelector("#gates-readout");
+        const stabilityReadout = document.querySelector("#stability-readout");
+        const coherenceReadout = document.querySelector("#coherence-readout");
+        const comboReadout = document.querySelector("#combo-readout");
+        const modeReadout = document.querySelector("#mode-readout");
+        const selectedName = document.querySelector("#selected-name");
+        const selectedKind = document.querySelector("#selected-kind");
+        const selectedCopy = document.querySelector("#selected-copy");
+        const radiusReadout = document.querySelector("#radius-readout");
+        const strengthReadout = document.querySelector("#strength-readout");
+        const fluxReadout = document.querySelector("#flux-readout");
+        const linksReadout = document.querySelector("#links-readout");
+        const logEl = document.querySelector("#log");
+        const pbar0 = document.querySelector("#pbar-0");
+        const pbar1 = document.querySelector("#pbar-1");
+        const eventFlash = document.querySelector("#event-flash");
+        const unlinkBtn = document.querySelector("#unlink-btn");
+
+        const flowSlider = document.querySelector("#flow-slider");
+        const radiusSlider = document.querySelector("#radius-slider");
+        const thresholdSlider = document.querySelector("#threshold-slider");
+        const coherenceSlider = document.querySelector("#coherence-slider");
+        const flowLabel = document.querySelector("#flow-label");
+        const radiusLabel = document.querySelector("#radius-label");
+        const thresholdLabel = document.querySelector("#threshold-label");
+        const coherenceLabel = document.querySelector("#coherence-label");
+
+        const worldLabelsEl = document.querySelector("#world-labels");
+        let gateLabels = [], emitterLabels = [], hazardLabels = [], nodeLabels = [];
+
+        const palette = {
+            cyan: new THREE.Color("#62eaff"),
+            violet: new THREE.Color("#bd92ff"),
+            gold: new THREE.Color("#ffd45f"),
+            rose: new THREE.Color("#ff5f8d"),
+            green: new THREE.Color("#8dffb4"),
+            ink: new THREE.Color("#f4fbff")
+        };
+
+        const typeSpecs = {
+            attract: { name: "Attractor Node", badge: "Gravity", color: palette.cyan, strength: 0.84, radius: 21.5,
+                copy: "Local gravity bends the particle stream into a luminous arc. High coherence particles gain stability on passage." },
+            repel: { name: "Repulsor Node", badge: "Deflect", color: palette.rose, strength: 0.76, radius: 19.5,
+                copy: "A hard pressure shell opens clean lanes, shields gates from chaotic particles, and sharpens flow edges." },
+            split: { name: "Splitter Node", badge: "Bifurcate", color: palette.violet, strength: 0.71, radius: 20.5,
+                copy: "Shear fields divide dense rivers into controlled branches with coherence-preserving micro-eddies." },
+            dampen: { name: "Dampener Node", badge: "Cool", color: palette.green, strength: 0.61, radius: 18.5,
+                copy: "Cooling fields slow hot particles, raise local coherence, and bleed pressure from nearby wells." },
+            ignite: { name: "Ignition Node", badge: "Charge", color: palette.gold, strength: 0.68, radius: 17.8,
+                copy: "Gain fields accelerate flow and bloom charge. High risk: lowers coherence and feeds pressure wells." },
+            vortex: { name: "Vortex Node", badge: "Swirl", color: palette.violet, strength: 0.73, radius: 20.2,
+                copy: "Rotational shear folds streams into coherent eddies. Excellent for funneling packets and sustaining resonance links." }
+        };
+
+        const modeSpecs = {
+            bloom: { label: "Bloom", drift: 2.4, hazardGain: 0.82, gateGain: 1.12, spread: 0.96, cohGain: 1.0, color: palette.cyan },
+            shear: { label: "Shear", drift: 6.2, hazardGain: 0.91, gateGain: 1.04, spread: 1.18, cohGain: 0.92, color: palette.violet },
+            pressure: { label: "Pressure", drift: 3.0, hazardGain: 1.28, gateGain: 0.94, spread: 0.88, cohGain: 0.78, color: palette.rose },
+            cascade: { label: "Cascade", drift: 8.1, hazardGain: 1.05, gateGain: 1.22, spread: 1.38, cohGain: 1.08, color: palette.gold },
+            resonance: { label: "Resonance", drift: 4.6, hazardGain: 0.74, gateGain: 1.38, spread: 1.04, cohGain: 1.52, color: palette.green }
+        };
+
+        const state = {
+            mode: "bloom",
+            selectedType: "attract",
+            selectedNode: 0,
+            draggingNode: -1,
+            elapsed: 0,
+            score: 0,
+            gatesOpened: 0,
+            stability: 1,
+            overload: 0,
+            bloomPulse: 0,
+            flux: 0,
+            flow: 1,
+            radiusScale: 1,
+            threshold: 1,
+            coherenceBias: 1,
+            combo: 1,
+            comboTimer: 0,
+            integrity: 0.94,
+            compact: window.innerWidth < 760,
+            links: [], // {a: index, b: index}
+            bestScore: 0,
+            paused: false
+        };
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.OrthographicCamera(-80, 80, 48, -48, 1, 220);
+        camera.position.set(0, 0, 120);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1.18;
+        stage.appendChild(renderer.domElement);
+
+        let worldWidth = 160;
+        const worldHeight = 96;
+        const clock = new THREE.Clock();
+        const pointer = new THREE.Vector2();
+
+        const emitters = [
+            { name: "Aster", yNorm: -0.27, colorIndex: 0, phase: 0, x: -72, y: -24 },
+            { name: "Lumen", yNorm: 0.01, colorIndex: 1, phase: 2.15, x: -72, y: 0 },
+            { name: "Crown", yNorm: 0.28, colorIndex: 2, phase: 4.3, x: -72, y: 24 }
+        ];
+        const gates = [
+            { name: "Gate A", yNorm: -0.27, color: palette.cyan, radius: 6.4, phase: 0.38, charge: 0.22, pulse: 0, flux: 0, y: -25, baseY: -25 },
+            { name: "Gate B", yNorm: 0.02, color: palette.gold, radius: 7.0, phase: 2.35, charge: 0.28, pulse: 0, flux: 0, y: 0, baseY: 0 },
+            { name: "Gate C", yNorm: 0.28, color: palette.violet, radius: 6.5, phase: 4.25, charge: 0.19, pulse: 0, flux: 0, y: 25, baseY: 25 }
+        ];
+        const hazards = [
+            { name: "Shear Well", xNorm: 0.47, yNorm: -0.19, radius: 11.2, pressure: 0.21, phase: 1.6, fracture: 0 },
+            { name: "Pressure Well", xNorm: 0.59, yNorm: 0.23, radius: 12.8, pressure: 0.26, phase: 3.55, fracture: 0 }
+        ];
+
+        const nodes = [];
+        const nodeVisuals = [];
+        const gateVisuals = [];
+        const hazardVisuals = [];
+        const emitterVisuals = [];
+        const pulseRings = [];
+        const linkVisuals = [];
+        const logEntries = [];
+
+        const particleCount = state.compact ? 6100 : 8400;
+        const trailCount = state.compact ? 580 : 1020;
+        const positions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+        const sizes = new Float32Array(particleCount);
+        const alphas = new Float32Array(particleCount);
+        const posX = new Float32Array(particleCount);
+        const posY = new Float32Array(particleCount);
+        const prevX = new Float32Array(particleCount);
+        const prevY = new Float32Array(particleCount);
+        const velX = new Float32Array(particleCount);
+        const velY = new Float32Array(particleCount);
+        const life = new Float32Array(particleCount);
+        const maxLife = new Float32Array(particleCount);
+        const heat = new Float32Array(particleCount);
+        const coherence = new Float32Array(particleCount);
+        const lane = new Uint8Array(particleCount);
+        const seed = new Float32Array(particleCount);
+
+        const particleGeometry = new THREE.BufferGeometry();
+        particleGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+        particleGeometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+        particleGeometry.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
+        particleGeometry.setAttribute("aAlpha", new THREE.BufferAttribute(alphas, 1));
+        particleGeometry.setAttribute("aCoherence", new THREE.BufferAttribute(coherence, 1));
+        particleGeometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 260);
+
+        const particleMaterial = new THREE.ShaderMaterial({
+            transparent: true,
+            depthWrite: false,
+            depthTest: false,
+            blending: THREE.AdditiveBlending,
+            vertexColors: true,
+            uniforms: {
+                uPixelRatio: { value: Math.min(window.devicePixelRatio || 1, 2) },
+                uBloom: { value: 0 },
+                uTime: { value: 0 }
+            },
+            vertexShader: `
+                attribute float aSize;
+                attribute float aAlpha;
+                attribute float aCoherence;
+                varying vec3 vColor;
+                varying float vAlpha;
+                varying float vCoherence;
+                uniform float uPixelRatio;
+                uniform float uBloom;
+
+                void main() {
+                    vColor = color;
+                    vAlpha = aAlpha;
+                    vCoherence = aCoherence;
+                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                    gl_Position = projectionMatrix * mvPosition;
+                    float sizeBoost = 1.0 + uBloom * 0.26 + aCoherence * 0.11;
+                    gl_PointSize = clamp(aSize * uPixelRatio * sizeBoost, 2.0, 11.8);
+                }
+            `,
+            fragmentShader: `
+                varying vec3 vColor;
+                varying float vAlpha;
+                varying float vCoherence;
+                uniform float uTime;
+
+                void main() {
+                    vec2 uv = gl_PointCoord * 2.0 - 1.0;
+                    float d = dot(uv, uv);
+                    if (d > 1.0) { discard; }
+                    float core = smoothstep(0.26, 0.0, d);
+                    float mid = smoothstep(0.68, 0.16, d) * 0.72;
+                    float halo = smoothstep(1.0, 0.52, d) * 0.36;
+                    float twinkle = 0.04 * sin(uTime * 6.2 + vCoherence * 9.0) * (0.4 + vCoherence * 0.6);
+                    float cBoost = 1.0 + vCoherence * 0.28;
+                    gl_FragColor = vec4(vColor * (cBoost + core * 0.85 + twinkle), vAlpha * (core + mid + halo));
+                }
+            `
+        });
+
+        const particleMesh = new THREE.Points(particleGeometry, particleMaterial);
+        particleMesh.frustumCulled = false;
+        scene.add(particleMesh);
+
+        const trailPositions = new Float32Array(trailCount * 2 * 3);
+        const trailColors = new Float32Array(trailCount * 2 * 3);
+        const trailGeometry = new THREE.BufferGeometry();
+        trailGeometry.setAttribute("position", new THREE.BufferAttribute(trailPositions, 3));
+        trailGeometry.setAttribute("color", new THREE.BufferAttribute(trailColors, 3));
+        trailGeometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 260);
+        const trailMaterial = new THREE.LineBasicMaterial({
+            transparent: true, opacity: 0.19, vertexColors: true,
+            blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false
+        });
+        const trailMesh = new THREE.LineSegments(trailGeometry, trailMaterial);
+        trailMesh.frustumCulled = false;
+        scene.add(trailMesh);
+
+        // Resonance link line (dynamic)
+        const linkPositions = new Float32Array(24 * 3); // up to 12 links (conservative)
+        const linkColors = new Float32Array(24 * 3);
+        const linkGeometry = new THREE.BufferGeometry();
+        linkGeometry.setAttribute("position", new THREE.BufferAttribute(linkPositions, 3));
+        linkGeometry.setAttribute("color", new THREE.BufferAttribute(linkColors, 3));
+        const linkMaterial = new THREE.LineBasicMaterial({
+            transparent: true, opacity: 0.32, vertexColors: true,
+            blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false
+        });
+        const linkMesh = new THREE.LineSegments(linkGeometry, linkMaterial);
+        linkMesh.frustumCulled = false;
+        scene.add(linkMesh);
+
+        function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+        function lerp(a, b, t) { return a + (b - a) * t; }
+        function rand(min, max) { return min + Math.random() * (max - min); }
+        function worldX(t) { return lerp(camera.left, camera.right, t); }
+        function worldY(t) { return t * worldHeight; }
+
+        function layoutField() {
+            emitters.forEach((e) => { e.x = camera.left + 9; e.y = worldY(e.yNorm); });
+            gates.forEach((g, i) => {
+                g.x = camera.right - 11 - i * 0.7;
+                g.baseY = worldY(g.yNorm);
+                g.y = g.baseY;
+            });
+            hazards.forEach((h) => { h.x = worldX(h.xNorm); h.y = worldY(h.yNorm); });
+        }
+
+        function resize() {
+            state.compact = window.innerWidth < 760;
+            worldWidth = worldHeight * (window.innerWidth / Math.max(1, window.innerHeight));
+            camera.left = -worldWidth * 0.5;
+            camera.right = worldWidth * 0.5;
+            camera.top = worldHeight * 0.5;
+            camera.bottom = -worldHeight * 0.5;
+            camera.updateProjectionMatrix();
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            particleMaterial.uniforms.uPixelRatio.value = Math.min(window.devicePixelRatio || 1, 2);
+            layoutField();
+            nodes.forEach((n) => {
+                n.x = clamp(n.x, camera.left + 7, camera.right - 7);
+                n.y = clamp(n.y, camera.bottom + 7, camera.top - 7);
+            });
+            syncWorldVisuals();
+            updateWorldLabels();
+        }
+
+        function makeDisc(color, opacity, radius = 1) {
+            return new THREE.Mesh(new THREE.CircleGeometry(radius, 72),
+                new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+        }
+        function makeRing(color, opacity, inner = 0.9, outer = 1) {
+            return new THREE.Mesh(new THREE.RingGeometry(inner, outer, 88),
+                new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+        }
+        function makeLine(points, color, opacity) {
+            const g = new THREE.BufferGeometry().setFromPoints(points);
+            const m = new THREE.LineBasicMaterial({ color, transparent: true, opacity, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false });
+            const l = new THREE.Line(g, m);
+            l.frustumCulled = false;
+            return l;
+        }
+
+        function createEmitterVisuals() {
+            emitters.forEach((e) => {
+                const group = new THREE.Group();
+                const c = [palette.cyan, palette.gold, palette.violet][e.colorIndex];
+                const glow = makeDisc(c, 0.09, 6.0);
+                const ring = makeRing(c, 0.40, 0.70, 1);
+                const core = makeDisc(c, 0.72, 1.38);
+                const spine = makeLine([new THREE.Vector3(0,-7,0.04), new THREE.Vector3(0,7,0.04)], c, 0.30);
+                ring.scale.set(4.0, 4.0, 1);
+                group.add(glow, ring, core, spine);
+                scene.add(group);
+                emitterVisuals.push({ group, glow, ring, core, spine });
+            });
+        }
+
+        function createGateVisuals() {
+            gates.forEach((g) => {
+                const group = new THREE.Group();
+                const halo = makeDisc(g.color, 0.07, 1);
+                const progress = makeDisc(g.color, 0.09, 1);
+                const ring = makeRing(g.color, 0.52, 0.80, 1);
+                const rim = makeRing(palette.ink, 0.14, 0.96, 1.02);
+                const gateLine = makeLine([new THREE.Vector3(-7.0,0,0.05), new THREE.Vector3(7.0,0,0.05)], g.color, 0.16);
+                group.add(halo, progress, ring, rim, gateLine);
+                scene.add(group);
+                gateVisuals.push({ group, halo, progress, ring, rim, gateLine });
+            });
+        }
+
+        function createHazardVisuals() {
+            hazards.forEach((h) => {
+                const group = new THREE.Group();
+                const glow = makeDisc(palette.rose, 0.07, 1);
+                const ring = makeRing(palette.rose, 0.28, 0.85, 1);
+                const inner = makeRing(palette.gold, 0.11, 0.42, 0.46);
+                group.add(glow, ring, inner);
+                scene.add(group);
+                hazardVisuals.push({ group, glow, ring, inner });
+            });
+        }
+
+        function createWorldLabels() {
+            if (!worldLabelsEl) return;
+            worldLabelsEl.innerHTML = "";
+            gateLabels = []; emitterLabels = []; hazardLabels = []; nodeLabels = [];
+
+            emitters.forEach((e, i) => {
+                const el = document.createElement("div");
+                el.className = "world-label emitter";
+                el.textContent = e.name || `EMIT ${i+1}`;
+                worldLabelsEl.appendChild(el);
+                emitterLabels.push({ el, ref: e });
+            });
+            gates.forEach((g, i) => {
+                const el = document.createElement("div");
+                el.className = "world-label";
+                el.textContent = g.name || `GATE ${i+1}`;
+                worldLabelsEl.appendChild(el);
+                gateLabels.push({ el, ref: g });
+            });
+            hazards.forEach((h, i) => {
+                const el = document.createElement("div");
+                el.className = "world-label hazard";
+                el.textContent = (h.name || "WELL").toUpperCase();
+                worldLabelsEl.appendChild(el);
+                hazardLabels.push({ el, ref: h });
+            });
+            rebuildNodeLabels();
+        }
+
+        function rebuildNodeLabels() {
+            // Remove any existing node labels
+            nodeLabels.forEach(l => { if (l.el && l.el.parentNode) l.el.parentNode.removeChild(l.el); });
+            nodeLabels.length = 0;
+
+            // Friendly short names for the effectors (much clearer than the internal badges)
+            const friendly = {
+                attract: "ATTRACT",
+                repel: "REPEL",
+                split: "SPLIT",
+                dampen: "DAMPEN",
+                ignite: "IGNITE",
+                vortex: "VORTEX"
+            };
+
+            nodes.forEach((node, i) => {
+                const spec = typeSpecs[node.type];
+                const el = document.createElement("div");
+                el.className = "world-label node-label";
+                const name = friendly[node.type] || spec.badge.toUpperCase();
+                el.textContent = `${String(i + 1).padStart(2, "0")} ${name}`;
+                el.dataset.nodeIndex = String(i);
+                worldLabelsEl.appendChild(el);
+                nodeLabels.push({ el, index: i });
+            });
+        }
+
+        function updateWorldLabels() {
+            if (!worldLabelsEl || (gateLabels.length === 0 && emitterLabels.length === 0 && nodeLabels.length === 0)) return;
+            const rect = renderer.domElement.getBoundingClientRect();
+            const toScreen = (wx, wy) => {
+                const ndcX = (wx - camera.left) / (camera.right - camera.left);
+                const ndcY = (wy - camera.bottom) / (camera.top - camera.bottom);
+                return {
+                    x: rect.left + ndcX * rect.width,
+                    y: rect.top + (1 - ndcY) * rect.height
+                };
+            };
+
+            emitterLabels.forEach((l, i) => {
+                const p = toScreen(emitters[i].x - 4.5, emitters[i].y);
+                l.el.style.left = `${p.x}px`;
+                l.el.style.top = `${p.y}px`;
+                l.el.style.opacity = "0.55";
+            });
+            gateLabels.forEach((l, i) => {
+                const g = gates[i];
+                const p = toScreen(g.x + 1.5, g.y - 9);
+                l.el.style.left = `${p.x}px`;
+                l.el.style.top = `${p.y}px`;
+                const charge = clamp(g.charge, 0, 1);
+                l.el.style.opacity = (0.5 + charge * 0.45).toFixed(2);
+                l.el.style.color = charge > 0.7 ? "#ffd45f" : "rgba(244,251,255,0.72)";
+            });
+            hazardLabels.forEach((l, i) => {
+                const h = hazards[i];
+                const heat = clamp(h.pressure + h.fracture * 0.6, 0, 1.6);
+                const p = toScreen(h.x, h.y + h.radius + 3.5);
+                l.el.style.left = `${p.x}px`;
+                l.el.style.top = `${p.y}px`;
+                l.el.style.opacity = (0.35 + heat * 0.28).toFixed(2);
+            });
+
+            // Effector / field node labels — clear, always-readable type badges
+            nodeLabels.forEach((l) => {
+                const idx = l.index;
+                const n = nodes[idx];
+                if (!n) return;
+                const r = n.radius * state.radiusScale;
+                const p = toScreen(n.x, n.y - r - 7.5); // a bit higher for breathing room
+                l.el.style.left = `${p.x}px`;
+                l.el.style.top = `${p.y}px`;
+
+                const isSel = idx === state.selectedNode;
+                const isDrag = idx === state.draggingNode;
+
+                if (isSel || isDrag) {
+                    l.el.style.opacity = "1.0";
+                    l.el.style.color = "#ffd45f";
+                    l.el.style.background = "rgba(4, 6, 12, 0.82)";
+                    l.el.style.borderColor = "rgba(255, 212, 95, 0.45)";
+                    l.el.style.fontWeight = "880";
+                    l.el.style.transform = isDrag
+                        ? "translate(-50%, -140%) scale(1.08)"
+                        : "translate(-50%, -115%)";
+                } else {
+                    l.el.style.opacity = "0.86";
+                    l.el.style.color = "#d4e8ff";
+                    l.el.style.background = "rgba(4, 6, 12, 0.74)";
+                    l.el.style.borderColor = "rgba(244, 251, 255, 0.20)";
+                    l.el.style.fontWeight = "860";
+                    l.el.style.transform = "translate(-50%, -110%)";
+                }
+            });
+        }
+
+        function createNodeVisual(node) {
+            const spec = typeSpecs[node.type];
+            const group = new THREE.Group();
+            const field = makeDisc(spec.color, 0.048, 1);
+            const ring = makeRing(spec.color, 0.46, 0.90, 1);
+            const halo = makeRing(spec.color, 0.16, 0.52, 0.56);
+            const core = makeDisc(spec.color, 0.78, 1.15);
+            const cross = makeLine([
+                new THREE.Vector3(-3.0,0,0.07), new THREE.Vector3(3.0,0,0.07),
+                new THREE.Vector3(0,-3.0,0.07), new THREE.Vector3(0,3.0,0.07)
+            ], spec.color, 0.28);
+            group.add(field, ring, halo, core, cross);
+            if (node.type === "vortex") {
+                const swirl = makeRing(spec.color, 0.22, 0.64, 0.82);
+                swirl.rotation.z = 0.8;
+                group.add(swirl);
+                nodeVisuals.push({ group, field, ring, halo, core, cross, swirl });
+            } else {
+                nodeVisuals.push({ group, field, ring, halo, core, cross });
+            }
+            scene.add(group);
+        }
+
+        function disposeVisual(v) {
+            if (!v || !v.group) return;
+            scene.remove(v.group);
+            v.group.traverse((c) => { if (c.geometry) c.geometry.dispose(); if (c.material) c.material.dispose(); });
+        }
+
+        function clearNodeVisuals() {
+            nodeVisuals.forEach(disposeVisual);
+            nodeVisuals.length = 0;
+        }
+
+        function rebuildNodeVisual(idx) {
+            if (idx < 0 || idx >= nodes.length) return;
+            const old = nodeVisuals[idx];
+            if (old) disposeVisual(old);
+            const node = nodes[idx];
+            const spec = typeSpecs[node.type];
+            const group = new THREE.Group();
+            const field = makeDisc(spec.color, 0.048, 1);
+            const ring = makeRing(spec.color, 0.46, 0.90, 1);
+            const halo = makeRing(spec.color, 0.16, 0.52, 0.56);
+            const core = makeDisc(spec.color, 0.78, 1.15);
+            const cross = makeLine([
+                new THREE.Vector3(-3.0,0,0.07), new THREE.Vector3(3.0,0,0.07),
+                new THREE.Vector3(0,-3.0,0.07), new THREE.Vector3(0,3.0,0.07)
+            ], spec.color, 0.28);
+            group.add(field, ring, halo, core, cross);
+            let visual;
+            if (node.type === "vortex") {
+                const swirl = makeRing(spec.color, 0.22, 0.64, 0.82);
+                swirl.rotation.z = 0.8;
+                group.add(swirl);
+                visual = { group, field, ring, halo, core, cross, swirl };
+            } else {
+                visual = { group, field, ring, halo, core, cross };
+            }
+            scene.add(group);
+            nodeVisuals[idx] = visual;
+        }
+
+        function resetNodes() {
+            nodes.length = 0;
+            // Artful default layout for immediate beautiful readable flow
+            nodes.push(
+                { type: "attract", x: worldX(0.28), y: worldY(0.19), radius: 21.5, strength: 0.84, flux: 0, pulse: 0.6 },
+                { type: "vortex", x: worldX(0.51), y: worldY(-0.21), radius: 20.2, strength: 0.73, flux: 0, pulse: 0.4 },
+                { type: "split", x: worldX(0.38), y: worldY(0.08), radius: 20.5, strength: 0.71, flux: 0, pulse: 0.3 },
+                { type: "dampen", x: worldX(0.61), y: worldY(0.31), radius: 18.5, strength: 0.61, flux: 0, pulse: 0.5 },
+                { type: "repel", x: worldX(0.44), y: worldY(-0.09), radius: 19.5, strength: 0.76, flux: 0, pulse: 0.25 },
+                { type: "ignite", x: worldX(0.69), y: worldY(-0.02), radius: 17.8, strength: 0.68, flux: 0, pulse: 0.35 }
+            );
+            clearNodeVisuals();
+            nodes.forEach(createNodeVisual);
+            state.selectedNode = 0;
+            state.selectedType = nodes[0].type;
+            state.links.length = 0;
+            rebuildNodeLabels();
+            updateTypeButtons();
+            updateInspector();
+        }
+
+        function syncWorldVisuals() {
+            emitterVisuals.forEach((v, i) => { const e = emitters[i]; v.group.position.set(e.x, e.y, 0.07); });
+            gateVisuals.forEach((v, i) => { const g = gates[i]; v.group.position.set(g.x, g.y, 0.08); });
+            hazardVisuals.forEach((v, i) => { const h = hazards[i]; v.group.position.set(h.x, h.y, 0.06); });
+            updateNodeVisuals(0);
+            updateLinkVisuals(0);
+        }
+
+        function updateNodeVisuals(dt) {
+            nodes.forEach((node, i) => {
+                const v = nodeVisuals[i];
+                if (!v) return;
+                const spec = typeSpecs[node.type];
+                const sel = (i === state.selectedNode) ? 1 : 0;
+                const r = node.radius * state.radiusScale;
+                const p = node.pulse + sel * 0.2 + Math.sin(state.elapsed * 3.1 + i) * 0.032;
+                v.group.position.set(node.x, node.y, 0.09);
+                v.field.scale.set(r, r, 1);
+                v.ring.scale.set(r * 0.17 + p * 1.55, r * 0.17 + p * 1.55, 1);
+                v.halo.scale.set(3.5 + p * 3.1, 3.5 + p * 3.1, 1);
+                v.core.scale.set(1 + p * 0.55, 1 + p * 0.55, 1);
+                const rotSpeed = (node.type === "vortex") ? 1.8 : (node.type === "split" ? -0.9 : 0.6);
+                v.cross.rotation.z += dt * (0.38 + node.strength * 0.7) * rotSpeed;
+                if (v.swirl) v.swirl.rotation.z += dt * 2.8;
+                v.field.material.color.copy(spec.color);
+                v.ring.material.color.copy(spec.color);
+                v.halo.material.color.copy(spec.color);
+                v.core.material.color.copy(spec.color);
+                v.cross.material.color.copy(spec.color);
+                if (v.swirl) v.swirl.material.color.copy(spec.color);
+                const fG = clamp(node.flux, 0, 1);
+                v.field.material.opacity = 0.032 + sel * 0.03 + fG * 0.02;
+                v.ring.material.opacity = 0.34 + sel * 0.22 + fG * 0.055;
+                v.halo.material.opacity = 0.11 + sel * 0.07 + fG * 0.035;
+                v.core.material.opacity = 0.60 + sel * 0.2;
+                node.pulse = Math.max(0, node.pulse - dt * 1.45);
+            });
+        }
+
+        function updateGateVisuals(dt) {
+            const m = modeSpecs[state.mode];
+            gates.forEach((g, i) => {
+                const v = gateVisuals[i];
+                g.y = g.baseY + Math.sin(state.elapsed * 0.38 + g.phase) * m.drift;
+                g.pulse = Math.max(0, g.pulse - dt * 1.7);
+                g.flux *= Math.pow(0.04, dt);
+                const s = g.radius * (1 + g.pulse * 0.07);
+                v.group.position.set(g.x, g.y, 0.08);
+                v.group.rotation.z = Math.sin(state.elapsed * 0.19 + g.phase) * 0.16;
+                v.halo.scale.set(s * 2.1, s * 2.1, 1);
+                v.progress.scale.set(s * clamp(g.charge, 0.03, 1), s * clamp(g.charge, 0.03, 1), 1);
+                v.ring.scale.set(s, s, 1);
+                v.rim.scale.set(s * 1.14, s * 1.14, 1);
+                v.halo.material.opacity = 0.04 + g.charge * 0.1 + g.pulse * 0.11;
+                v.progress.material.opacity = 0.055 + g.charge * 0.18;
+                v.ring.material.opacity = 0.36 + g.charge * 0.3 + g.pulse * 0.18;
+                v.gateLine.material.opacity = 0.11 + g.flux * 0.2;
+            });
+        }
+
+        function updateHazardVisuals(dt) {
+            const m = modeSpecs[state.mode];
+            hazards.forEach((h, i) => {
+                const v = hazardVisuals[i];
+                h.pressure = Math.max(0, h.pressure - dt * 0.075);
+                h.fracture = Math.max(0, h.fracture - dt * 0.9);
+                const heat = clamp(h.pressure + h.fracture * 0.6, 0, 1.55);
+                v.group.position.set(h.x, h.y, 0.06);
+                v.group.rotation.z += dt * (0.14 + heat * 0.48) * (i % 2 ? -1 : 1);
+                const rs = h.radius * (1 + heat * 0.09);
+                v.glow.scale.set(rs * 1.82, rs * 1.82, 1);
+                v.ring.scale.set(rs * (1 + heat * 0.06), rs * (1 + heat * 0.06), 1);
+                v.inner.scale.set(rs * (0.94 + Math.sin(state.elapsed * 1.9 + h.phase) * 0.04), rs * (0.94 + Math.sin(state.elapsed * 1.9 + h.phase) * 0.04), 1);
+                v.glow.material.opacity = 0.035 + heat * 0.12 * m.hazardGain;
+                v.ring.material.opacity = 0.17 + heat * 0.2;
+                v.inner.material.opacity = 0.07 + heat * 0.14;
+                // telegraph spikes
+                if (heat > 0.9) {
+                    const t = (Math.sin(state.elapsed * 18 + i) * 0.5 + 0.5);
+                    v.ring.scale.set(rs * (1.06 + t * 0.09), rs * (1.06 + t * 0.09), 1);
+                }
+            });
+        }
+
+        function updateEmitterVisuals(dt) {
+            emitterVisuals.forEach((v, i) => {
+                const e = emitters[i];
+                const p = 0.48 + Math.sin(state.elapsed * 3.0 + e.phase) * 0.52;
+                v.group.position.set(e.x, e.y, 0.07);
+                v.ring.rotation.z += dt * (0.82 + i * 0.16);
+                v.ring.scale.set(4.0 + p * 0.52, 4.0 + p * 0.52, 1);
+                v.glow.material.opacity = 0.045 + p * 0.035;
+                v.core.material.opacity = 0.60 + p * 0.16;
+            });
+        }
+
+        function createPulse(x, y, color, radius, speed = 22, opacity = 0.40) {
+            const ring = makeRing(color, opacity, 0.86, 1);
+            ring.position.set(x, y, 0.18);
+            ring.scale.set(radius * 0.2, radius * 0.2, 1);
+            scene.add(ring);
+            pulseRings.push({ ring, age: 0, life: 0.92, radius, speed, opacity });
+        }
+
+        function spawnGateBurst(gate, intensity = 1) {
+            // Spray bright resonant particles outward from the gate for juicy feedback
+            const count = Math.floor(11 + intensity * 7);
+            for (let k = 0; k < count; k++) {
+                // find a dead or low-life particle to repurpose for the burst
+                let idx = -1;
+                for (let i = Math.floor(Math.random() * particleCount); i < particleCount; i++) {
+                    if (life[i] < 0.6) { idx = i; break; }
+                }
+                if (idx < 0) idx = Math.floor(Math.random() * particleCount);
+                const ang = (k / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+                const sp = 38 + Math.random() * 26;
+                posX[idx] = gate.x + Math.cos(ang) * 1.2;
+                posY[idx] = gate.y + Math.sin(ang) * 1.2;
+                prevX[idx] = posX[idx] - Math.cos(ang) * 0.8;
+                prevY[idx] = posY[idx] - Math.sin(ang) * 0.8;
+                velX[idx] = Math.cos(ang) * sp;
+                velY[idx] = Math.sin(ang) * sp * 0.7 + (Math.random() - 0.5) * 9;
+                life[idx] = 0.55 + Math.random() * 0.35;
+                maxLife[idx] = life[idx];
+                heat[idx] = 0.3 + Math.random() * 0.4;
+                coherence[idx] = 0.92;
+                lane[idx] = 0;
+                seed[idx] = Math.random();
+                // force bright gold-white for the burst frame
+                const b = palette.gold;
+                colors[idx * 3] = b.r * 1.1; colors[idx * 3 + 1] = b.g * 1.05; colors[idx * 3 + 2] = b.b * 0.95;
+                sizes[idx] = 4.8 + Math.random() * 2.8;
+                alphas[idx] = 0.95;
+            }
+            particleGeometry.attributes.position.needsUpdate = true;
+            particleGeometry.attributes.color.needsUpdate = true;
+            particleGeometry.attributes.aSize.needsUpdate = true;
+            particleGeometry.attributes.aAlpha.needsUpdate = true;
+            particleGeometry.attributes.aCoherence.needsUpdate = true;
+        }
+
+        function triggerEventFlash(intensity = 0.6) {
+            if (!eventFlash) return;
+            eventFlash.style.transition = "none";
+            eventFlash.style.opacity = String(intensity);
+            // force reflow then fade
+            void eventFlash.offsetWidth;
+            eventFlash.style.transition = "opacity 180ms ease";
+            eventFlash.style.opacity = "0";
+        }
+
+        function updatePulses(dt) {
+            for (let i = pulseRings.length - 1; i >= 0; i--) {
+                const p = pulseRings[i];
+                p.age += dt;
+                const t = p.age / p.life;
+                const sc = p.radius * (0.2 + t * p.speed * 0.052);
+                p.ring.scale.set(sc, sc, 1);
+                p.ring.material.opacity = p.opacity * (1 - t);
+                if (t >= 1) {
+                    scene.remove(p.ring);
+                    p.ring.geometry.dispose();
+                    p.ring.material.dispose();
+                    pulseRings.splice(i, 1);
+                }
+            }
+        }
+
+        function resetParticle(i, preferred = -1) {
+            const ei = preferred >= 0 ? preferred : Math.floor(Math.random() * emitters.length);
+            const e = emitters[ei];
+            const m = modeSpecs[state.mode];
+            const j = rand(-5.6, 5.6) * m.spread;
+            const sp = rand(17.5, 29) * state.flow;
+            const ang = rand(-0.17, 0.17) + (ei - 1) * 0.032;
+            posX[i] = e.x + rand(-2.6, 1.4);
+            posY[i] = e.y + j;
+            prevX[i] = posX[i] - Math.cos(ang) * 0.7;
+            prevY[i] = posY[i] - Math.sin(ang) * 0.7;
+            velX[i] = Math.cos(ang) * sp;
+            velY[i] = Math.sin(ang) * sp + rand(-1.8, 1.8);
+            lane[i] = ei;
+            life[i] = rand(4.2, 7.6);
+            maxLife[i] = life[i];
+            heat[i] = rand(0.11, 0.36);
+            coherence[i] = rand(0.28, 0.58);
+            seed[i] = Math.random();
+            positions[i * 3] = posX[i];
+            positions[i * 3 + 1] = posY[i];
+            positions[i * 3 + 2] = 0;
+            sizes[i] = rand(2.1, 5.0);
+            alphas[i] = rand(0.22, 0.56);
+        }
+
+        function resetParticles() {
+            for (let i = 0; i < particleCount; i++) {
+                resetParticle(i, i % emitters.length);
+                posX[i] += rand(-9, worldWidth * 0.38);
+                prevX[i] = posX[i] - rand(0.35, 1.5);
+                coherence[i] = clamp(coherence[i] + 0.18, 0.3, 0.82);
+            }
+            particleGeometry.attributes.position.needsUpdate = true;
+            particleGeometry.attributes.color.needsUpdate = true;
+            particleGeometry.attributes.aSize.needsUpdate = true;
+            particleGeometry.attributes.aAlpha.needsUpdate = true;
+            particleGeometry.attributes.aCoherence.needsUpdate = true;
+        }
+
+        function nearestGateForParticle(i) {
+            const idx = lane[i] % gates.length;
+            if (state.mode === "cascade") {
+                return gates[(idx + Math.floor(state.elapsed * 0.42 + seed[i] * 2.8)) % gates.length];
+            }
+            return gates[idx];
+        }
+
+        function applyNodeForce(node, i, dt) {
+            const spec = typeSpecs[node.type];
+            const dx = node.x - posX[i];
+            const dy = node.y - posY[i];
+            const r = node.radius * state.radiusScale;
+            const dsq = dx * dx + dy * dy;
+            if (dsq > r * r) return { ax: 0, ay: 0 };
+            const d = Math.sqrt(dsq) + 0.0001;
+            const fall = (1 - d / r);
+            const crv = fall * fall;
+            const nx = dx / d, ny = dy / d;
+            const pow = spec.strength * node.strength * crv;
+            node.flux = Math.min(1.55, node.flux + crv * 0.0032);
+
+            if (node.type === "attract") {
+                coherence[i] = Math.min(1, coherence[i] + crv * dt * 0.6 * state.coherenceBias);
+                return { ax: nx * pow * 82, ay: ny * pow * 82 };
+            }
+            if (node.type === "repel") {
+                coherence[i] = Math.max(0.08, coherence[i] - crv * dt * 0.18);
+                return { ax: -nx * pow * 90, ay: -ny * pow * 90 };
+            }
+            if (node.type === "split") {
+                const sgn = ((seed[i] + lane[i]) % 1 > 0.5) ? 1 : -1;
+                coherence[i] = Math.min(1, coherence[i] + crv * dt * 0.32 * state.coherenceBias);
+                return { ax: -ny * sgn * pow * 100 + nx * pow * 16, ay: nx * sgn * pow * 100 + ny * pow * 16 };
+            }
+            if (node.type === "dampen") {
+                const damp = Math.max(0.52, 1 - crv * 0.78 * dt * 5.0);
+                velX[i] *= damp; velY[i] *= damp;
+                heat[i] = Math.max(0.02, heat[i] - crv * dt * 0.9);
+                coherence[i] = Math.min(1, coherence[i] + crv * dt * 1.1 * state.coherenceBias);
+                return { ax: nx * pow * 14, ay: ny * pow * 14 };
+            }
+            if (node.type === "ignite") {
+                const spd = Math.hypot(velX[i], velY[i]) + 0.0001;
+                heat[i] = Math.min(1.85, heat[i] + crv * dt * 1.18);
+                coherence[i] = Math.max(0.05, coherence[i] - crv * dt * 0.72);
+                return { ax: (velX[i] / spd) * pow * 102 - ny * pow * 16, ay: (velY[i] / spd) * pow * 102 + nx * pow * 16 };
+            }
+            if (node.type === "vortex") {
+                // Tangential swirl + mild centering for beautiful eddies
+                const tx = -ny, ty = nx;
+                const vortPow = pow * 1.12;
+                coherence[i] = Math.min(1, coherence[i] + crv * dt * 0.82 * state.coherenceBias);
+                return {
+                    ax: tx * vortPow * (0.58 + 0.42 * crv) + nx * pow * 11,
+                    ay: ty * vortPow * (0.58 + 0.42 * crv) + ny * pow * 11
+                };
+            }
+            return { ax: 0, ay: 0 };
+        }
+
+        function updateParticles(dt) {
+            const m = modeSpecs[state.mode];
+            let totalFlux = 0;
+            nodes.forEach(n => { n.flux *= Math.pow(0.07, dt); });
+
+            // Apply resonance link forces/coherence (powerful new mechanic)
+            for (let li = 0; li < state.links.length; li++) {
+                const L = state.links[li];
+                const na = nodes[L.a], nb = nodes[L.b];
+                if (!na || !nb) continue;
+                const lx = (na.x + nb.x) * 0.5;
+                const ly = (na.y + nb.y) * 0.5;
+                const ldx = nb.x - na.x, ldy = nb.y - na.y;
+                const llen = Math.hypot(ldx, ldy) + 0.0001;
+                const lnx = ldx / llen, lny = ldy / llen;
+                for (let i = 0; i < particleCount; i += 3) { // subsample for perf
+                    const dx = posX[i] - lx, dy = posY[i] - ly;
+                    const t = (dx * lnx + dy * lny) / llen;
+                    if (t < -0.1 || t > 1.1) continue;
+                    const px = na.x + lnx * clamp(t, 0, 1) * llen;
+                    const py = na.y + lny * clamp(t, 0, 1) * llen;
+                    const ddx = posX[i] - px, ddy = posY[i] - py;
+                    const dd = Math.hypot(ddx, ddy) + 0.0001;
+                    if (dd < 14) {
+                        const near = (1 - dd / 14);
+                        coherence[i] = Math.min(1, coherence[i] + near * dt * 0.9 * m.cohGain);
+                        velX[i] += (lnx * 38 - ddx * 2.2) * near * dt * 0.6;
+                        velY[i] += (lny * 38 - ddy * 2.2) * near * dt * 0.6;
+                    }
+                }
+            }
+
+            for (let i = 0; i < particleCount; i += 1) {
+                prevX[i] = posX[i]; prevY[i] = posY[i];
+                life[i] -= dt;
+
+                let ax = 6.2 * state.flow;
+                let ay = Math.sin(state.elapsed * 0.82 + seed[i] * 9.0) * 0.86;
+                const tgt = nearestGateForParticle(i);
+                const tx = tgt.x - posX[i], ty = tgt.y - posY[i];
+                const gd = Math.sqrt(tx * tx + ty * ty) + 0.0001;
+                const gpull = clamp((posX[i] - camera.left) / worldWidth, 0, 1);
+                ax += (tx / gd) * (6.8 + gpull * 17) * state.flow;
+                ay += (ty / gd) * (3.8 + gpull * 19) * state.flow;
+
+                for (let n = 0; n < nodes.length; n++) {
+                    const f = applyNodeForce(nodes[n], i, dt);
+                    ax += f.ax; ay += f.ay;
+                }
+
+                for (let h = 0; h < hazards.length; h++) {
+                    const haz = hazards[h];
+                    const dx = posX[i] - haz.x, dy = posY[i] - haz.y;
+                    const dsq = dx * dx + dy * dy;
+                    const hr = haz.radius * (1.22 + haz.pressure * 0.11 + haz.fracture * 0.18);
+                    if (dsq < hr * hr) {
+                        const d = Math.sqrt(dsq) + 0.0001;
+                        const c = (1 - d / hr);
+                        const hgain = (0.22 + heat[i] * 0.11) * m.hazardGain;
+                        haz.pressure = Math.min(1.48, haz.pressure + c * hgain * dt * 0.32);
+                        if (haz.fracture > 0.6) {
+                            heat[i] = Math.min(1.9, heat[i] + c * dt * 0.48);
+                            coherence[i] = Math.max(0.04, coherence[i] - c * dt * 0.9);
+                            ax += (dx / d) * c * 18; ay += (dy / d) * c * 18;
+                        } else {
+                            heat[i] = Math.min(1.82, heat[i] + c * dt * 0.28);
+                        }
+                        coherence[i] = Math.max(0.03, coherence[i] - c * dt * 0.22);
+                    }
+                }
+
+                velX[i] += ax * dt; velY[i] += ay * dt;
+                const spd = Math.hypot(velX[i], velY[i]) + 0.0001;
+                const mx = 52 + heat[i] * 17 + state.flow * 7.5;
+                if (spd > mx) { const sc = mx / spd; velX[i] *= sc; velY[i] *= sc; }
+                velX[i] *= Math.pow(0.16, dt);
+                velY[i] *= Math.pow(0.19, dt);
+                posX[i] += velX[i] * dt;
+                posY[i] += velY[i] * dt;
+                heat[i] = Math.max(0.02, heat[i] - dt * 0.065);
+                coherence[i] = clamp(coherence[i] - dt * 0.014, 0.03, 1);
+
+                const gdx = posX[i] - tgt.x, gdy = posY[i] - tgt.y;
+                const ghr = tgt.radius * (1.06 + state.bloomPulse * 0.1);
+                if (gdx * gdx + gdy * gdy < ghr * ghr && velX[i] > 0) {
+                    const ch = (0.42 + heat[i] * 0.38 + Math.max(0, velX[i]) * 0.007) * m.gateGain;
+                    const cohBonus = 0.6 + coherence[i] * 1.35;
+                    tgt.charge += ch * 0.0135 / state.threshold * cohBonus;
+                    tgt.flux = Math.min(1, tgt.flux + ch * 0.011);
+                    totalFlux += ch;
+                    const add = Math.floor(2 + ch * 7.5 * cohBonus);
+                    state.score += add;
+                    if (state.comboTimer > 0) state.score += Math.floor(add * (state.combo - 1) * 0.6);
+                    resetParticle(i, lane[i] % emitters.length);
+                    if (tgt.charge >= 1) {
+                        tgt.charge = 0.14;
+                        tgt.pulse = 1;
+                        state.gatesOpened += 1;
+                        const comboGain = state.combo;
+                        state.score += Math.floor(195 + state.stability * 85 * comboGain);
+                        // cadence milestone every 3 gates
+                        if (state.gatesOpened % 3 === 0) {
+                            const bonus = Math.floor(85 + state.stability * 60);
+                            state.score += bonus;
+                            state.integrity = clamp(state.integrity + 0.03, 0.4, 1);
+                            addLog("Resonance", `Triad bloom • +${bonus}`);
+                            triggerEventFlash(0.38);
+                        }
+                        state.bloomPulse = 1.0;
+                        if (state.comboTimer > 0) {
+                            state.combo = clamp(state.combo + 0.6, 1, 4.2);
+                        } else {
+                            state.combo = Math.min(4.2, state.combo + 0.8);
+                        }
+                        if (state.score > state.bestScore && state.bestScore > 0) {
+                            // live new best moment
+                            if (Math.random() < 0.6) addLog("Record", "New personal best");
+                        }
+                        if (comboReadout) {
+                            comboReadout.style.transition = "transform 60ms ease, color 60ms";
+                            comboReadout.style.transform = "scale(1.35)";
+                            comboReadout.style.color = "#ffd45f";
+                            setTimeout(() => {
+                                if (comboReadout) { comboReadout.style.transform = "scale(1)"; comboReadout.style.color = ""; }
+                            }, 180);
+                        }
+                        state.comboTimer = 3.15;
+                        state.integrity = clamp(state.integrity + 0.018, 0.4, 1);
+                        createPulse(tgt.x, tgt.y, tgt.color, tgt.radius * 2.5, 30, 0.52);
+                        spawnGateBurst(tgt, comboGain - 0.6);
+                        // extra inner flash ring for bigger moments
+                        if (comboGain > 2.2) {
+                            createPulse(tgt.x, tgt.y, palette.gold, tgt.radius * 1.6, 48, 0.7);
+                        }
+                        triggerEventFlash(0.55 + Math.min(0.25, (comboGain - 1) * 0.12));
+                        addLog("Gate", `${tgt.name} opened • x${comboGain.toFixed(1)}`);
+                        // small coherence wave
+                        for (let k = 0; k < particleCount; k += 4) {
+                            const ddx = posX[k] - tgt.x, ddy = posY[k] - tgt.y;
+                            if (ddx*ddx + ddy*ddy < 420) coherence[k] = Math.min(1, coherence[k] + 0.22);
+                        }
+                    }
+                }
+
+                const off = posX[i] > camera.right + 9 || posY[i] > camera.top + 11 || posY[i] < camera.bottom - 11 || life[i] <= 0;
+                if (off) resetParticle(i);
+
+                const age = 1 - life[i] / Math.max(0.001, maxLife[i]);
+                const fd = Math.sin(clamp(age, 0, 1) * Math.PI);
+                const intens = 0.72 + heat[i] * 0.48 + state.bloomPulse * 0.16;
+                const baseC = [palette.cyan, palette.gold, palette.violet];
+                const hotC = heat[i] > 0.82 ? palette.rose : (heat[i] > 0.5 ? palette.gold : baseC[lane[i] % 3]);
+                const b = baseC[lane[i] % 3];
+                const mxh = clamp(heat[i] * 0.52, 0, 1);
+                let cr = lerp(b.r, hotC.r, mxh) * intens;
+                let cg = lerp(b.g, hotC.g, mxh) * intens;
+                let cb = lerp(b.b, hotC.b, mxh) * intens;
+
+                // High combo visual juice: larger, slightly golden resonant particles
+                const comboBoost = state.combo > 2.6 ? (state.combo - 2.3) * 0.9 : 0;
+                const cSize = clamp(2.1 + heat[i] * 2.6 + (coherence[i] - 0.3) * 1.8 + spd * 0.022 + comboBoost * 0.9, 1.9, 9.2);
+                sizes[i] = cSize;
+                alphas[i] = clamp(0.15 + fd * 0.48 + heat[i] * 0.1 + coherence[i] * 0.14 + comboBoost * 0.06, 0.05, 0.94);
+
+                if (comboBoost > 0.1) {
+                    const t = Math.min(0.42, comboBoost * 0.26);
+                    cr = cr * (1 - t * 0.2) + (0.98 * t);
+                    cg = cg * (1 - t * 0.1) + (0.88 * t);
+                }
+                colors[i * 3] = cr;
+                colors[i * 3 + 1] = cg;
+                colors[i * 3 + 2] = cb;
+                positions[i * 3] = posX[i];
+                positions[i * 3 + 1] = posY[i];
+                positions[i * 3 + 2] = (heat[i] - 0.48) * 0.7;
+            }
+
+            state.flux = state.flux * Math.pow(0.035, dt) + totalFlux * 0.0018;
+            particleGeometry.attributes.position.needsUpdate = true;
+            particleGeometry.attributes.color.needsUpdate = true;
+            particleGeometry.attributes.aSize.needsUpdate = true;
+            particleGeometry.attributes.aAlpha.needsUpdate = true;
+            particleGeometry.attributes.aCoherence.needsUpdate = true;
+            updateTrails();
+        }
+
+        function updateTrails() {
+            const step = Math.max(1, Math.floor(particleCount / trailCount));
+            for (let t = 0; t < trailCount; t++) {
+                const i = (t * step) % particleCount;
+                const pi = t * 6;
+                trailPositions[pi] = prevX[i]; trailPositions[pi + 1] = prevY[i]; trailPositions[pi + 2] = -0.18;
+                trailPositions[pi + 3] = posX[i]; trailPositions[pi + 4] = posY[i]; trailPositions[pi + 5] = -0.18;
+                const ab = clamp(0.48 + coherence[i] * 0.32, 0.48, 1);
+                trailColors[pi] = colors[i * 3] * 0.22;
+                trailColors[pi + 1] = colors[i * 3 + 1] * 0.22;
+                trailColors[pi + 2] = colors[i * 3 + 2] * 0.22;
+                trailColors[pi + 3] = colors[i * 3] * ab;
+                trailColors[pi + 4] = colors[i * 3 + 1] * ab;
+                trailColors[pi + 5] = colors[i * 3 + 2] * ab;
+            }
+            trailGeometry.attributes.position.needsUpdate = true;
+            trailGeometry.attributes.color.needsUpdate = true;
+        }
+
+        function updateLinkVisuals(dt) {
+            let idx = 0;
+            for (let i = 0; i < state.links.length && idx < 22; i++) {
+                const L = state.links[i];
+                const a = nodes[L.a], b = nodes[L.b];
+                if (!a || !b) continue;
+                linkPositions[idx * 3] = a.x; linkPositions[idx * 3 + 1] = a.y; linkPositions[idx * 3 + 2] = 0.11;
+                linkPositions[idx * 3 + 3] = b.x; linkPositions[idx * 3 + 4] = b.y; linkPositions[idx * 3 + 5] = 0.11;
+                const lc = (a.flux + b.flux) * 0.22 + 0.28;
+                linkColors[idx * 3] = 0.72 + lc * 0.2; linkColors[idx * 3 + 1] = 0.82 + lc * 0.12; linkColors[idx * 3 + 2] = 0.95;
+                linkColors[idx * 3 + 3] = 0.68 + lc * 0.22; linkColors[idx * 3 + 4] = 0.78 + lc * 0.14; linkColors[idx * 3 + 5] = 0.92;
+                idx += 2;
+            }
+            linkGeometry.setDrawRange(0, idx);
+            linkMesh.visible = idx > 0;
+            linkMaterial.opacity = 0.26 + state.bloomPulse * 0.08;
+        }
+
+        function updateGameState(dt) {
+            state.elapsed += dt;
+            state.bloomPulse = Math.max(0, state.bloomPulse - dt * 1.2);
+            state.comboTimer = Math.max(0, state.comboTimer - dt);
+            if (state.comboTimer <= 0.02) state.combo = Math.max(1, state.combo - dt * 0.6);
+
+            const pres = hazards.reduce((s, h) => s + h.pressure + h.fracture * 0.6, 0) / hazards.length;
+            state.overload = clamp(pres / 1.52, 0, 1);
+            const cohAvg = coherence.reduce((s, c) => s + c, 0) / particleCount;
+            state.stability = clamp(1 - state.overload * 0.64 + Math.min(0.09, state.flux * 0.0035) + (cohAvg - 0.48) * 0.12, 0.05, 1.0);
+            state.integrity = clamp(state.integrity - (state.overload > 0.78 ? dt * 0.012 : -dt * 0.004), 0.38, 1.0);
+
+            if (state.integrity < 0.52 && state.overload > 0.6 && Math.sin(state.elapsed * 1.7) > 0.94) {
+                if (Math.random() < 0.4) addLog("Advice", "Vent pressure or pulse lattice");
+            }
+
+            if (state.overload > 0.82 && Math.sin(state.elapsed * 2.4) > 0.96) {
+                state.score = Math.max(0, state.score - 6);
+                state.integrity = Math.max(0.38, state.integrity - 0.004);
+                if (Math.random() < 0.18) addLog("Pressure", "Spike • stability taxed");
+                if (stabilityReadout) {
+                    stabilityReadout.style.transition = "color 80ms";
+                    stabilityReadout.style.color = "#ff5f8d";
+                    setTimeout(() => { if (stabilityReadout) stabilityReadout.style.color = ""; }, 280);
+                }
+            }
+            particleMaterial.uniforms.uBloom.value = state.bloomPulse;
+            particleMaterial.uniforms.uTime.value = state.elapsed;
+            trailMaterial.opacity = 0.15 + state.bloomPulse * 0.12 + state.flux * 0.009;
+        }
+
+        function updateHud() {
+            scoreReadout.textContent = String(Math.floor(state.score));
+            gatesReadout.textContent = String(state.gatesOpened);
+            stabilityReadout.textContent = `${Math.round(state.stability * 100)}%`;
+            coherenceReadout.textContent = `${Math.round(coherence.reduce((s, c) => s + c, 0) / particleCount * 100)}%`;
+            comboReadout.textContent = `x${state.combo.toFixed(1)}`;
+            modeReadout.textContent = modeSpecs[state.mode].label;
+
+            const st = state.stability;
+            stabilityReadout.style.color = st < 0.45 ? "#ff5f8d" : (st < 0.72 ? "#ffd45f" : "#8dffb4");
+
+            fluxReadout.textContent = state.flux.toFixed(2);
+            pbar0.style.width = `${clamp(hazards[0].pressure * 78 + hazards[0].fracture * 22, 2, 100)}%`;
+            pbar1.style.width = `${clamp(hazards[1].pressure * 78 + hazards[1].fracture * 22, 2, 100)}%`;
+
+            flowLabel.textContent = state.flow.toFixed(2);
+            radiusLabel.textContent = state.radiusScale.toFixed(2);
+            thresholdLabel.textContent = state.threshold.toFixed(2);
+            coherenceLabel.textContent = state.coherenceBias.toFixed(2);
+
+            const bestEl = document.querySelector("#best-readout");
+            if (bestEl) {
+                if (state.bestScore > 0) {
+                    bestEl.textContent = `PB ${Math.floor(state.bestScore)}`;
+                    if (state.score > state.bestScore) bestEl.style.color = "#ffd45f";
+                } else {
+                    bestEl.textContent = "";
+                }
+            }
+            updateInspector();
+        }
+
+        function updateInspector() {
+            const node = nodes[state.selectedNode];
+            if (!node) return;
+            const spec = typeSpecs[node.type];
+            selectedName.textContent = spec.name;
+            selectedKind.textContent = `Node ${String(state.selectedNode + 1).padStart(2, "0")} / ${spec.badge}`;
+            selectedCopy.textContent = spec.copy;
+            radiusReadout.textContent = (node.radius * state.radiusScale).toFixed(1);
+            strengthReadout.textContent = node.strength.toFixed(2);
+            fluxReadout.textContent = node.flux.toFixed(2);
+
+            const linkCount = state.links.filter(L => L.a === state.selectedNode || L.b === state.selectedNode).length;
+            linksReadout.textContent = linkCount > 0 ? `${linkCount} active` : "—";
+        }
+
+        function addLog(kind, msg) {
+            logEntries.unshift({ kind, message: msg });
+            logEntries.splice(5);
+            renderLog();
+        }
+        function renderLog() {
+            logEl.innerHTML = "";
+            logEntries.forEach((e) => {
+                const row = document.createElement("div");
+                row.className = "log-entry";
+                const lab = document.createElement("strong");
+                lab.textContent = e.kind;
+                const txt = document.createElement("span");
+                txt.textContent = e.message;
+                row.append(lab, txt);
+                logEl.appendChild(row);
+            });
+        }
+
+        function updateTypeButtons() {
+            document.querySelectorAll("[data-type]").forEach((b) => {
+                b.classList.toggle("active", b.dataset.type === state.selectedType);
+            });
+        }
+        function updateModeButtons() {
+            document.querySelectorAll("[data-mode]").forEach((b) => {
+                b.classList.toggle("active", b.dataset.mode === state.mode);
+            });
+        }
+
+        function setSelectedNodeType(type) {
+            state.selectedType = type;
+            const n = nodes[state.selectedNode];
+            if (n) {
+                const s = typeSpecs[type];
+                n.type = type;
+                n.radius = s.radius;
+                n.strength = s.strength;
+                n.pulse = 1.0;
+                rebuildNodeVisual(state.selectedNode);
+                rebuildNodeLabels(); // refresh the badge text above the node
+                createPulse(n.x, n.y, s.color, n.radius, 18, 0.34);
+            }
+            updateTypeButtons();
+            updateInspector();
+        }
+
+        function setMode(m) {
+            state.mode = m;
+            updateModeButtons();
+            addLog("Mode", `${modeSpecs[m].label} lattice engaged`);
+            gates.forEach((g, i) => {
+                g.pulse = 0.65;
+                g.charge = clamp(g.charge + 0.06 + i * 0.015, 0.04, 0.8);
+            });
+        }
+
+        function addNode() {
+            if (nodes.length >= 9) { addLog("Limit", "Nine field nodes maximum"); return; }
+            const s = typeSpecs[state.selectedType];
+            const t = nodes.length / 9;
+            const n = {
+                type: state.selectedType,
+                x: worldX(0.36 + t * 0.26),
+                y: worldY(-0.24 + ((t * 1.7) % 0.72) - 0.2),
+                radius: s.radius, strength: s.strength, flux: 0, pulse: 0.9
+            };
+            nodes.push(n);
+            createNodeVisual(n);
+            state.selectedNode = nodes.length - 1;
+            rebuildNodeLabels();
+            createPulse(n.x, n.y, s.color, n.radius, 18, 0.32);
+            updateInspector();
+            addLog("Node", `${s.badge} node deployed`);
+        }
+
+        function linkSelected() {
+            const sel = state.selectedNode;
+            if (state.links.length >= 5) { addLog("Link", "Resonance limit reached"); return; }
+            // find nearest other node not already linked to sel
+            let best = -1, bd = 999;
+            nodes.forEach((n, i) => {
+                if (i === sel) return;
+                const already = state.links.some(L => (L.a === sel && L.b === i) || (L.b === sel && L.a === i));
+                if (already) return;
+                const d = Math.hypot(n.x - nodes[sel].x, n.y - nodes[sel].y);
+                if (d < bd) { bd = d; best = i; }
+            });
+            if (best < 0) return;
+            state.links.push({ a: sel, b: best });
+            nodes[sel].pulse = 1.1;
+            nodes[best].pulse = 0.9;
+            createPulse((nodes[sel].x + nodes[best].x) * 0.5, (nodes[sel].y + nodes[best].y) * 0.5, palette.cyan, 14, 14, 0.28);
+            addLog("Resonance", `Bridge ${sel + 1}–${best + 1} formed`);
+            updateInspector();
+        }
+
+        function pulseNodes() {
+            nodes.forEach((n) => {
+                n.pulse = 1.0;
+                n.strength = clamp(n.strength + 0.045, 0.44, 1.15);
+                createPulse(n.x, n.y, typeSpecs[n.type].color, n.radius, 15, 0.2);
+            });
+            state.bloomPulse = 0.75;
+            // global coherence nudge
+            for (let i = 0; i < particleCount; i += 2) coherence[i] = Math.min(1, coherence[i] + 0.09);
+            state.score = Math.max(0, state.score - 18);
+            addLog("Pulse", "Lattice surge • coherence field");
+        }
+
+        function ventPressure() {
+            hazards.forEach((h, i) => {
+                h.pressure *= 0.32;
+                h.fracture *= 0.25;
+                createPulse(h.x, h.y, palette.green, h.radius * 1.6, 26, 0.42);
+                // secondary cooling ring
+                createPulse(h.x, h.y, palette.cyan, h.radius * 0.9, 18, 0.28);
+            });
+            // strong cooling + coherence wave around the wells
+            for (let i = 0; i < particleCount; i += 2) {
+                let affected = false;
+                for (let h = 0; h < hazards.length; h++) {
+                    const hx = posX[i] - hazards[h].x, hy = posY[i] - hazards[h].y;
+                    if (hx*hx + hy*hy < 520) {
+                        heat[i] = Math.max(0.02, heat[i] * 0.55);
+                        coherence[i] = Math.min(1, coherence[i] + 0.14);
+                        affected = true;
+                    }
+                }
+                if (affected && Math.random() < 0.3) {
+                    // tiny green flash via size bump (next frame will decay)
+                    sizes[i] = Math.min(9.5, sizes[i] * 1.25);
+                }
+            }
+            state.score = Math.max(0, state.score - 36);
+            addLog("Vent", "Pressure vented • fracture cleared");
+        }
+
+        function togglePause() {
+            state.paused = !state.paused;
+            const btn = document.querySelector("#pause-btn");
+            if (btn) btn.textContent = state.paused ? "Resume" : "Pause";
+            if (state.paused) {
+                const overlay = document.createElement("div");
+                overlay.id = "pause-overlay";
+                overlay.className = "pause-overlay";
+                overlay.innerHTML = `
+                    <div class="pause-card">
+                        <h3>Lattice Paused</h3>
+                        <p>Press P or click Resume to continue</p>
+                        <div class="row">
+                            <button id="resume-btn" type="button">Resume</button>
+                            <button id="reset-from-pause" type="button">Reset Run</button>
+                        </div>
+                    </div>`;
+                document.body.appendChild(overlay);
+                overlay.querySelector("#resume-btn").addEventListener("click", () => togglePause());
+                overlay.querySelector("#reset-from-pause").addEventListener("click", () => {
+                    overlay.remove();
+                    resetGame();
+                });
+            } else {
+                document.getElementById("pause-overlay")?.remove();
+            }
+        }
+
+        function showPrimer() {
+            const existing = document.getElementById("primer-overlay");
+            if (existing) { existing.remove(); return; }
+            const ov = document.createElement("div");
+            ov.id = "primer-overlay";
+            ov.className = "primer-overlay";
+            ov.innerHTML = `
+                <div class="primer-card">
+                    <h3>Field Primer — Vector Bloom</h3>
+                    <div class="primer-grid">
+                        <div class="primer-row"><strong>Flow:</strong> <span>Particles stream from left emitters toward right bloom gates. Your nodes reshape their paths.</span></div>
+                        <div class="primer-row"><strong>Nodes:</strong> <span>Drag nodes. 1–6 or buttons change type. Attract pulls, Vortex swirls, Ignite charges, Dampen cools.</span></div>
+                        <div class="primer-row"><strong>Gates:</strong> <span>Direct coherent (cool) flow into gates to charge them. Opening a gate scores big and extends combo.</span></div>
+                        <div class="primer-row"><strong>Pressure:</strong> <span>Hot chaotic particles feed the two wells. High pressure tanks stability. Use Vent (or Dampen nodes) to bleed it.</span></div>
+                        <div class="primer-row"><strong>Resonance:</strong> <span>Link nodes (L) to create powerful coherence fields between them. Modes (Q–T) change global flow character.</span></div>
+                    </div>
+                    <p style="margin:10px 0 0;font-size:9px;color:var(--muted);">Drag nodes • Pulse for power • Chain gates for x4 combo • Keep stability &gt;40%</p>
+                    <button class="close" type="button">Close</button>
+                </div>`;
+            document.body.appendChild(ov);
+            ov.querySelector(".close").addEventListener("click", () => ov.remove());
+            ov.addEventListener("click", (e) => { if (e.target === ov) ov.remove(); });
+        }
+
+        function resetGame() {
+            // Save best before wiping
+            if (state.score > state.bestScore) {
+                state.bestScore = Math.floor(state.score);
+                try { localStorage.setItem("vectorBloomBest", String(state.bestScore)); } catch (e) {}
+            }
+            state.score = 0;
+            state.gatesOpened = 0;
+            state.bloomPulse = 0.22;
+            state.flux = 0;
+            state.combo = 1;
+            state.comboTimer = 0;
+            state.integrity = 0.93;
+            state.links.length = 0;
+            state.paused = false;
+            document.getElementById("pause-overlay")?.remove();
+            hazards.forEach((h, i) => { h.pressure = 0.19 + i * 0.055; h.fracture = 0; });
+            gates.forEach((g, i) => { g.charge = 0.26 + i * 0.04; g.pulse = 0.55; });
+            resetNodes();
+            resetParticles();
+            addLog("Reset", "Evolved lattice restored");
+        }
+
+        function findNearestNode(wp) {
+            let best = -1, dmin = Infinity;
+            nodes.forEach((n, i) => {
+                const d = Math.hypot(n.x - wp.x, n.y - wp.y);
+                const thr = Math.max(5.6, n.radius * state.radiusScale * 0.24);
+                if (d < thr && d < dmin) { dmin = d; best = i; }
+            });
+            return best;
+        }
+
+        function screenToWorld(ev) {
+            const r = renderer.domElement.getBoundingClientRect();
+            const x = ((ev.clientX - r.left) / r.width) * 2 - 1;
+            const y = -(((ev.clientY - r.top) / r.height) * 2 - 1);
+            pointer.set(x, y);
+            return {
+                x: lerp(camera.left, camera.right, (pointer.x + 1) * 0.5),
+                y: lerp(camera.bottom, camera.top, (pointer.y + 1) * 0.5)
+            };
+        }
+
+        function moveNode(idx, wp) {
+            const m = 7;
+            const n = nodes[idx];
+            n.x = clamp(wp.x, camera.left + m, camera.right - m);
+            n.y = clamp(wp.y, camera.bottom + m, camera.top - m);
+            n.pulse = Math.max(n.pulse, 0.26);
+        }
+
+        function bindEvents() {
+            window.addEventListener("resize", resize);
+
+            const canvas = renderer.domElement;
+            canvas.addEventListener("pointerdown", (ev) => {
+                const wp = screenToWorld(ev);
+                const near = findNearestNode(wp);
+                if (near >= 0) {
+                    state.selectedNode = near;
+                    state.selectedType = nodes[near].type;
+                    state.draggingNode = near;
+                    canvas.classList.add("dragging");
+                } else {
+                    state.draggingNode = state.selectedNode;
+                    moveNode(state.selectedNode, wp);
+                    canvas.classList.add("dragging");
+                }
+                canvas.setPointerCapture(ev.pointerId);
+                updateTypeButtons();
+                updateInspector();
+            });
+
+            canvas.addEventListener("pointermove", (ev) => {
+                if (state.draggingNode < 0) return;
+                moveNode(state.draggingNode, screenToWorld(ev));
+            });
+
+            canvas.addEventListener("pointerup", (ev) => {
+                if (state.draggingNode >= 0) {
+                    const n = nodes[state.draggingNode];
+                    createPulse(n.x, n.y, typeSpecs[n.type].color, n.radius, 13, 0.22);
+                }
+                state.draggingNode = -1;
+                canvas.classList.remove("dragging");
+                if (canvas.hasPointerCapture(ev.pointerId)) canvas.releasePointerCapture(ev.pointerId);
+            });
+            canvas.addEventListener("pointercancel", () => { state.draggingNode = -1; canvas.classList.remove("dragging"); });
+
+            document.querySelectorAll("[data-type]").forEach((b) => {
+                b.addEventListener("click", () => setSelectedNodeType(b.dataset.type));
+            });
+            document.querySelectorAll("[data-mode]").forEach((b) => {
+                b.addEventListener("click", () => setMode(b.dataset.mode));
+            });
+
+            document.querySelector("#add-btn").addEventListener("click", addNode);
+            document.querySelector("#link-btn").addEventListener("click", linkSelected);
+            if (unlinkBtn) unlinkBtn.addEventListener("click", () => {
+                if (state.links.length === 0) return;
+                state.links.length = 0;
+                addLog("Resonance", "All bridges cleared");
+                updateInspector();
+            });
+            document.querySelector("#pulse-btn").addEventListener("click", pulseNodes);
+            document.querySelector("#vent-btn").addEventListener("click", ventPressure);
+            document.querySelector("#pause-btn").addEventListener("click", togglePause);
+            document.querySelector("#reset-btn").addEventListener("click", resetGame);
+            const helpBtn = document.querySelector("#help-btn");
+            if (helpBtn) helpBtn.addEventListener("click", showPrimer);
+
+            flowSlider.addEventListener("input", () => { state.flow = Number(flowSlider.value); flowLabel.textContent = state.flow.toFixed(2); });
+            radiusSlider.addEventListener("input", () => { state.radiusScale = Number(radiusSlider.value); radiusLabel.textContent = state.radiusScale.toFixed(2); });
+            thresholdSlider.addEventListener("input", () => { state.threshold = Number(thresholdSlider.value); thresholdLabel.textContent = state.threshold.toFixed(2); });
+            coherenceSlider.addEventListener("input", () => { state.coherenceBias = Number(coherenceSlider.value); coherenceLabel.textContent = state.coherenceBias.toFixed(2); });
+
+            // Keyboard (pro use)
+            window.addEventListener("keydown", (e) => {
+                if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
+                const k = e.key.toLowerCase();
+                if (k === " " || (k === "r" && e.shiftKey)) {
+                    if (k === " ") e.preventDefault();
+                    resetGame();
+                    return;
+                }
+                if (k >= "1" && k <= "6") {
+                    const types = ["attract", "repel", "split", "dampen", "ignite", "vortex"];
+                    setSelectedNodeType(types[parseInt(k, 10) - 1]);
+                }
+                if (k === "q") setMode("bloom");
+                if (k === "w") setMode("shear");
+                if (k === "e") setMode("pressure");
+                if (k === "r") setMode("cascade");
+                if (k === "t") setMode("resonance");
+                if (k === "a") addNode();
+                if (k === "l") linkSelected();
+                if (k === "p") { if (e.shiftKey) { /* future */ } else { togglePause(); } }
+                if (k === "v") ventPressure();
+                if (k === "u") { state.links.length = 0; addLog("Resonance", "All bridges cleared"); }
+                if (k === "h" || k === "?") showPrimer();
+            });
+
+            // Double-click cycles type on selected (nice pro touch)
+            canvas.addEventListener("dblclick", () => {
+                const types = Object.keys(typeSpecs);
+                const cur = nodes[state.selectedNode].type;
+                const next = types[(types.indexOf(cur) + 1) % types.length];
+                setSelectedNodeType(next);
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(0.032, clock.getDelta());
+            if (!state.paused) {
+                updateGameState(dt);
+                updateParticles(dt);
+                updateEmitterVisuals(dt);
+                updateGateVisuals(dt);
+                updateHazardVisuals(dt);
+                updateNodeVisuals(dt);
+                updatePulses(dt);
+                updateLinkVisuals(dt);
+            }
+            updateHud();
+            updateWorldLabels();
+            renderer.render(scene, camera);
+        }
+
+        function init() {
+            // Load personal best
+            try {
+                const saved = localStorage.getItem("vectorBloomBest");
+                if (saved) state.bestScore = parseInt(saved, 10) || 0;
+            } catch (e) {}
+
+            layoutField();
+            resize();
+            createEmitterVisuals();
+            createGateVisuals();
+            createHazardVisuals();
+            createWorldLabels();
+            resetNodes();
+            syncWorldVisuals();
+            resetParticles();
+            bindEvents();
+
+            // Initial bloom for immediate presence
+            state.bloomPulse = 0.35;
+            particleMaterial.uniforms.uBloom.value = 0.35;
+
+            addLog("Online", "Vector Bloom evolved lattice online");
+            addLog("Directive", "Steer the bloom • Open gates • Sustain x4 combos • Protect the lattice");
+            addLog("Help", "Press H or ? for the Field Primer");
+
+            window.__vectorBloomGrokReady = true;
+            animate();
+        }
+
+        init();
+    </script>
+</body>
+</html>

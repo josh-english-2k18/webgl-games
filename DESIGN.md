@@ -17,6 +17,7 @@ Examples:
 - `Signal City`, not just system map.
 - `Kinetic Containment`, not just ball physics v2.
 - `Barycentric Dawn`, not just a three-body demo.
+- `Vector Bloom`, not just particle flow.
 
 The name, visual language, controls, readouts, and motion should reinforce the same idea.
 
@@ -156,6 +157,24 @@ What to watch during iteration:
 - Does dense shuttle traffic clarify motion instead of creating noise?
 - Does the HUD feel like an instrument panel for the loom?
 - After the visual craft is working, is the underlying idea still exciting?
+
+### Vector Bloom
+
+Vector Bloom is the current playable-particle test. It exists to answer a specific question: can the Prismalith-style particle language support an engaging loop with goals, pressure, and tactile control?
+
+What to preserve during iteration:
+
+- Particle flow should remain the main subject, not a background effect.
+- Draggable field nodes should produce immediate, readable consequences.
+- Gates, overload wells, score, stability, and log feedback should make consequences visible without heavy instruction text.
+- The default scene should already have strong flow, active pressure, and visible gate progress.
+- The first playable loop should stay compact enough to evaluate feel before adding more mechanics.
+
+The main playtesting risk is that it becomes a beautiful toy rather than a game. If the loop is not exciting, iterate on pressure, timing, gate feedback, and node affordance before adding new node types.
+
+`vector-bloom-grok.html` is the external-agent comparison variant. Treat it as a useful test of the same philosophy: keep the original readable particle instrument intact, then evaluate whether professional game-development polish actually clarifies intent. Valuable upgrades include explicit player feedback for gates, combos, pressure, and recovery; discoverable controls instead of hidden shortcuts; and bug fixes that preserve visual state, such as rebuilding node geometry when the selected type changes.
+
+When using AI-generated variants, review them like production submissions. Check shortcut conflicts, stale rendered state, draw-range math, selector wiring, particle-sprite hygiene, and whether new feedback strengthens the core loop rather than burying it.
 
 ### Kinetic Containment
 

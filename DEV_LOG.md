@@ -22,6 +22,36 @@ Gravity Loom was built as a direct test of the design philosophy after it had be
 
 Playtesting produced an important nuance: the result is excellent craft, but the underlying idea is not as exciting as the best particle experiments. This is a useful distinction. Execution quality and concept strength are different axes, and future work should evaluate both after the visual system is working.
 
+### Vector Bloom
+
+Files: `vector-bloom.html`, `vector-bloom-grok.html`
+
+Vector Bloom is the pinned idea from the post-Gravity Loom design discussion: take the Prismalith-level particle language and give it a real playable loop. The design question is whether shaping a beautiful particle field can become intrinsically fun, not just visually impressive.
+
+First pass:
+
+- Dense shader-rendered particle streams spawn from three emitters and flow toward three bloom gates.
+- Five default field nodes shape the stream: attract, repel, split, dampen, and ignite.
+- Field nodes are draggable on the canvas, and the active node can be retuned through compact controls.
+- Gates charge when tuned flow reaches them; opening a gate produces score, bloom pulses, and log feedback.
+- Overload wells build pressure when hot particles become messy, reducing stability until vented or corrected.
+- Flow modes, flow rate, field radius, and gate tension provide immediate levers without turning the first version into a large ruleset.
+- The particle layer uses custom shader points with circular fragment discard and hard-capped point size to avoid the recurring square-sprite failure mode.
+
+Manual playtesting has not been recorded yet. The main acceptance question is whether the loop of dragging force nodes, opening gates, and managing overload feels alive enough to justify iteration.
+
+Key lesson target: combine our strongest particle visual language with consequences, pressure, and tactile control.
+
+Grok variant:
+
+- Asked Grok Build to create its own Vector Bloom variant in `vector-bloom-grok.html`, keeping the original source intact for comparison.
+- Initial static review found three concrete issues: `r` both selected Cascade and reset the game, selected-node type changes did not rebuild visuals so Vortex geometry could be stale, and resonance link draw ranges used component counts instead of vertex counts.
+- A professional game-developer upgrade pass added clearer feedback for gates, combos, pressure spikes, milestones, and recovery advice; made unlinking discoverable; and kept the loop focused on shaping particle flow rather than adding a large ruleset.
+- The remaining `Shift+R` reset conflict was fixed after the upgrade by returning before mode shortcuts run.
+- Static checks confirmed the variant keeps custom shader particles with circular discard and capped point size, avoids raw `PointsMaterial`, preserves `window.__vectorBloomGrokReady`, and has no duplicate or missing queried IDs.
+
+Key comparison lesson: external-agent variants are useful when reviewed like production code. Let the agent explore, then inspect for interaction conflicts, stale visual state, rendering invariants, and whether the upgrade strengthens the game loop instead of just adding surface polish.
+
 ### Kinetic Containment
 
 Files: `ball-physics-simulation.html`, `ball-physics-simulation-v2.html`
