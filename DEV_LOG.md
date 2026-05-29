@@ -24,7 +24,7 @@ Playtesting produced an important nuance: the result is excellent craft, but the
 
 ### Vector Bloom
 
-Files: `vector-bloom.html`, `vector-bloom-grok.html`
+Files: `vector-bloom.html`, `vector-bloom-grok.html`, `vector-bloom-composer.html`
 
 Vector Bloom is the pinned idea from the post-Gravity Loom design discussion: take the Prismalith-level particle language and give it a real playable loop. The design question is whether shaping a beautiful particle field can become intrinsically fun, not just visually impressive.
 
@@ -52,6 +52,16 @@ Grok variant:
 
 Key comparison lesson: external-agent variants are useful when reviewed like production code. Let the agent explore, then inspect for interaction conflicts, stale visual state, rendering invariants, and whether the upgrade strengthens the game loop instead of just adding surface polish.
 
+Composer variant:
+
+- Composer created `vector-bloom-composer.html` as a cinematic particle-instrument variant. It looks strong because it commits to a clear frame: camera shot presets, post-processing bloom and color grade, projected field labels, shader flow backdrop, film grain, letterboxing, and a quieter editorial HUD.
+- Static inspection confirmed the variant keeps the good particle hygiene: custom shader points with circular `gl_PointCoord` discard, capped `gl_PointSize`, typed arrays for particle state, `window.__vectorBloomComposerReady`, and no missing queried IDs.
+- The variant is less game-complete than Grok's pass: it does not add links, combo cadence, resonance mode, pause/help, unlink, or stronger milestone feedback. Its value is presentation and legibility, not necessarily deeper play.
+
+Key framing lesson: camera, grade, labels, and editorial UI can act like design tools. They make a system feel directed, legible, and premium. Use them deliberately, but do not let cinematic polish substitute for feel, pressure, and consequences.
+
+Key workflow lesson: comparison variants should have explicit frames. Grok tested professional game feedback; Composer tested cinematic presentation. The useful process is to harvest the best lesson from each frame, then decide what belongs in the main artifact.
+
 ### Kinetic Containment
 
 Files: `ball-physics-simulation.html`, `ball-physics-simulation-v2.html`
@@ -74,7 +84,7 @@ Key lesson: a functional simulation becomes more interesting when density, color
 
 ### Barycentric Dawn
 
-File: `barycentric-dawn.html`
+Files: `barycentric-dawn.html`, `barycentric-dawn-composer.html`, `barycentric-dawn-agy.html`
 
 Barycentric Dawn explores a more physically grounded visual simulation: two luminous stars and one terrestrial planet in a scaled Newtonian three-body integration. The goal is to combine real orbital consequences with the strongest visual-system lessons from the particle experiments.
 
@@ -124,6 +134,13 @@ Lessons learned:
 - The process worked because each manual-test failure was named precisely, then translated into a design constraint instead of treated as a random bug.
 
 Key lesson: a realistic simulation can follow the artifact philosophy if the physics is visible, each force layer has one job, and visual effects clarify cause and effect instead of becoming decoration.
+
+Comparison variants:
+
+- `barycentric-dawn-composer.html` reframes the same simulation family as a cinematic observatory. It adds camera shot presets, bloom and grade controls, lens streaks, nebula backdrop, film grain, letterboxing, and composer-style HUD controls while preserving the core force-layer language.
+- `barycentric-dawn-agy.html` was generated through Antigravity CLI as an external-agent comparison variant. It emphasizes an operator/observatory view with fixed-timestep regimes, probe injection, live telemetry, energy graphing, debug force arrows, luminance control, and mobile HUD toggling.
+
+Key variant lesson: comparison variants are useful when their framing is explicit. Composer is a presentation test; AGY is an inspection/telemetry test. Both should be reviewed against the same physical-legibility and particle-hygiene constraints as the primary Barycentric Dawn.
 
 ## Particle And System Experiments
 

@@ -1,0 +1,2261 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Vector Bloom Composer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.174.0/examples/jsm/"
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg: #010206;
+            --ink: #f4fbff;
+            --muted: rgba(244, 251, 255, 0.46);
+            --line: rgba(244, 251, 255, 0.07);
+            --panel: rgba(4, 6, 14, 0.06);
+            --cyan: #62eaff;
+            --violet: #bd92ff;
+            --gold: #ffd45f;
+            --rose: #ff5f8d;
+            --green: #8dffb4;
+            --radius: 7px;
+            --display: "Cormorant Garamond", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+            --ui: "DM Sans", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: var(--ui);
+            letter-spacing: 0.01em;
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        button {
+            color: inherit;
+        }
+
+        #stage {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background:
+                radial-gradient(ellipse 80% 55% at 16% 24%, rgba(98, 234, 255, 0.07), transparent 42%),
+                radial-gradient(ellipse 70% 50% at 78% 68%, rgba(189, 146, 255, 0.06), transparent 40%),
+                linear-gradient(180deg, #050912 0%, #020308 58%, #010106 100%);
+        }
+
+        #stage canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: crosshair;
+        }
+
+        .field-grid,
+        .scan,
+        .vignette,
+        .grain,
+        .letterbox,
+        .flow-scrim {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .field-grid {
+            opacity: 0.06;
+            background-image:
+                linear-gradient(rgba(244, 251, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(244, 251, 255, 0.05) 1px, transparent 1px);
+            background-size: 48px 48px;
+            mask-image: radial-gradient(circle at 50% 48%, #000 0%, #000 54%, transparent 86%);
+            animation: gridDrift 26s linear infinite;
+        }
+
+        .flow-scrim {
+            opacity: 0.22;
+            background: linear-gradient(90deg, transparent 8%, rgba(98, 234, 255, 0.07) 38%, rgba(189, 146, 255, 0.06) 62%, transparent 92%);
+            mix-blend-mode: screen;
+        }
+
+        .grain {
+            opacity: 0.032;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+            mix-blend-mode: overlay;
+            animation: filmGrain 8s steps(6) infinite;
+        }
+
+        @keyframes filmGrain {
+            0%, 100% { transform: translate3d(0, 0, 0); }
+            25% { transform: translate3d(-1%, 0.8%, 0); }
+            50% { transform: translate3d(1%, -0.4%, 0); }
+            75% { transform: translate3d(-0.6%, -0.8%, 0); }
+        }
+
+        .scan {
+            opacity: 0.03;
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent 0,
+                transparent 8px,
+                rgba(255, 255, 255, 0.42) 9px
+            );
+            mix-blend-mode: screen;
+        }
+
+        .vignette {
+            background:
+                radial-gradient(ellipse 78% 64% at 50% 46%, transparent 52%, rgba(0, 0, 0, 0.36) 100%),
+                linear-gradient(to right, rgba(0, 0, 0, 0.48), transparent 16%, transparent 84%, rgba(0, 0, 0, 0.44)),
+                linear-gradient(to bottom, rgba(0, 0, 0, 0.34), transparent 18%, transparent 76%, rgba(0, 0, 0, 0.52));
+        }
+
+        .letterbox::before,
+        .letterbox::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: clamp(8px, 2vh, 22px);
+            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.68), rgba(0, 0, 0, 0.48));
+        }
+
+        .letterbox::before { top: 0; }
+        .letterbox::after { bottom: 0; transform: rotate(180deg); }
+
+        @keyframes gridDrift {
+            from { transform: translate3d(0, 0, 0); }
+            to { transform: translate3d(48px, 48px, 0); }
+        }
+
+        .hud {
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            z-index: 20;
+            max-width: 300px;
+            pointer-events: none;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+            color: var(--muted);
+            font-size: 8px;
+            font-weight: 600;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+        }
+
+        .mark {
+            position: relative;
+            width: 22px;
+            height: 22px;
+            border: 1px solid rgba(98, 234, 255, 0.52);
+            border-radius: 50%;
+            box-shadow: 0 0 14px rgba(98, 234, 255, 0.14);
+        }
+
+        .mark::before,
+        .mark::after {
+            content: "";
+            position: absolute;
+            border-radius: 50%;
+        }
+
+        .mark::before {
+            inset: 4px;
+            border: 1px solid rgba(255, 212, 95, 0.48);
+            transform: scaleX(1.48) rotate(-24deg);
+        }
+
+        .mark::after {
+            inset: 8px;
+            background: var(--rose);
+            box-shadow: 0 0 10px rgba(255, 95, 141, 0.42);
+        }
+
+        h1 {
+            margin: 0;
+            font-family: var(--display);
+            font-size: clamp(20px, 2.8vw, 32px);
+            font-weight: 500;
+            font-style: italic;
+            line-height: 0.94;
+            letter-spacing: -0.01em;
+            text-shadow: 0 0 24px rgba(98, 234, 255, 0.12);
+        }
+
+        .subtitle {
+            margin: 4px 0 0;
+            color: rgba(244, 251, 255, 0.4);
+            font-size: 8px;
+            font-weight: 600;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+        }
+
+        .readout {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 10px;
+            margin-top: 8px;
+            color: rgba(244, 251, 255, 0.44);
+            font-size: 8px;
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        .readout strong {
+            color: rgba(244, 251, 255, 0.84);
+        }
+
+        .timeline {
+            position: relative;
+            height: 2px;
+            max-width: 160px;
+            margin-top: 8px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: rgba(244, 251, 255, 0.05);
+        }
+
+        .timeline-fill {
+            width: 0%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--cyan), var(--violet));
+            box-shadow: 0 0 8px rgba(98, 234, 255, 0.28);
+            transition: width 240ms ease;
+        }
+
+        .side-panel {
+            position: fixed;
+            top: 12px;
+            right: 12px;
+            z-index: 22;
+            display: grid;
+            gap: 8px;
+            width: 228px;
+            pointer-events: none;
+        }
+
+        .panel {
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(8px) saturate(115%);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            pointer-events: auto;
+        }
+
+        .panel-head {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 8px 10px 0;
+        }
+
+        .panel h2 {
+            margin: 0;
+            font-family: var(--display);
+            font-size: 15px;
+            font-weight: 500;
+            font-style: italic;
+            line-height: 1;
+        }
+
+        .badge {
+            color: rgba(98, 234, 255, 0.72);
+            font-size: 7px;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+
+        .panel p {
+            min-height: 0;
+            margin: 6px 10px 8px;
+            color: rgba(244, 251, 255, 0.42);
+            font-size: 10px;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 1px;
+            overflow: hidden;
+            border-top: 1px solid var(--line);
+            border-radius: 0 0 var(--radius) var(--radius);
+            background: var(--line);
+        }
+
+        .stat-cell {
+            min-width: 0;
+            padding: 6px 8px;
+            background: rgba(4, 6, 14, 0.04);
+        }
+
+        .stat-cell span,
+        .slider label span {
+            display: block;
+            color: rgba(244, 251, 255, 0.4);
+            font-size: 7px;
+            font-weight: 600;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        .stat-cell strong {
+            display: block;
+            margin-top: 2px;
+            overflow: hidden;
+            color: rgba(244, 251, 255, 0.82);
+            font-size: 12px;
+            font-variant-numeric: tabular-nums;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .log {
+            display: grid;
+            gap: 5px;
+            max-height: 72px;
+            overflow: hidden;
+            padding: 8px 10px 9px;
+            color: rgba(244, 251, 255, 0.42);
+            font-size: 9px;
+            line-height: 1.3;
+        }
+
+        .log-entry {
+            display: grid;
+            grid-template-columns: 44px 1fr;
+            gap: 6px;
+        }
+
+        .log-entry strong {
+            color: rgba(255, 212, 95, 0.72);
+            font-size: 7px;
+            text-transform: uppercase;
+        }
+
+        .controls {
+            position: fixed;
+            right: 12px;
+            bottom: 14px;
+            left: 12px;
+            z-index: 24;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            max-width: 980px;
+            margin: 0 auto;
+            pointer-events: none;
+        }
+
+        .control-panel {
+            display: grid;
+            gap: 6px;
+            padding: 8px;
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(8px) saturate(115%);
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.1);
+            pointer-events: auto;
+        }
+
+        .control-panel-sliders {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            column-gap: 10px;
+        }
+
+        .control-panel-sliders .control-title {
+            grid-column: 1 / -1;
+        }
+
+        .control-title {
+            color: rgba(244, 251, 255, 0.4);
+            font-size: 7px;
+            font-weight: 600;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+        }
+
+        .button-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 5px;
+        }
+
+        .button-grid.modes,
+        .button-grid.shots {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .button-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        button {
+            min-height: 26px;
+            padding: 0 6px;
+            border: 1px solid rgba(244, 251, 255, 0.08);
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.018);
+            cursor: pointer;
+            font-size: 8px;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            transition: border-color 180ms ease, background 180ms ease, transform 180ms ease;
+        }
+
+        button:hover {
+            border-color: rgba(98, 234, 255, 0.32);
+            background: rgba(98, 234, 255, 0.04);
+        }
+
+        button:active {
+            transform: translateY(1px);
+        }
+
+        button.active {
+            border-color: rgba(255, 212, 95, 0.42);
+            background: rgba(255, 212, 95, 0.06);
+            box-shadow: inset 0 0 12px rgba(255, 212, 95, 0.04);
+        }
+
+        .slider {
+            display: grid;
+            gap: 3px;
+        }
+
+        .slider label {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .slider label strong {
+            color: rgba(244, 251, 255, 0.78);
+            font-size: 9px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 14px;
+            accent-color: var(--cyan);
+        }
+
+        #world-labels {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 12;
+            overflow: hidden;
+        }
+
+        .field-label {
+            position: absolute;
+            display: grid;
+            gap: 1px;
+            padding: 3px 8px 4px;
+            border-radius: 5px;
+            border: 1px solid rgba(244, 251, 255, 0.1);
+            background: rgba(4, 6, 14, 0.54);
+            backdrop-filter: blur(7px);
+            -webkit-backdrop-filter: blur(7px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.32);
+            transform: translate(-50%, -100%);
+            transition: opacity 140ms ease, transform 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+            white-space: nowrap;
+        }
+
+        .field-label__kicker,
+        .field-label__index {
+            font-family: var(--ui);
+            font-size: 6px;
+            font-weight: 600;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+            color: rgba(244, 251, 255, 0.4);
+        }
+
+        .field-label__name {
+            font-family: var(--display);
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            color: rgba(244, 251, 255, 0.94);
+            line-height: 1.05;
+        }
+
+        .field-label__badge {
+            font-family: var(--ui);
+            font-size: 6px;
+            font-weight: 600;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--label-accent, rgba(98, 234, 255, 0.78));
+        }
+
+        .field-label--emitter {
+            --label-accent: rgba(98, 234, 255, 0.88);
+            border-color: rgba(98, 234, 255, 0.16);
+        }
+
+        .field-label--gate {
+            --label-accent: rgba(255, 212, 95, 0.88);
+            border-color: rgba(255, 212, 95, 0.14);
+        }
+
+        .field-label--gate.is-charged {
+            border-color: rgba(255, 212, 95, 0.34);
+            box-shadow: 0 4px 18px rgba(255, 212, 95, 0.1);
+        }
+
+        .field-label--gate.is-charged .field-label__name {
+            color: rgba(255, 212, 95, 0.96);
+        }
+
+        .field-label--hazard {
+            --label-accent: rgba(255, 95, 141, 0.88);
+            border-color: rgba(255, 95, 141, 0.18);
+        }
+
+        .field-label--node {
+            border-left: 2px solid var(--label-accent);
+            padding-left: 7px;
+        }
+
+        .field-label--node.is-selected {
+            border-color: rgba(255, 212, 95, 0.38);
+            border-left-color: rgba(255, 212, 95, 0.9);
+            background: rgba(4, 6, 14, 0.72);
+            box-shadow: 0 4px 20px rgba(255, 212, 95, 0.12);
+            transform: translate(-50%, -108%) scale(1.04);
+        }
+
+        .field-label--node.is-dragging {
+            transform: translate(-50%, -118%) scale(1.08);
+            box-shadow: 0 6px 24px rgba(255, 212, 95, 0.16);
+        }
+
+        .field-label.is-hidden {
+            opacity: 0 !important;
+        }
+
+        @media (max-width: 720px) {
+            .field-label__name {
+                font-size: 10px;
+            }
+
+            .field-label__kicker,
+            .field-label__index,
+            .field-label__badge {
+                font-size: 5px;
+            }
+
+            .field-label {
+                padding: 2px 6px 3px;
+            }
+        }
+
+        @media (max-width: 1180px) {
+            .controls {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                max-width: 640px;
+            }
+        }
+
+        @media (max-width: 1060px) {
+            .side-panel {
+                top: auto;
+                right: 10px;
+                bottom: 120px;
+                width: min(220px, calc(100vw - 20px));
+            }
+
+            .controls {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                max-width: none;
+            }
+
+            .button-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 720px) {
+            .hud {
+                top: 10px;
+                left: 10px;
+                max-width: calc(100vw - 20px);
+            }
+
+            h1 {
+                font-size: 18px;
+            }
+
+            .subtitle {
+                display: none;
+            }
+
+            .readout {
+                gap: 4px 8px;
+                font-size: 7px;
+            }
+
+            .side-panel {
+                display: none;
+            }
+
+            .controls {
+                right: 8px;
+                bottom: 8px;
+                left: 8px;
+                grid-template-columns: 1fr;
+            }
+
+            .control-panel-sliders {
+                grid-template-columns: 1fr;
+            }
+
+            .button-grid,
+            .button-grid.modes,
+            .button-grid.shots {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            button {
+                min-height: 24px;
+                font-size: 7px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main id="stage" aria-label="Vector Bloom Composer particle field"></main>
+    <div class="field-grid" aria-hidden="true"></div>
+    <div class="flow-scrim" aria-hidden="true"></div>
+    <div class="scan" aria-hidden="true"></div>
+    <div class="grain" aria-hidden="true"></div>
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="letterbox" aria-hidden="true"></div>
+    <div id="world-labels" aria-hidden="true"></div>
+
+    <section class="hud" aria-label="Vector Bloom Composer status">
+        <div class="brand"><span class="mark" aria-hidden="true"></span><span>Cinematic Particle Instrument</span></div>
+        <h1>Vector Bloom Composer</h1>
+        <p class="subtitle">Playable bloom lattice</p>
+        <div class="readout">
+            <span>Score <strong id="score-readout">0</strong></span>
+            <span>Gates <strong id="gates-readout">0</strong></span>
+            <span>Stability <strong id="stability-readout">100%</strong></span>
+            <span>Mode <strong id="mode-readout">Bloom</strong></span>
+            <span>Shot <strong id="shot-readout">Wide</strong></span>
+        </div>
+        <div class="timeline" aria-hidden="true"><div id="timeline-fill" class="timeline-fill"></div></div>
+    </section>
+
+    <aside class="side-panel">
+        <section class="panel" aria-label="Node inspection">
+            <div class="panel-head">
+                <h2 id="selected-name">Attractor Node</h2>
+                <span id="selected-kind" class="badge">Node 01</span>
+            </div>
+            <p id="selected-copy">Local gravity bends the particle stream into a luminous arc while gate pressure builds on the far side of the field.</p>
+            <div class="stat-grid">
+                <div class="stat-cell"><span>Radius</span><strong id="radius-readout">22.0</strong></div>
+                <div class="stat-cell"><span>Strength</span><strong id="strength-readout">0.82</strong></div>
+                <div class="stat-cell"><span>Flux</span><strong id="flux-readout">0.00</strong></div>
+                <div class="stat-cell"><span>Overload</span><strong id="overload-readout">0%</strong></div>
+            </div>
+        </section>
+        <section class="panel" aria-label="Bloom log">
+            <div class="panel-head">
+                <h2>Score Log</h2>
+                <span class="badge">Live</span>
+            </div>
+            <div id="log" class="log"></div>
+        </section>
+    </aside>
+
+    <nav class="controls" aria-label="Vector Bloom Composer controls">
+        <section class="control-panel">
+            <div class="control-title">Field Nodes</div>
+            <div class="button-grid" id="type-controls">
+                <button class="active" type="button" data-type="attract">Attract</button>
+                <button type="button" data-type="repel">Repel</button>
+                <button type="button" data-type="split">Split</button>
+                <button type="button" data-type="dampen">Dampen</button>
+                <button type="button" data-type="ignite">Ignite</button>
+            </div>
+            <div class="button-row">
+                <button id="add-btn" type="button">Add Node</button>
+                <button id="pulse-btn" type="button">Pulse</button>
+                <button id="vent-btn" type="button">Vent</button>
+                <button id="reset-btn" type="button">Reset</button>
+            </div>
+        </section>
+        <section class="control-panel">
+            <div class="control-title">Flow Mode</div>
+            <div class="button-grid modes" id="mode-controls">
+                <button class="active" type="button" data-mode="bloom">Bloom</button>
+                <button type="button" data-mode="shear">Shear</button>
+                <button type="button" data-mode="pressure">Pressure</button>
+                <button type="button" data-mode="cascade">Cascade</button>
+            </div>
+        </section>
+        <section class="control-panel">
+            <div class="control-title">Camera Shots</div>
+            <div class="button-grid shots">
+                <button class="active" type="button" data-shot="wide">Wide</button>
+                <button type="button" data-shot="tight">Tight</button>
+                <button type="button" data-shot="lane">Lane</button>
+                <button type="button" data-shot="drift">Drift</button>
+            </div>
+        </section>
+        <section class="control-panel control-panel-sliders">
+            <div class="control-title">Tuning</div>
+            <div class="slider">
+                <label for="flow-slider"><span>Flow</span><strong id="flow-label">1.00</strong></label>
+                <input id="flow-slider" type="range" min="0.45" max="1.75" value="1" step="0.01">
+            </div>
+            <div class="slider">
+                <label for="radius-slider"><span>Field Radius</span><strong id="radius-label">1.00</strong></label>
+                <input id="radius-slider" type="range" min="0.65" max="1.55" value="1" step="0.01">
+            </div>
+            <div class="slider">
+                <label for="threshold-slider"><span>Gate Tension</span><strong id="threshold-label">1.00</strong></label>
+                <input id="threshold-slider" type="range" min="0.65" max="1.75" value="1" step="0.01">
+            </div>
+            <div class="slider">
+                <label for="bloom-slider"><span>Bloom</span><strong id="bloom-label">40%</strong></label>
+                <input id="bloom-slider" type="range" min="20" max="120" value="40" step="1">
+            </div>
+            <div class="slider">
+                <label for="grade-slider"><span>Grade</span><strong id="grade-label">24%</strong></label>
+                <input id="grade-slider" type="range" min="0" max="100" value="24" step="1">
+            </div>
+        </section>
+    </nav>
+
+    <script type="module">
+        import * as THREE from "three";
+        import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+        import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+        import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+        import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+        import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+
+        const stage = document.querySelector("#stage");
+        const scoreReadout = document.querySelector("#score-readout");
+        const gatesReadout = document.querySelector("#gates-readout");
+        const stabilityReadout = document.querySelector("#stability-readout");
+        const modeReadout = document.querySelector("#mode-readout");
+        const selectedName = document.querySelector("#selected-name");
+        const selectedKind = document.querySelector("#selected-kind");
+        const selectedCopy = document.querySelector("#selected-copy");
+        const radiusReadout = document.querySelector("#radius-readout");
+        const strengthReadout = document.querySelector("#strength-readout");
+        const fluxReadout = document.querySelector("#flux-readout");
+        const overloadReadout = document.querySelector("#overload-readout");
+        const logEl = document.querySelector("#log");
+        const flowSlider = document.querySelector("#flow-slider");
+        const radiusSlider = document.querySelector("#radius-slider");
+        const thresholdSlider = document.querySelector("#threshold-slider");
+        const flowLabel = document.querySelector("#flow-label");
+        const radiusLabel = document.querySelector("#radius-label");
+        const thresholdLabel = document.querySelector("#threshold-label");
+        const bloomSlider = document.querySelector("#bloom-slider");
+        const gradeSlider = document.querySelector("#grade-slider");
+        const bloomLabel = document.querySelector("#bloom-label");
+        const gradeLabel = document.querySelector("#grade-label");
+        const shotReadout = document.querySelector("#shot-readout");
+        const worldLabelsEl = document.querySelector("#world-labels");
+        const timelineFill = document.querySelector("#timeline-fill");
+
+        const colorGradeShader = {
+            uniforms: {
+                tDiffuse: { value: null },
+                grade: { value: 0.24 }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform float grade;
+                varying vec2 vUv;
+
+                void main() {
+                    vec2 uv = vUv;
+                    vec2 offset = (uv - 0.5) * grade * 0.0011;
+                    vec3 color = vec3(
+                        texture2D(tDiffuse, uv + offset).r,
+                        texture2D(tDiffuse, uv).g,
+                        texture2D(tDiffuse, uv - offset).b
+                    );
+                    float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+                    vec3 cool = vec3(0.88, 0.96, 1.06);
+                    vec3 warm = vec3(1.02, 0.98, 0.94);
+                    color *= mix(vec3(1.0), mix(cool, warm, smoothstep(0.22, 0.86, luma)), grade * 0.3);
+                    color = (color - 0.5) * (1.0 + grade * 0.05) + 0.5;
+                    gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+                }
+            `
+        };
+
+        const shotModes = {
+            wide: { name: "Wide", scale: 1, panX: 0, panY: 0, drift: 0.1 },
+            tight: { name: "Tight", scale: 1.24, panX: 16, panY: 0, drift: 0.06 },
+            lane: { name: "Lane", scale: 0.94, panX: -12, panY: 0, drift: 0.14 },
+            drift: { name: "Drift", scale: 1.05, panX: 0, panY: 2, drift: 0.32 }
+        };
+
+        const palette = {
+            cyan: new THREE.Color("#62eaff"),
+            violet: new THREE.Color("#bd92ff"),
+            gold: new THREE.Color("#ffd45f"),
+            rose: new THREE.Color("#ff5f8d"),
+            green: new THREE.Color("#8dffb4"),
+            ink: new THREE.Color("#f4fbff")
+        };
+
+        const typeSpecs = {
+            attract: {
+                name: "Attractor Node",
+                badge: "Gravity",
+                color: palette.cyan,
+                strength: 0.82,
+                radius: 22,
+                copy: "Local gravity bends the particle stream into a luminous arc while gate pressure builds on the far side of the field."
+            },
+            repel: {
+                name: "Repulsor Node",
+                badge: "Deflect",
+                color: palette.rose,
+                strength: 0.74,
+                radius: 20,
+                copy: "A hard pressure shell opens a lane, keeps unstable particles away from overload zones, and sharpens the flow edge."
+            },
+            split: {
+                name: "Splitter Node",
+                badge: "Bifurcate",
+                color: palette.violet,
+                strength: 0.68,
+                radius: 21,
+                copy: "A shear field divides the stream into twin bands and turns one dense river into a controlled branching bloom."
+            },
+            dampen: {
+                name: "Dampener Node",
+                badge: "Cool",
+                color: palette.green,
+                strength: 0.58,
+                radius: 19,
+                copy: "A cooling field slows hot particles, lowers overload pressure, and turns messy motion back into readable flow."
+            },
+            ignite: {
+                name: "Ignition Node",
+                badge: "Charge",
+                color: palette.gold,
+                strength: 0.64,
+                radius: 18,
+                copy: "A gain field accelerates particles, raises bloom charge, and risks instability when pressure zones are already hot."
+            }
+        };
+
+        const modeSpecs = {
+            bloom: {
+                label: "Bloom",
+                drift: 2.6,
+                hazardGain: 0.85,
+                gateGain: 1.08,
+                spread: 1,
+                color: palette.cyan
+            },
+            shear: {
+                label: "Shear",
+                drift: 6.5,
+                hazardGain: 0.95,
+                gateGain: 1,
+                spread: 1.22,
+                color: palette.violet
+            },
+            pressure: {
+                label: "Pressure",
+                drift: 3.2,
+                hazardGain: 1.34,
+                gateGain: 0.92,
+                spread: 0.92,
+                color: palette.rose
+            },
+            cascade: {
+                label: "Cascade",
+                drift: 8.4,
+                hazardGain: 1.08,
+                gateGain: 1.18,
+                spread: 1.42,
+                color: palette.gold
+            }
+        };
+
+        const state = {
+            mode: "bloom",
+            selectedType: "attract",
+            selectedNode: 0,
+            draggingNode: -1,
+            elapsed: 0,
+            score: 0,
+            gatesOpened: 0,
+            stability: 1,
+            overload: 0,
+            bloomPulse: 0,
+            flux: 0,
+            flow: 1,
+            radiusScale: 1,
+            threshold: 1,
+            bloom: 0.4,
+            grade: 0.24,
+            shot: "wide",
+            compact: window.innerWidth < 760
+        };
+
+        let composer;
+        let bloomPass;
+        let gradePass;
+        let flowBackdrop;
+        let baseHalfW = 80;
+        let baseHalfH = 48;
+        let cameraPanX = 0;
+        let cameraPanY = 0;
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.OrthographicCamera(-80, 80, 48, -48, 1, 220);
+        camera.position.set(0, 0, 120);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 0.98;
+        stage.appendChild(renderer.domElement);
+
+        composer = new EffectComposer(renderer);
+        composer.addPass(new RenderPass(scene, camera));
+        bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.56, 0.48, 0.16);
+        composer.addPass(bloomPass);
+        gradePass = new ShaderPass(colorGradeShader);
+        composer.addPass(gradePass);
+        composer.addPass(new OutputPass());
+
+        let worldWidth = 160;
+        const worldHeight = 96;
+        const clock = new THREE.Clock();
+        const pointer = new THREE.Vector2();
+
+        const emitters = [
+            { name: "Aster", yNorm: -0.26, colorIndex: 0, phase: 0, x: -72, y: -24 },
+            { name: "Lumen", yNorm: 0.02, colorIndex: 1, phase: 2.1, x: -72, y: 0 },
+            { name: "Crown", yNorm: 0.29, colorIndex: 2, phase: 4.2, x: -72, y: 24 }
+        ];
+
+        const gates = [
+            { name: "Gate A", yNorm: -0.28, color: palette.cyan, radius: 6.5, phase: 0.4, charge: 0.18, pulse: 0, flux: 0, y: -25 },
+            { name: "Gate B", yNorm: 0.01, color: palette.gold, radius: 7.1, phase: 2.4, charge: 0.24, pulse: 0, flux: 0, y: 0 },
+            { name: "Gate C", yNorm: 0.29, color: palette.violet, radius: 6.6, phase: 4.3, charge: 0.16, pulse: 0, flux: 0, y: 25 }
+        ];
+
+        const hazards = [
+            { name: "Shear Well", xNorm: 0.46, yNorm: -0.2, radius: 11, pressure: 0.18, phase: 1.5 },
+            { name: "Pressure Well", xNorm: 0.58, yNorm: 0.24, radius: 12.5, pressure: 0.24, phase: 3.6 }
+        ];
+
+        const nodes = [];
+        const nodeVisuals = [];
+        const gateVisuals = [];
+        const hazardVisuals = [];
+        const emitterVisuals = [];
+        const pulseRings = [];
+        const logEntries = [];
+        const emitterLabels = [];
+        const gateLabels = [];
+        const hazardLabels = [];
+        const nodeLabels = [];
+
+        const labelAccent = {
+            attract: "#62eaff",
+            repel: "#ff5f8d",
+            split: "#bd92ff",
+            dampen: "#8dffb4",
+            ignite: "#ffd45f"
+        };
+
+        const particleCount = state.compact ? 6200 : 10800;
+        const trailCount = state.compact ? 620 : 1120;
+        const positions = new Float32Array(particleCount * 3);
+        const colors = new Float32Array(particleCount * 3);
+        const sizes = new Float32Array(particleCount);
+        const alphas = new Float32Array(particleCount);
+        const posX = new Float32Array(particleCount);
+        const posY = new Float32Array(particleCount);
+        const prevX = new Float32Array(particleCount);
+        const prevY = new Float32Array(particleCount);
+        const velX = new Float32Array(particleCount);
+        const velY = new Float32Array(particleCount);
+        const life = new Float32Array(particleCount);
+        const maxLife = new Float32Array(particleCount);
+        const heat = new Float32Array(particleCount);
+        const lane = new Uint8Array(particleCount);
+        const seed = new Float32Array(particleCount);
+
+        const particleGeometry = new THREE.BufferGeometry();
+        particleGeometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+        particleGeometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+        particleGeometry.setAttribute("aSize", new THREE.BufferAttribute(sizes, 1));
+        particleGeometry.setAttribute("aAlpha", new THREE.BufferAttribute(alphas, 1));
+        particleGeometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 260);
+
+        const particleMaterial = new THREE.ShaderMaterial({
+            transparent: true,
+            depthWrite: false,
+            depthTest: false,
+            blending: THREE.AdditiveBlending,
+            vertexColors: true,
+            uniforms: {
+                uPixelRatio: { value: Math.min(window.devicePixelRatio || 1, 2) },
+                uBloom: { value: 0 },
+                uTime: { value: 0 }
+            },
+            vertexShader: `
+                attribute float aSize;
+                attribute float aAlpha;
+                varying vec3 vColor;
+                varying float vAlpha;
+                uniform float uPixelRatio;
+                uniform float uBloom;
+                uniform float uTime;
+
+                void main() {
+                    vColor = color;
+                    vAlpha = aAlpha;
+                    vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                    gl_Position = projectionMatrix * mvPosition;
+                    gl_PointSize = clamp(aSize * uPixelRatio * (1.0 + uBloom * 0.18), 2.0, 12.0);
+                }
+            `,
+            fragmentShader: `
+                varying vec3 vColor;
+                varying float vAlpha;
+                uniform float uTime;
+
+                void main() {
+                    vec2 uv = gl_PointCoord * 2.0 - 1.0;
+                    float d = dot(uv, uv);
+                    if (d > 1.0) {
+                        discard;
+                    }
+                    float core = smoothstep(0.38, 0.0, d);
+                    float halo = smoothstep(1.0, 0.1, d) * 0.42;
+                    float streak = exp(-abs(uv.x) * 5.2) * exp(-abs(uv.y) * 12.0);
+                    vec3 color = vColor * (0.88 + core * 0.48 + streak * 0.18);
+                    float alpha = vAlpha * (core * 0.9 + halo + streak * 0.12);
+                    gl_FragColor = vec4(color, alpha);
+                }
+            `
+        });
+
+        const particleMesh = new THREE.Points(particleGeometry, particleMaterial);
+        particleMesh.frustumCulled = false;
+        particleMesh.renderOrder = 5;
+        scene.add(particleMesh);
+
+        const trailPositions = new Float32Array(trailCount * 2 * 3);
+        const trailColors = new Float32Array(trailCount * 2 * 3);
+        const trailGeometry = new THREE.BufferGeometry();
+        trailGeometry.setAttribute("position", new THREE.BufferAttribute(trailPositions, 3));
+        trailGeometry.setAttribute("color", new THREE.BufferAttribute(trailColors, 3));
+        trailGeometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 260);
+        const trailMaterial = new THREE.LineBasicMaterial({
+            transparent: true,
+            opacity: 0.22,
+            vertexColors: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            depthTest: false
+        });
+        const trailMesh = new THREE.LineSegments(trailGeometry, trailMaterial);
+        trailMesh.frustumCulled = false;
+        trailMesh.renderOrder = 4;
+        scene.add(trailMesh);
+
+        function createFlowBackdrop() {
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    opacity: { value: 0.46 }
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    void main() {
+                        vUv = uv;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform float opacity;
+                    varying vec2 vUv;
+
+                    void main() {
+                        vec2 uv = vUv;
+                        float lanes = sin(uv.x * 34.0 - time * 0.42) * 0.5 + 0.5;
+                        lanes *= sin(uv.y * 22.0 + time * 0.24) * 0.5 + 0.5;
+                        float sweep = sin((uv.x + uv.y * 0.28) * 18.0 - time * 0.55) * 0.5 + 0.5;
+                        vec3 cyan = vec3(0.38, 0.92, 1.0);
+                        vec3 violet = vec3(0.74, 0.57, 1.0);
+                        vec3 color = mix(cyan, violet, smoothstep(0.18, 0.82, uv.x));
+                        float alpha = (lanes * 0.05 + sweep * 0.025) * opacity;
+                        gl_FragColor = vec4(color, alpha);
+                    }
+                `,
+                transparent: true,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                depthTest: false
+            });
+            const mesh = new THREE.Mesh(new THREE.PlaneGeometry(worldWidth * 1.15, worldHeight * 1.15), material);
+            mesh.position.z = -2;
+            mesh.renderOrder = -1;
+            scene.add(mesh);
+            return { mesh, material };
+        }
+
+        function applyCameraFrustum() {
+            const shot = shotModes[state.shot] || shotModes.wide;
+            const halfW = baseHalfW / shot.scale;
+            const halfH = baseHalfH / shot.scale;
+            camera.left = -halfW + cameraPanX;
+            camera.right = halfW + cameraPanX;
+            camera.top = halfH + cameraPanY;
+            camera.bottom = -halfH + cameraPanY;
+            camera.updateProjectionMatrix();
+        }
+
+        function updateCameraShot(dt, time) {
+            const shot = shotModes[state.shot] || shotModes.wide;
+            const targetPanX = shot.panX + Math.sin(time * 0.11) * shot.drift * 2.4;
+            const targetPanY = shot.panY + Math.cos(time * 0.09) * shot.drift * 1.6;
+            const blend = 1 - Math.exp(-dt * 2.4);
+            cameraPanX = lerp(cameraPanX, targetPanX, blend);
+            cameraPanY = lerp(cameraPanY, targetPanY, blend);
+            applyCameraFrustum();
+        }
+
+        function updatePostProcessing() {
+            if (!bloomPass) {
+                return;
+            }
+            const bloomBase = 0.44 + state.bloom * 0.22 + state.bloomPulse * 0.18;
+            bloomPass.strength = bloomBase + state.flux * 0.04;
+            bloomPass.radius = 0.44 + state.bloom * 0.08;
+            bloomPass.threshold = 0.14 + state.bloom * 0.1;
+            if (gradePass) {
+                gradePass.uniforms.grade.value = state.grade;
+            }
+        }
+
+        function clamp(value, min, max) {
+            return Math.max(min, Math.min(max, value));
+        }
+
+        function lerp(a, b, t) {
+            return a + (b - a) * t;
+        }
+
+        function rand(min, max) {
+            return min + Math.random() * (max - min);
+        }
+
+        function worldX(t) {
+            return lerp(camera.left, camera.right, t);
+        }
+
+        function worldY(t) {
+            return t * worldHeight;
+        }
+
+        function layoutField() {
+            emitters.forEach((emitter) => {
+                emitter.x = camera.left + 9;
+                emitter.y = worldY(emitter.yNorm);
+            });
+            gates.forEach((gate, index) => {
+                gate.x = camera.right - 12 - index * 0.8;
+                gate.baseY = worldY(gate.yNorm);
+                gate.y = gate.baseY;
+            });
+            hazards.forEach((hazard) => {
+                hazard.x = worldX(hazard.xNorm);
+                hazard.y = worldY(hazard.yNorm);
+            });
+        }
+
+        function resize() {
+            state.compact = window.innerWidth < 760;
+            worldWidth = worldHeight * (window.innerWidth / Math.max(1, window.innerHeight));
+            baseHalfW = worldWidth * 0.5;
+            baseHalfH = worldHeight * 0.5;
+            applyCameraFrustum();
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+            bloomPass.setSize(window.innerWidth, window.innerHeight);
+            particleMaterial.uniforms.uPixelRatio.value = Math.min(window.devicePixelRatio || 1, 2);
+            if (flowBackdrop) {
+                flowBackdrop.mesh.scale.set(worldWidth * 1.15, worldHeight * 1.15, 1);
+            }
+            layoutField();
+            nodes.forEach((node) => {
+                node.x = clamp(node.x, camera.left + 8, camera.right - 8);
+                node.y = clamp(node.y, camera.bottom + 8, camera.top - 8);
+            });
+            syncWorldVisuals();
+            updateWorldLabels();
+        }
+
+        function makeDisc(color, opacity, radius = 1) {
+            return new THREE.Mesh(
+                new THREE.CircleGeometry(radius, 80),
+                new THREE.MeshBasicMaterial({
+                    color,
+                    transparent: true,
+                    opacity,
+                    depthWrite: false,
+                    depthTest: false,
+                    blending: THREE.AdditiveBlending,
+                    side: THREE.DoubleSide
+                })
+            );
+        }
+
+        function makeRing(color, opacity, inner = 0.9, outer = 1) {
+            return new THREE.Mesh(
+                new THREE.RingGeometry(inner, outer, 96),
+                new THREE.MeshBasicMaterial({
+                    color,
+                    transparent: true,
+                    opacity,
+                    depthWrite: false,
+                    depthTest: false,
+                    blending: THREE.AdditiveBlending,
+                    side: THREE.DoubleSide
+                })
+            );
+        }
+
+        function makeLine(points, color, opacity) {
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const material = new THREE.LineBasicMaterial({
+                color,
+                transparent: true,
+                opacity,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                depthTest: false
+            });
+            const line = new THREE.Line(geometry, material);
+            line.frustumCulled = false;
+            return line;
+        }
+
+        function createEmitterVisuals() {
+            emitters.forEach((emitter) => {
+                const group = new THREE.Group();
+                const color = [palette.cyan, palette.gold, palette.violet][emitter.colorIndex];
+                const glow = makeDisc(color, 0.1, 6.2);
+                const ring = makeRing(color, 0.42, 0.72, 1);
+                const core = makeDisc(color, 0.75, 1.45);
+                const spine = makeLine([
+                    new THREE.Vector3(0, -7.2, 0.04),
+                    new THREE.Vector3(0, 7.2, 0.04)
+                ], color, 0.32);
+                ring.scale.set(4.2, 4.2, 1);
+                group.add(glow, ring, core, spine);
+                scene.add(group);
+                emitterVisuals.push({ group, glow, ring, core, spine });
+            });
+        }
+
+        function createGateVisuals() {
+            gates.forEach((gate) => {
+                const group = new THREE.Group();
+                const halo = makeDisc(gate.color, 0.08, 1);
+                const progress = makeDisc(gate.color, 0.1, 1);
+                const ring = makeRing(gate.color, 0.55, 0.82, 1);
+                const rim = makeRing(palette.ink, 0.16, 0.97, 1.02);
+                const gateLine = makeLine([
+                    new THREE.Vector3(-7.2, 0, 0.05),
+                    new THREE.Vector3(7.2, 0, 0.05)
+                ], gate.color, 0.18);
+                group.add(halo, progress, ring, rim, gateLine);
+                scene.add(group);
+                gateVisuals.push({ group, halo, progress, ring, rim, gateLine });
+            });
+        }
+
+        function createHazardVisuals() {
+            hazards.forEach((hazard) => {
+                const group = new THREE.Group();
+                const glow = makeDisc(palette.rose, 0.08, 1);
+                const ring = makeRing(palette.rose, 0.3, 0.87, 1);
+                const inner = makeRing(palette.gold, 0.12, 0.44, 0.47);
+                group.add(glow, ring, inner);
+                scene.add(group);
+                hazardVisuals.push({ group, glow, ring, inner });
+            });
+        }
+
+        function makeFieldLabel(className, kicker, name, badge) {
+            const el = document.createElement("div");
+            el.className = `field-label ${className}`;
+            if (kicker) {
+                const kickerEl = document.createElement("span");
+                kickerEl.className = "field-label__kicker";
+                kickerEl.textContent = kicker;
+                el.appendChild(kickerEl);
+            }
+            const nameEl = document.createElement("span");
+            nameEl.className = "field-label__name";
+            nameEl.textContent = name;
+            el.appendChild(nameEl);
+            if (badge) {
+                const badgeEl = document.createElement("span");
+                badgeEl.className = "field-label__badge";
+                badgeEl.textContent = badge;
+                el.appendChild(badgeEl);
+            }
+            return el;
+        }
+
+        function makeNodeLabelElement() {
+            const el = document.createElement("div");
+            el.className = "field-label field-label--node";
+            const indexEl = document.createElement("span");
+            indexEl.className = "field-label__index";
+            const nameEl = document.createElement("span");
+            nameEl.className = "field-label__name";
+            const badgeEl = document.createElement("span");
+            badgeEl.className = "field-label__badge";
+            el.append(indexEl, nameEl, badgeEl);
+            return { el, indexEl, nameEl, badgeEl };
+        }
+
+        function createWorldLabels() {
+            if (!worldLabelsEl) {
+                return;
+            }
+            worldLabelsEl.innerHTML = "";
+            emitterLabels.length = 0;
+            gateLabels.length = 0;
+            hazardLabels.length = 0;
+            nodeLabels.length = 0;
+
+            emitters.forEach((emitter) => {
+                const el = makeFieldLabel("field-label--emitter", "Emitter", emitter.name, "Source");
+                worldLabelsEl.appendChild(el);
+                emitterLabels.push({ el });
+            });
+
+            gates.forEach((gate) => {
+                const el = makeFieldLabel("field-label--gate", "Bloom Gate", gate.name, "Accept");
+                worldLabelsEl.appendChild(el);
+                gateLabels.push({ el });
+            });
+
+            hazards.forEach((hazard) => {
+                const el = makeFieldLabel("field-label--hazard", "Pressure Well", hazard.name, "Overload");
+                worldLabelsEl.appendChild(el);
+                hazardLabels.push({ el });
+            });
+        }
+
+        function rebuildNodeLabels() {
+            if (!worldLabelsEl) {
+                return;
+            }
+            nodeLabels.forEach((label) => {
+                if (label.el.parentNode) {
+                    label.el.parentNode.removeChild(label.el);
+                }
+            });
+            nodeLabels.length = 0;
+
+            nodes.forEach((node, index) => {
+                const parts = makeNodeLabelElement();
+                parts.el.dataset.nodeIndex = String(index);
+                worldLabelsEl.appendChild(parts.el);
+                nodeLabels.push({ ...parts, index });
+            });
+        }
+
+        function worldToScreen(wx, wy) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            const ndcX = (wx - camera.left) / (camera.right - camera.left);
+            const ndcY = (wy - camera.bottom) / (camera.top - camera.bottom);
+            return {
+                x: rect.left + ndcX * rect.width,
+                y: rect.top + (1 - ndcY) * rect.height
+            };
+        }
+
+        function placeLabel(el, wx, wy, offsetY = 0) {
+            const point = worldToScreen(wx, wy + offsetY);
+            el.style.left = `${point.x}px`;
+            el.style.top = `${point.y}px`;
+            const margin = 48;
+            const hidden = point.x < -margin
+                || point.x > window.innerWidth + margin
+                || point.y < -margin
+                || point.y > window.innerHeight + margin;
+            el.classList.toggle("is-hidden", hidden);
+            return !hidden;
+        }
+
+        function updateWorldLabels() {
+            if (!worldLabelsEl) {
+                return;
+            }
+
+            emitters.forEach((emitter, index) => {
+                const label = emitterLabels[index];
+                if (!label) {
+                    return;
+                }
+                placeLabel(label.el, emitter.x - 5.5, emitter.y, -2);
+                label.el.style.opacity = state.compact ? "0.62" : "0.72";
+            });
+
+            gates.forEach((gate, index) => {
+                const label = gateLabels[index];
+                if (!label) {
+                    return;
+                }
+                placeLabel(label.el, gate.x + 2, gate.y, -gate.radius - 10);
+                const charge = clamp(gate.charge, 0, 1);
+                label.el.classList.toggle("is-charged", charge > 0.62);
+                label.el.style.opacity = (0.58 + charge * 0.38).toFixed(2);
+            });
+
+            hazards.forEach((hazard, index) => {
+                const label = hazardLabels[index];
+                if (!label) {
+                    return;
+                }
+                placeLabel(label.el, hazard.x, hazard.y, hazard.radius + 4);
+                const heat = clamp(hazard.pressure, 0, 1.2);
+                label.el.style.opacity = (0.48 + heat * 0.34).toFixed(2);
+            });
+
+            nodeLabels.forEach((label) => {
+                const node = nodes[label.index];
+                if (!node) {
+                    return;
+                }
+                const spec = typeSpecs[node.type];
+                const radius = node.radius * state.radiusScale;
+                const shortName = spec.name.replace(" Node", "");
+                label.indexEl.textContent = `Node ${String(label.index + 1).padStart(2, "0")}`;
+                label.nameEl.textContent = shortName;
+                label.badgeEl.textContent = spec.badge;
+                label.el.style.setProperty("--label-accent", labelAccent[node.type] || "#62eaff");
+
+                const isSelected = label.index === state.selectedNode;
+                const isDragging = label.index === state.draggingNode;
+                label.el.classList.toggle("is-selected", isSelected);
+                label.el.classList.toggle("is-dragging", isDragging);
+
+                const visible = placeLabel(label.el, node.x, node.y, -radius - 8);
+                if (visible) {
+                    label.el.style.opacity = isSelected || isDragging ? "1" : "0.9";
+                }
+            });
+        }
+
+        function createNodeVisual(node) {
+            const spec = typeSpecs[node.type];
+            const group = new THREE.Group();
+            const field = makeDisc(spec.color, 0.055, 1);
+            const ring = makeRing(spec.color, 0.48, 0.92, 1);
+            const halo = makeRing(spec.color, 0.18, 0.55, 0.58);
+            const core = makeDisc(spec.color, 0.8, 1.2);
+            const cross = makeLine([
+                new THREE.Vector3(-3.1, 0, 0.08),
+                new THREE.Vector3(3.1, 0, 0.08),
+                new THREE.Vector3(0, -3.1, 0.08),
+                new THREE.Vector3(0, 3.1, 0.08)
+            ], spec.color, 0.3);
+            group.add(field, ring, halo, core, cross);
+            scene.add(group);
+            nodeVisuals.push({ group, field, ring, halo, core, cross });
+        }
+
+        function clearNodeVisuals() {
+            nodeVisuals.forEach((visual) => {
+                scene.remove(visual.group);
+                visual.group.traverse((child) => {
+                    if (child.geometry) {
+                        child.geometry.dispose();
+                    }
+                    if (child.material) {
+                        child.material.dispose();
+                    }
+                });
+            });
+            nodeVisuals.length = 0;
+        }
+
+        function resetNodes() {
+            nodes.length = 0;
+            nodes.push(
+                { type: "attract", x: worldX(0.31), y: worldY(0.17), radius: 22, strength: 0.82, flux: 0, pulse: 0 },
+                { type: "repel", x: worldX(0.44), y: worldY(-0.22), radius: 20, strength: 0.74, flux: 0, pulse: 0 },
+                { type: "split", x: worldX(0.55), y: worldY(0.11), radius: 21, strength: 0.68, flux: 0, pulse: 0 },
+                { type: "dampen", x: worldX(0.42), y: worldY(0.33), radius: 19, strength: 0.58, flux: 0, pulse: 0 },
+                { type: "ignite", x: worldX(0.66), y: worldY(-0.08), radius: 18, strength: 0.64, flux: 0, pulse: 0 }
+            );
+            clearNodeVisuals();
+            nodes.forEach(createNodeVisual);
+            rebuildNodeLabels();
+            state.selectedNode = 0;
+            state.selectedType = nodes[0].type;
+            updateTypeButtons();
+            updateInspector();
+        }
+
+        function syncWorldVisuals() {
+            emitterVisuals.forEach((visual, index) => {
+                const emitter = emitters[index];
+                visual.group.position.set(emitter.x, emitter.y, 0.08);
+            });
+            gateVisuals.forEach((visual, index) => {
+                const gate = gates[index];
+                visual.group.position.set(gate.x, gate.y, 0.09);
+            });
+            hazardVisuals.forEach((visual, index) => {
+                const hazard = hazards[index];
+                visual.group.position.set(hazard.x, hazard.y, 0.07);
+            });
+            updateNodeVisuals(0);
+        }
+
+        function updateNodeVisuals(dt) {
+            nodes.forEach((node, index) => {
+                const visual = nodeVisuals[index];
+                if (!visual) {
+                    return;
+                }
+                const spec = typeSpecs[node.type];
+                const selected = index === state.selectedNode ? 1 : 0;
+                const radius = node.radius * state.radiusScale;
+                const pulse = node.pulse + selected * 0.22 + Math.sin(state.elapsed * 3.2 + index) * 0.035;
+                visual.group.position.set(node.x, node.y, 0.1);
+                visual.field.scale.set(radius, radius, 1);
+                visual.ring.scale.set(radius * 0.18 + pulse * 1.6, radius * 0.18 + pulse * 1.6, 1);
+                visual.halo.scale.set(3.6 + pulse * 3.2, 3.6 + pulse * 3.2, 1);
+                visual.core.scale.set(1 + pulse * 0.6, 1 + pulse * 0.6, 1);
+                visual.cross.rotation.z += dt * (0.4 + node.strength * 0.8) * (node.type === "split" ? -1 : 1);
+                visual.field.material.color.copy(spec.color);
+                visual.ring.material.color.copy(spec.color);
+                visual.halo.material.color.copy(spec.color);
+                visual.core.material.color.copy(spec.color);
+                visual.cross.material.color.copy(spec.color);
+                const fluxGlow = clamp(node.flux, 0, 1);
+                visual.field.material.opacity = 0.035 + selected * 0.035 + fluxGlow * 0.022;
+                visual.ring.material.opacity = 0.36 + selected * 0.24 + fluxGlow * 0.06;
+                visual.halo.material.opacity = 0.12 + selected * 0.08 + fluxGlow * 0.04;
+                visual.core.material.opacity = 0.62 + selected * 0.22;
+                node.pulse = Math.max(0, node.pulse - dt * 1.5);
+            });
+        }
+
+        function updateGateVisuals(dt) {
+            const mode = modeSpecs[state.mode];
+            gates.forEach((gate, index) => {
+                const visual = gateVisuals[index];
+                gate.y = gate.baseY + Math.sin(state.elapsed * 0.42 + gate.phase) * mode.drift;
+                gate.pulse = Math.max(0, gate.pulse - dt * 1.8);
+                gate.flux *= Math.pow(0.05, dt);
+                const scale = gate.radius * (1 + gate.pulse * 0.08);
+                visual.group.position.set(gate.x, gate.y, 0.09);
+                visual.group.rotation.z = Math.sin(state.elapsed * 0.22 + gate.phase) * 0.18;
+                visual.halo.scale.set(scale * 2.15, scale * 2.15, 1);
+                visual.progress.scale.set(scale * clamp(gate.charge, 0.04, 1), scale * clamp(gate.charge, 0.04, 1), 1);
+                visual.ring.scale.set(scale, scale, 1);
+                visual.rim.scale.set(scale * 1.16, scale * 1.16, 1);
+                visual.halo.material.opacity = 0.045 + gate.charge * 0.11 + gate.pulse * 0.12;
+                visual.progress.material.opacity = 0.06 + gate.charge * 0.2;
+                visual.ring.material.opacity = 0.38 + gate.charge * 0.32 + gate.pulse * 0.2;
+                visual.gateLine.material.opacity = 0.12 + gate.flux * 0.22;
+            });
+        }
+
+        function updateHazardVisuals(dt) {
+            const mode = modeSpecs[state.mode];
+            hazards.forEach((hazard, index) => {
+                const visual = hazardVisuals[index];
+                hazard.pressure = Math.max(0, hazard.pressure - dt * 0.08);
+                const heatLevel = clamp(hazard.pressure, 0, 1.4);
+                visual.group.position.set(hazard.x, hazard.y, 0.07);
+                visual.group.rotation.z += dt * (0.16 + heatLevel * 0.5) * (index % 2 ? -1 : 1);
+                visual.glow.scale.set(hazard.radius * (1.8 + heatLevel * 0.2), hazard.radius * (1.8 + heatLevel * 0.2), 1);
+                visual.ring.scale.set(hazard.radius * (1 + heatLevel * 0.08), hazard.radius * (1 + heatLevel * 0.08), 1);
+                visual.inner.scale.set(hazard.radius * (0.95 + Math.sin(state.elapsed * 2 + hazard.phase) * 0.05), hazard.radius * (0.95 + Math.sin(state.elapsed * 2 + hazard.phase) * 0.05), 1);
+                visual.glow.material.opacity = 0.04 + heatLevel * 0.13 * mode.hazardGain;
+                visual.ring.material.opacity = 0.18 + heatLevel * 0.22;
+                visual.inner.material.opacity = 0.08 + heatLevel * 0.16;
+            });
+        }
+
+        function updateEmitterVisuals(dt) {
+            emitterVisuals.forEach((visual, index) => {
+                const emitter = emitters[index];
+                const pulse = 0.5 + Math.sin(state.elapsed * 3.1 + emitter.phase) * 0.5;
+                visual.group.position.set(emitter.x, emitter.y, 0.08);
+                visual.ring.rotation.z += dt * (0.85 + index * 0.18);
+                visual.ring.scale.set(4.1 + pulse * 0.55, 4.1 + pulse * 0.55, 1);
+                visual.glow.material.opacity = 0.05 + pulse * 0.04;
+                visual.core.material.opacity = 0.62 + pulse * 0.18;
+            });
+        }
+
+        function createPulse(x, y, color, radius, speed = 24, opacity = 0.42) {
+            const ring = makeRing(color, opacity, 0.88, 1);
+            ring.position.set(x, y, 0.2);
+            ring.scale.set(radius * 0.22, radius * 0.22, 1);
+            scene.add(ring);
+            pulseRings.push({ ring, age: 0, life: 0.95, radius, speed, opacity });
+        }
+
+        function updatePulses(dt) {
+            for (let i = pulseRings.length - 1; i >= 0; i -= 1) {
+                const pulse = pulseRings[i];
+                pulse.age += dt;
+                const t = pulse.age / pulse.life;
+                const scale = pulse.radius * (0.22 + t * pulse.speed * 0.055);
+                pulse.ring.scale.set(scale, scale, 1);
+                pulse.ring.material.opacity = pulse.opacity * (1 - t);
+                if (t >= 1) {
+                    scene.remove(pulse.ring);
+                    pulse.ring.geometry.dispose();
+                    pulse.ring.material.dispose();
+                    pulseRings.splice(i, 1);
+                }
+            }
+        }
+
+        function resetParticle(i, preferredEmitter = -1) {
+            const emitterIndex = preferredEmitter >= 0 ? preferredEmitter : Math.floor(Math.random() * emitters.length);
+            const emitter = emitters[emitterIndex];
+            const mode = modeSpecs[state.mode];
+            const jitter = rand(-5.8, 5.8) * mode.spread;
+            const speed = rand(18, 30) * state.flow;
+            const angle = rand(-0.18, 0.18) + (emitterIndex - 1) * 0.035;
+            posX[i] = emitter.x + rand(-2.8, 1.5);
+            posY[i] = emitter.y + jitter;
+            prevX[i] = posX[i] - Math.cos(angle) * 0.8;
+            prevY[i] = posY[i] - Math.sin(angle) * 0.8;
+            velX[i] = Math.cos(angle) * speed;
+            velY[i] = Math.sin(angle) * speed + rand(-2, 2);
+            lane[i] = emitterIndex;
+            life[i] = rand(4.4, 7.8);
+            maxLife[i] = life[i];
+            heat[i] = rand(0.12, 0.38);
+            seed[i] = Math.random();
+            positions[i * 3] = posX[i];
+            positions[i * 3 + 1] = posY[i];
+            positions[i * 3 + 2] = 0;
+            sizes[i] = rand(2.2, 5.2);
+            alphas[i] = rand(0.2, 0.58);
+        }
+
+        function resetParticles() {
+            for (let i = 0; i < particleCount; i += 1) {
+                resetParticle(i, i % emitters.length);
+                posX[i] += rand(-10, worldWidth * 0.42);
+                prevX[i] = posX[i] - rand(0.4, 1.6);
+            }
+            particleGeometry.attributes.position.needsUpdate = true;
+            particleGeometry.attributes.color.needsUpdate = true;
+            particleGeometry.attributes.aSize.needsUpdate = true;
+            particleGeometry.attributes.aAlpha.needsUpdate = true;
+        }
+
+        function nearestGateForParticle(i) {
+            const index = lane[i] % gates.length;
+            if (state.mode === "cascade") {
+                return gates[(index + Math.floor(state.elapsed * 0.45 + seed[i] * 3)) % gates.length];
+            }
+            return gates[index];
+        }
+
+        function applyNodeForce(node, i, dt) {
+            const spec = typeSpecs[node.type];
+            const dx = node.x - posX[i];
+            const dy = node.y - posY[i];
+            const radius = node.radius * state.radiusScale;
+            const distSq = dx * dx + dy * dy;
+            if (distSq > radius * radius) {
+                return { ax: 0, ay: 0 };
+            }
+            const dist = Math.sqrt(distSq) + 0.0001;
+            const falloff = (1 - dist / radius);
+            const curve = falloff * falloff;
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const power = spec.strength * node.strength * curve;
+            node.flux = Math.min(1.6, node.flux + curve * 0.0035);
+
+            if (node.type === "attract") {
+                return { ax: nx * power * 86, ay: ny * power * 86 };
+            }
+            if (node.type === "repel") {
+                return { ax: -nx * power * 92, ay: -ny * power * 92 };
+            }
+            if (node.type === "split") {
+                const sign = (seed[i] + lane[i] * 0.31) % 1 > 0.5 ? 1 : -1;
+                return { ax: -ny * sign * power * 104 + nx * power * 18, ay: nx * sign * power * 104 + ny * power * 18 };
+            }
+            if (node.type === "dampen") {
+                const damping = Math.max(0.55, 1 - curve * 0.75 * dt * 5.2);
+                velX[i] *= damping;
+                velY[i] *= damping;
+                heat[i] = Math.max(0.02, heat[i] - curve * dt * 0.85);
+                return { ax: nx * power * 15, ay: ny * power * 15 };
+            }
+            if (node.type === "ignite") {
+                const speed = Math.hypot(velX[i], velY[i]) + 0.0001;
+                heat[i] = Math.min(1.8, heat[i] + curve * dt * 1.25);
+                return { ax: (velX[i] / speed) * power * 105 - ny * power * 18, ay: (velY[i] / speed) * power * 105 + nx * power * 18 };
+            }
+            return { ax: 0, ay: 0 };
+        }
+
+        function updateParticles(dt) {
+            const mode = modeSpecs[state.mode];
+            let totalFlux = 0;
+            nodes.forEach((node) => {
+                node.flux *= Math.pow(0.08, dt);
+            });
+
+            for (let i = 0; i < particleCount; i += 1) {
+                prevX[i] = posX[i];
+                prevY[i] = posY[i];
+                life[i] -= dt;
+
+                let ax = 6.4 * state.flow;
+                let ay = Math.sin(state.elapsed * 0.85 + seed[i] * 9.2) * 0.9;
+                const target = nearestGateForParticle(i);
+                const tx = target.x - posX[i];
+                const ty = target.y - posY[i];
+                const gateDistance = Math.sqrt(tx * tx + ty * ty) + 0.0001;
+                const gatePull = clamp((posX[i] - camera.left) / worldWidth, 0, 1);
+                ax += (tx / gateDistance) * (7 + gatePull * 18) * state.flow;
+                ay += (ty / gateDistance) * (4 + gatePull * 20) * state.flow;
+
+                for (let n = 0; n < nodes.length; n += 1) {
+                    const force = applyNodeForce(nodes[n], i, dt);
+                    ax += force.ax;
+                    ay += force.ay;
+                }
+
+                for (let h = 0; h < hazards.length; h += 1) {
+                    const hazard = hazards[h];
+                    const dx = posX[i] - hazard.x;
+                    const dy = posY[i] - hazard.y;
+                    const distSq = dx * dx + dy * dy;
+                    const radius = hazard.radius * (1.25 + hazard.pressure * 0.12);
+                    if (distSq < radius * radius) {
+                        const dist = Math.sqrt(distSq) + 0.0001;
+                        const curve = (1 - dist / radius);
+                        const heatGain = (0.24 + heat[i] * 0.12) * mode.hazardGain;
+                        hazard.pressure = Math.min(1.5, hazard.pressure + curve * heatGain * dt * 0.34);
+                        heat[i] = Math.min(1.9, heat[i] + curve * dt * 0.32);
+                        ax += (dx / dist) * curve * hazard.pressure * 26;
+                        ay += (dy / dist) * curve * hazard.pressure * 26;
+                    }
+                }
+
+                velX[i] += ax * dt;
+                velY[i] += ay * dt;
+                const speed = Math.hypot(velX[i], velY[i]) + 0.0001;
+                const maxSpeed = 54 + heat[i] * 18 + state.flow * 8;
+                if (speed > maxSpeed) {
+                    const scale = maxSpeed / speed;
+                    velX[i] *= scale;
+                    velY[i] *= scale;
+                }
+                velX[i] *= Math.pow(0.18, dt);
+                velY[i] *= Math.pow(0.2, dt);
+                posX[i] += velX[i] * dt;
+                posY[i] += velY[i] * dt;
+                heat[i] = Math.max(0.02, heat[i] - dt * 0.07);
+
+                const gateDx = posX[i] - target.x;
+                const gateDy = posY[i] - target.y;
+                const gateHitRadius = target.radius * (1.08 + state.bloomPulse * 0.12);
+                if (gateDx * gateDx + gateDy * gateDy < gateHitRadius * gateHitRadius && velX[i] > 0) {
+                    const charge = (0.45 + heat[i] * 0.42 + Math.max(0, velX[i]) * 0.008) * mode.gateGain;
+                    target.charge += charge * 0.014 / state.threshold;
+                    target.flux = Math.min(1, target.flux + charge * 0.012);
+                    totalFlux += charge;
+                    state.score += Math.floor(2 + charge * 8);
+                    resetParticle(i, lane[i] % emitters.length);
+                    if (target.charge >= 1) {
+                        target.charge = 0.16;
+                        target.pulse = 1;
+                        state.gatesOpened += 1;
+                        state.score += 180 + Math.floor(state.stability * 90);
+                        state.bloomPulse = 1;
+                        createPulse(target.x, target.y, target.color, target.radius * 2.4, 32, 0.55);
+                        addLog("Gate", `${target.name} opened under ${mode.label.toLowerCase()} flow`);
+                    }
+                }
+
+                const offscreen = posX[i] > camera.right + 10 || posY[i] > camera.top + 12 || posY[i] < camera.bottom - 12 || life[i] <= 0;
+                if (offscreen) {
+                    resetParticle(i);
+                }
+
+                const age = 1 - life[i] / Math.max(0.001, maxLife[i]);
+                const fade = Math.sin(clamp(age, 0, 1) * Math.PI);
+                const intensity = 0.75 + heat[i] * 0.52 + state.bloomPulse * 0.18;
+                const baseColors = [palette.cyan, palette.gold, palette.violet];
+                const hot = heat[i] > 0.85 ? palette.rose : (heat[i] > 0.52 ? palette.gold : baseColors[lane[i] % baseColors.length]);
+                const base = baseColors[lane[i] % baseColors.length];
+                const mix = clamp(heat[i] * 0.55, 0, 1);
+                colors[i * 3] = lerp(base.r, hot.r, mix) * intensity;
+                colors[i * 3 + 1] = lerp(base.g, hot.g, mix) * intensity;
+                colors[i * 3 + 2] = lerp(base.b, hot.b, mix) * intensity;
+                positions[i * 3] = posX[i];
+                positions[i * 3 + 1] = posY[i];
+                positions[i * 3 + 2] = (heat[i] - 0.5) * 0.8;
+                sizes[i] = clamp(2.2 + heat[i] * 2.8 + speed * 0.025, 2, 7.5);
+                alphas[i] = clamp(0.16 + fade * 0.5 + heat[i] * 0.12, 0.06, 0.82);
+            }
+
+            state.flux = state.flux * Math.pow(0.04, dt) + totalFlux * 0.002;
+            particleGeometry.attributes.position.needsUpdate = true;
+            particleGeometry.attributes.color.needsUpdate = true;
+            particleGeometry.attributes.aSize.needsUpdate = true;
+            particleGeometry.attributes.aAlpha.needsUpdate = true;
+            updateTrails();
+        }
+
+        function updateTrails() {
+            const step = Math.max(1, Math.floor(particleCount / trailCount));
+            for (let t = 0; t < trailCount; t += 1) {
+                const i = (t * step) % particleCount;
+                const pi = t * 6;
+                const ci = t * 6;
+                trailPositions[pi] = prevX[i];
+                trailPositions[pi + 1] = prevY[i];
+                trailPositions[pi + 2] = -0.2;
+                trailPositions[pi + 3] = posX[i];
+                trailPositions[pi + 4] = posY[i];
+                trailPositions[pi + 5] = -0.2;
+                const alphaBoost = clamp(0.5 + heat[i] * 0.3, 0.5, 1);
+                trailColors[ci] = colors[i * 3] * 0.24;
+                trailColors[ci + 1] = colors[i * 3 + 1] * 0.24;
+                trailColors[ci + 2] = colors[i * 3 + 2] * 0.24;
+                trailColors[ci + 3] = colors[i * 3] * alphaBoost;
+                trailColors[ci + 4] = colors[i * 3 + 1] * alphaBoost;
+                trailColors[ci + 5] = colors[i * 3 + 2] * alphaBoost;
+            }
+            trailGeometry.attributes.position.needsUpdate = true;
+            trailGeometry.attributes.color.needsUpdate = true;
+        }
+
+        function updateGameState(dt) {
+            state.elapsed += dt;
+            state.bloomPulse = Math.max(0, state.bloomPulse - dt * 1.25);
+            const pressure = hazards.reduce((sum, hazard) => sum + hazard.pressure, 0) / hazards.length;
+            state.overload = clamp(pressure / 1.5, 0, 1);
+            state.stability = clamp(1 - state.overload * 0.68 + Math.min(0.08, state.flux * 0.004), 0.06, 1);
+            if (state.overload > 0.84 && Math.sin(state.elapsed * 2.5) > 0.98) {
+                state.score = Math.max(0, state.score - 8);
+            }
+            particleMaterial.uniforms.uBloom.value = state.bloomPulse;
+            particleMaterial.uniforms.uTime.value = state.elapsed;
+            trailMaterial.opacity = 0.14 + state.bloomPulse * 0.12 + state.flux * 0.008;
+            if (timelineFill) {
+                timelineFill.style.width = `${Math.min(100, (state.gatesOpened * 18 + state.score * 0.04) % 100)}%`;
+            }
+        }
+
+        function updateHud() {
+            scoreReadout.textContent = String(Math.floor(state.score));
+            gatesReadout.textContent = String(state.gatesOpened);
+            stabilityReadout.textContent = `${Math.round(state.stability * 100)}%`;
+            modeReadout.textContent = modeSpecs[state.mode].label;
+            if (shotReadout) {
+                shotReadout.textContent = shotModes[state.shot].name;
+            }
+            fluxReadout.textContent = state.flux.toFixed(2);
+            overloadReadout.textContent = `${Math.round(state.overload * 100)}%`;
+            flowLabel.textContent = state.flow.toFixed(2);
+            radiusLabel.textContent = state.radiusScale.toFixed(2);
+            thresholdLabel.textContent = state.threshold.toFixed(2);
+            if (bloomLabel) {
+                bloomLabel.textContent = `${Math.round(state.bloom * 100)}%`;
+            }
+            if (gradeLabel) {
+                gradeLabel.textContent = `${Math.round(state.grade * 100)}%`;
+            }
+            updateInspector();
+        }
+
+        function updateInspector() {
+            const node = nodes[state.selectedNode];
+            if (!node) {
+                return;
+            }
+            const spec = typeSpecs[node.type];
+            selectedName.textContent = spec.name;
+            selectedKind.textContent = `Node ${String(state.selectedNode + 1).padStart(2, "0")} / ${spec.badge}`;
+            selectedCopy.textContent = spec.copy;
+            radiusReadout.textContent = (node.radius * state.radiusScale).toFixed(1);
+            strengthReadout.textContent = node.strength.toFixed(2);
+        }
+
+        function addLog(kind, message) {
+            logEntries.unshift({ kind, message });
+            logEntries.splice(5);
+            renderLog();
+        }
+
+        function renderLog() {
+            logEl.innerHTML = "";
+            logEntries.forEach((entry) => {
+                const row = document.createElement("div");
+                row.className = "log-entry";
+                const label = document.createElement("strong");
+                label.textContent = entry.kind;
+                const text = document.createElement("span");
+                text.textContent = entry.message;
+                row.append(label, text);
+                logEl.appendChild(row);
+            });
+        }
+
+        function updateTypeButtons() {
+            document.querySelectorAll("[data-type]").forEach((button) => {
+                button.classList.toggle("active", button.dataset.type === state.selectedType);
+            });
+        }
+
+        function updateModeButtons() {
+            document.querySelectorAll("[data-mode]").forEach((button) => {
+                button.classList.toggle("active", button.dataset.mode === state.mode);
+            });
+        }
+
+        function setSelectedNodeType(type) {
+            state.selectedType = type;
+            const node = nodes[state.selectedNode];
+            if (node) {
+                const spec = typeSpecs[type];
+                node.type = type;
+                node.radius = spec.radius;
+                node.strength = spec.strength;
+                node.pulse = 1;
+                createPulse(node.x, node.y, spec.color, node.radius, 20, 0.36);
+            }
+            updateTypeButtons();
+            updateInspector();
+        }
+
+        function setMode(mode) {
+            state.mode = mode;
+            updateModeButtons();
+            addLog("Mode", `${modeSpecs[mode].label} field engaged`);
+            gates.forEach((gate, index) => {
+                gate.pulse = 0.7;
+                gate.charge = clamp(gate.charge + 0.08 + index * 0.02, 0.05, 0.82);
+            });
+        }
+
+        function addNode() {
+            if (nodes.length >= 8) {
+                addLog("Limit", "Eight field nodes are already online");
+                return;
+            }
+            const spec = typeSpecs[state.selectedType];
+            const t = nodes.length / 8;
+            const node = {
+                type: state.selectedType,
+                x: worldX(0.38 + t * 0.28),
+                y: worldY(-0.28 + (t % 0.6)),
+                radius: spec.radius,
+                strength: spec.strength,
+                flux: 0,
+                pulse: 1
+            };
+            nodes.push(node);
+            createNodeVisual(node);
+            rebuildNodeLabels();
+            state.selectedNode = nodes.length - 1;
+            createPulse(node.x, node.y, spec.color, node.radius, 20, 0.34);
+            updateInspector();
+            addLog("Node", `${spec.badge} node added`);
+        }
+
+        function pulseNodes() {
+            nodes.forEach((node) => {
+                node.pulse = 1;
+                node.strength = clamp(node.strength + 0.05, 0.42, 1.12);
+                createPulse(node.x, node.y, typeSpecs[node.type].color, node.radius, 16, 0.22);
+            });
+            state.bloomPulse = 0.8;
+            state.score = Math.max(0, state.score - 20);
+            addLog("Pulse", "Field nodes surged");
+        }
+
+        function ventPressure() {
+            hazards.forEach((hazard) => {
+                hazard.pressure *= 0.36;
+                createPulse(hazard.x, hazard.y, palette.green, hazard.radius, 24, 0.35);
+            });
+            state.score = Math.max(0, state.score - 40);
+            addLog("Vent", "Overload pressure vented");
+        }
+
+        function resetGame() {
+            state.score = 0;
+            state.gatesOpened = 0;
+            state.bloomPulse = 0.25;
+            state.flux = 0;
+            hazards.forEach((hazard, index) => {
+                hazard.pressure = 0.18 + index * 0.06;
+            });
+            gates.forEach((gate, index) => {
+                gate.charge = 0.16 + index * 0.04;
+                gate.pulse = 0.5;
+            });
+            resetNodes();
+            resetParticles();
+            addLog("Reset", "Bloom lattice restored");
+        }
+
+        function findNearestNode(worldPoint) {
+            let nearest = -1;
+            let best = Infinity;
+            nodes.forEach((node, index) => {
+                const dx = node.x - worldPoint.x;
+                const dy = node.y - worldPoint.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                const threshold = Math.max(5.8, node.radius * state.radiusScale * 0.25);
+                if (distance < threshold && distance < best) {
+                    nearest = index;
+                    best = distance;
+                }
+            });
+            return nearest;
+        }
+
+        function screenToWorld(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            const y = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
+            pointer.set(x, y);
+            return {
+                x: lerp(camera.left, camera.right, (pointer.x + 1) * 0.5),
+                y: lerp(camera.bottom, camera.top, (pointer.y + 1) * 0.5)
+            };
+        }
+
+        function moveNode(index, worldPoint) {
+            const margin = 8;
+            const node = nodes[index];
+            node.x = clamp(worldPoint.x, camera.left + margin, camera.right - margin);
+            node.y = clamp(worldPoint.y, camera.bottom + margin, camera.top - margin);
+            node.pulse = Math.max(node.pulse, 0.28);
+        }
+
+        function bindEvents() {
+            window.addEventListener("resize", resize);
+
+            renderer.domElement.addEventListener("pointerdown", (event) => {
+                const worldPoint = screenToWorld(event);
+                const nearest = findNearestNode(worldPoint);
+                if (nearest >= 0) {
+                    state.selectedNode = nearest;
+                    state.selectedType = nodes[nearest].type;
+                    state.draggingNode = nearest;
+                } else {
+                    state.draggingNode = state.selectedNode;
+                    moveNode(state.selectedNode, worldPoint);
+                }
+                renderer.domElement.setPointerCapture(event.pointerId);
+                updateTypeButtons();
+                updateInspector();
+            });
+
+            renderer.domElement.addEventListener("pointermove", (event) => {
+                if (state.draggingNode < 0) {
+                    return;
+                }
+                moveNode(state.draggingNode, screenToWorld(event));
+            });
+
+            renderer.domElement.addEventListener("pointerup", (event) => {
+                if (state.draggingNode >= 0) {
+                    const node = nodes[state.draggingNode];
+                    createPulse(node.x, node.y, typeSpecs[node.type].color, node.radius, 14, 0.24);
+                }
+                state.draggingNode = -1;
+                if (renderer.domElement.hasPointerCapture(event.pointerId)) {
+                    renderer.domElement.releasePointerCapture(event.pointerId);
+                }
+            });
+
+            renderer.domElement.addEventListener("pointercancel", () => {
+                state.draggingNode = -1;
+            });
+
+            document.querySelectorAll("[data-type]").forEach((button) => {
+                button.addEventListener("click", () => setSelectedNodeType(button.dataset.type));
+            });
+
+            document.querySelectorAll("[data-mode]").forEach((button) => {
+                button.addEventListener("click", () => setMode(button.dataset.mode));
+            });
+
+            document.querySelector("#add-btn").addEventListener("click", addNode);
+            document.querySelector("#pulse-btn").addEventListener("click", pulseNodes);
+            document.querySelector("#vent-btn").addEventListener("click", ventPressure);
+            document.querySelector("#reset-btn").addEventListener("click", resetGame);
+
+            flowSlider.addEventListener("input", () => {
+                state.flow = Number(flowSlider.value);
+                flowLabel.textContent = state.flow.toFixed(2);
+            });
+
+            radiusSlider.addEventListener("input", () => {
+                state.radiusScale = Number(radiusSlider.value);
+                radiusLabel.textContent = state.radiusScale.toFixed(2);
+            });
+
+            thresholdSlider.addEventListener("input", () => {
+                state.threshold = Number(thresholdSlider.value);
+                thresholdLabel.textContent = state.threshold.toFixed(2);
+            });
+
+            bloomSlider.addEventListener("input", () => {
+                state.bloom = Number(bloomSlider.value) / 100;
+                bloomLabel.textContent = `${Math.round(state.bloom * 100)}%`;
+            });
+
+            gradeSlider.addEventListener("input", () => {
+                state.grade = Number(gradeSlider.value) / 100;
+                gradeLabel.textContent = `${Math.round(state.grade * 100)}%`;
+            });
+
+            document.querySelectorAll("[data-shot]").forEach((button) => {
+                button.addEventListener("click", () => {
+                    document.querySelectorAll("[data-shot]").forEach((candidate) => candidate.classList.toggle("active", candidate === button));
+                    state.shot = button.dataset.shot;
+                    addLog("Shot", `${shotModes[state.shot].name} framing engaged`);
+                    updateHud();
+                });
+            });
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(0.033, clock.getDelta());
+            updateGameState(dt);
+            updateParticles(dt);
+            updateEmitterVisuals(dt);
+            updateGateVisuals(dt);
+            updateHazardVisuals(dt);
+            updateNodeVisuals(dt);
+            updatePulses(dt);
+            updateCameraShot(dt, state.elapsed);
+            updatePostProcessing();
+            updateWorldLabels();
+            if (flowBackdrop) {
+                flowBackdrop.material.uniforms.time.value = state.elapsed;
+            }
+            updateHud();
+            composer.render();
+        }
+
+        function init() {
+            layoutField();
+            resize();
+            flowBackdrop = createFlowBackdrop();
+            createEmitterVisuals();
+            createGateVisuals();
+            createHazardVisuals();
+            createWorldLabels();
+            resetNodes();
+            syncWorldVisuals();
+            resetParticles();
+            bindEvents();
+            applyCameraFrustum();
+            addLog("Online", "Vector Bloom Composer field initialized");
+            addLog("Gate", "Three bloom gates accepting tuned flow");
+            window.__vectorBloomComposerReady = true;
+            animate();
+        }
+
+        init();
+    </script>
+</body>
+</html>

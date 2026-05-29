@@ -174,7 +174,11 @@ The main playtesting risk is that it becomes a beautiful toy rather than a game.
 
 `vector-bloom-grok.html` is the external-agent comparison variant. Treat it as a useful test of the same philosophy: keep the original readable particle instrument intact, then evaluate whether professional game-development polish actually clarifies intent. Valuable upgrades include explicit player feedback for gates, combos, pressure, and recovery; discoverable controls instead of hidden shortcuts; and bug fixes that preserve visual state, such as rebuilding node geometry when the selected type changes.
 
+`vector-bloom-composer.html` is the cinematic comparison variant. It shows that framing can be a mechanic-adjacent design tool: camera shots, projected field labels, post-processing bloom, color grade, film grain, letterboxing, and a quieter editorial HUD can make the same particle system feel more legible and premium. Preserve that lesson without confusing it for game-loop depth. Cinematic presentation can reveal a good system, but it can also hide a weak loop if pressure, timing, and interaction feedback are not strong.
+
 When using AI-generated variants, review them like production submissions. Check shortcut conflicts, stale rendered state, draw-range math, selector wiring, particle-sprite hygiene, and whether new feedback strengthens the core loop rather than burying it.
+
+The stronger workflow is to ask comparison agents for a clear frame, then merge lessons rather than files: Grok tested professional game-development feedback, Composer tested cinematic presentation, and AGY-style variants test observatory telemetry. A variant succeeds when its frame makes the artifact easier to understand, not merely when it adds more effects.
 
 ### Kinetic Containment
 
@@ -194,6 +198,8 @@ Current design constraints:
 
 Barycentric Dawn is the current test for realistic simulation as an expressive artifact. It should read as a gravity-driven two-star one-planet system first, then as a beautiful particle scene second.
 
+`barycentric-dawn-composer.html` and `barycentric-dawn-agy.html` are comparison variants, not replacements for the primary simulation. Composer tests cinematic presentation over the same force-language family: shot presets, bloom, color grading, lens streaks, nebula backdrop, film grain, and letterboxing should amplify the physical drama without hiding orbital readability. AGY tests an observatory/operator framing: fixed-timestep regimes, probe injection, telemetry, energy graphing, debug force readouts, and compact HUD controls should make the simulation more inspectable rather than simply busier.
+
 Current design constraints:
 
 - Keep the body motion tied to scaled Newtonian gravity.
@@ -209,6 +215,7 @@ Current design constraints:
 - When a planet-local force layer is requested as particles, remove the line proxy for that layer and build a local-frame birth/death stream. Static curves with particles added on top are not a real replacement.
 - Keep the force layers readable rather than letting particles hide the bodies.
 - Treat presets as orbital regimes with distinct dynamics, not only camera or color changes.
+- Keep comparison variants honest to their frame. Composer should feel cinematic; AGY should feel like an observatory console. Neither should dilute the primary Barycentric Dawn lessons about visible gravity, force-layer roles, and particle hygiene.
 
 Lessons from the successful iteration:
 

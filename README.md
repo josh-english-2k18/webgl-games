@@ -11,6 +11,7 @@ See [DESIGN.md](DESIGN.md) for the shared design philosophy, quality rubric, and
 - [Axiom Breach](https://josh-english-2k18.github.io/webgl-games/axiom-breach.html) (`axiom-breach.html`)
 - [Rift Conductor](https://josh-english-2k18.github.io/webgl-games/rift-conductor.html) (`rift-conductor.html`)
 - [Vector Bloom](https://josh-english-2k18.github.io/webgl-games/vector-bloom.html) (`vector-bloom.html`)
+- [Vector Bloom Composer](https://josh-english-2k18.github.io/webgl-games/vector-bloom-composer.html) (`vector-bloom-composer.html`)
 - [Vector Bloom Grok](https://josh-english-2k18.github.io/webgl-games/vector-bloom-grok.html) (`vector-bloom-grok.html`)
 - [Vesper Belt](https://josh-english-2k18.github.io/webgl-games/asteroids.html) (`asteroids.html`)
 - [Crownfield Chess](https://josh-english-2k18.github.io/webgl-games/chess.html) (`chess.html`)
@@ -51,6 +52,8 @@ See [DESIGN.md](DESIGN.md) for the shared design philosophy, quality rubric, and
 `barycentric-dawn-agy.html` is Barycentric Dawn AGY, an observatory-style variant with fixed-timestep Newtonian integration, regime profiles, probe injection, live telemetry, an energy graph, debug force readouts, and a compact Outfit/JetBrains Mono HUD. Built by Gemini 3.5 Flash on Antigravity CLI.
 
 `vector-bloom.html` is Vector Bloom, a playable particle-field experiment built from the pinned design idea. It combines dense shader particles, draggable force nodes, bloom gates, overload pressure wells, score/stability feedback, mode presets, and compact tuning controls to test whether Prismalith-level visual craft can support a genuinely engaging interaction loop.
+
+`vector-bloom-composer.html` is Vector Bloom Composer, a cinematic variant with post-processing bloom and color grade, camera shot presets, projected field labels, a shader flow backdrop, film grain, letterboxing, compact transparent HUD controls, and denser particles. It demonstrates that framing can make the same particle system feel more directed and legible, while still needing separate game-loop evaluation. Built with Composer 2.5.
 
 `vector-bloom-grok.html` is Vector Bloom Grok, a Grok-built variant that received a professional game-developer upgrade pass. It keeps the particle-instrument identity while adding clearer game-loop feedback, explicit unlink/reset controls, combo and gate milestone feedback, pressure telegraphing, and targeted fixes for shortcut conflicts, node visual rebuilding, and resonance link rendering.
 
