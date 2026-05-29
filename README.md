@@ -14,6 +14,7 @@ See [DESIGN.md](DESIGN.md) for the shared design philosophy, quality rubric, and
 - [Vector Bloom Composer](https://josh-english-2k18.github.io/webgl-games/vector-bloom-composer.html) (`vector-bloom-composer.html`)
 - [Vector Bloom Grok](https://josh-english-2k18.github.io/webgl-games/vector-bloom-grok.html) (`vector-bloom-grok.html`)
 - [Vesper Belt](https://josh-english-2k18.github.io/webgl-games/asteroids.html) (`asteroids.html`)
+- [Vesper Belt Composer](https://josh-english-2k18.github.io/webgl-games/asteroids-composer.html) (`asteroids-composer.html`)
 - [Crownfield Chess](https://josh-english-2k18.github.io/webgl-games/chess.html) (`chess.html`)
 - [Crownline Checkers](https://josh-english-2k18.github.io/webgl-games/checkers.html) (`checkers.html`)
 - [Umbra Meridian Othello](https://josh-english-2k18.github.io/webgl-games/othello.html) (`othello.html`)
@@ -58,6 +59,8 @@ See [DESIGN.md](DESIGN.md) for the shared design philosophy, quality rubric, and
 `vector-bloom-grok.html` is Vector Bloom Grok, a Grok-built variant that received a professional game-developer upgrade pass. It keeps the particle-instrument identity while adding clearer game-loop feedback, explicit unlink/reset controls, combo and gate milestone feedback, pressure telegraphing, and targeted fixes for shortcut conflicts, node visual rebuilding, and resonance link rendering.
 
 `asteroids.html` is Vesper Belt, a wrap-around 3D asteroids shooter with wave progression, shield and heat management, missile locks, pickup upgrades, and a compact mission-driven HUD.
+
+`asteroids-composer.html` is Vesper Belt Composer, a cinematic variant with post-processing bloom and color grade, camera shot presets, a shader belt backdrop, nebula dome, denser starfield, film grain, letterboxing, and compact transparent HUD controls. Bloom and grade tuning live in the debug console. Built with Composer 2.5.
 
 The Vesper Belt comparison sharpened the process lesson: Codex should not build a plain game and wait for a separate presentation pass to add taste. Future game experiments should include the director layer up front: camera grammar, atmospheric frame, transparent HUD hierarchy, feedback language, and live tuning controls alongside movement and combat feel.
 
