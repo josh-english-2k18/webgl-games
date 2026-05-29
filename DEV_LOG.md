@@ -2,7 +2,9 @@
 
 This is the working record of the WebGL experiments tried so far, including the practical lessons from iteration and manual playtesting. It complements `README.md`, which indexes the runnable files, and `DESIGN.md`, which captures the philosophy that emerged from the work.
 
-The current pattern is clear: a first pass proves the idea, then a few focused iterations can turn a generic demo into a specific artifact. The strongest results happen when the implementation, visual language, controls, and default state all express the same premise.
+The current pattern is clear: a first pass proves the idea, then a few focused iterations can turn a generic demo into a specific artifact. The strongest results happen when the implementation, visual language, controls, camera, HUD hierarchy, tuning hooks, and default state all express the same premise from the beginning.
+
+The lesson from recent Composer comparisons is not to outsource taste. It is to make Codex carry the whole experience frame earlier: core loop, feel target, camera language, atmosphere, feedback, and visual tuning should be part of the first serious build, not a later rescue pass.
 
 ## Current Benchmarks
 
@@ -233,7 +235,7 @@ Key lesson: tactical experiments benefit from clear board state, obvious consequ
 
 ### Vesper Belt / Asteroids
 
-Files: `asteroids.html`, `gpt-5-asteroids.html`, `grok-4-asteroids.html`
+Files: `asteroids.html`, `asteroids-composer.html`, `gpt-5-asteroids.html`, `grok-4-asteroids.html`
 
 Asteroids has had several versions and model-generated variants. The current visual direction is acceptable, but manual playtesting showed that movement, playability, powerups, combat feel, escalation, and recovery windows require more iteration.
 
@@ -243,8 +245,17 @@ Iterations tried:
 - Added AI prompts to the Asteroids source.
 - Added GPT-5 and Grok 4 variants for comparison.
 - Upgraded the main Asteroids presentation into Vesper Belt.
+- Compared Vesper Belt against the active Vesper Belt Composer variant. The composer file mostly keeps the same gameplay backbone while adding a stronger director layer: chase/wide/tight/drift camera shots, transparent compact HUDs, shader belt backdrop, nebula dome, color grading, film grain, letterboxing, and live bloom/grade tuning.
 
-Future priority: improve feel before adding more mechanics. Ship acceleration, drag, rotation, shooting cadence, collision feedback, powerup readability, and scoring pressure matter more than feature count.
+Lessons from the comparison:
+
+- The composer variant is better presented, not automatically a better game. The core movement, combat, waves, pickups, heat, shields, and missiles still need the same feel-first playtesting.
+- Camera is part of game design. A readable chase camera and alternate framing modes can make thrust, threat direction, and speed easier to judge.
+- Transparent HUDs, environmental framing, and grading can dramatically raise perceived quality when they support the playfield instead of competing with it.
+- Live visual tuning belongs in the workflow. Bloom, grade, opacity, and framing controls make taste testable instead of hardcoded.
+- The correct process lesson is to fold these principles into Codex-built first passes. External variants should challenge our approach, not become the place where taste lives.
+
+Future priority: improve feel before adding more mechanics. Ship acceleration, drag, rotation, shooting cadence, collision feedback, powerup readability, camera readability, and scoring pressure matter more than feature count.
 
 ### Vectorwing: Rift Patrol
 
@@ -328,6 +339,8 @@ The source of record should live in this git repository, especially under `webgl
 - Board games are solid but need stronger identity to rise above competent implementations.
 - Asteroids needs feel-first iteration before more feature expansion.
 - For games, movement, timing, feedback, and recovery loops matter more than a long feature list.
+- For Codex-built games, the first serious pass should include the director layer: camera grammar, atmospheric frame, transparent HUD hierarchy, feedback language, and tuning hooks.
+- Comparison variants are useful when they expose principles we can absorb into our own process; they are not substitutes for making the main build good.
 - For simulations, visible cause and effect matter more than raw object count.
 - For visualizers, signal response should shape structure rather than decorate it.
 - Manual playtesting remains the source of truth for feel and visual judgment unless browser automation is explicitly requested.

@@ -57,6 +57,10 @@ See [DESIGN.md](DESIGN.md) for the shared design philosophy, quality rubric, and
 
 `vector-bloom-grok.html` is Vector Bloom Grok, a Grok-built variant that received a professional game-developer upgrade pass. It keeps the particle-instrument identity while adding clearer game-loop feedback, explicit unlink/reset controls, combo and gate milestone feedback, pressure telegraphing, and targeted fixes for shortcut conflicts, node visual rebuilding, and resonance link rendering.
 
+`asteroids.html` is Vesper Belt, a wrap-around 3D asteroids shooter with wave progression, shield and heat management, missile locks, pickup upgrades, and a compact mission-driven HUD.
+
+The Vesper Belt comparison sharpened the process lesson: Codex should not build a plain game and wait for a separate presentation pass to add taste. Future game experiments should include the director layer up front: camera grammar, atmospheric frame, transparent HUD hierarchy, feedback language, and live tuning controls alongside movement and combat feel.
+
 ## License
 
 This repository is licensed under the MIT License. See [LICENSE](LICENSE) for details.

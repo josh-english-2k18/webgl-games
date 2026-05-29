@@ -27,6 +27,12 @@ The first load matters. The scene should already feel alive, legible, and intent
 
 Controls should deepen or redirect the system. They should not be required to make the page interesting.
 
+### Whole Experience From The First Pass
+
+Do not split an experiment into a utilitarian implementation first and a taste pass later. For Codex-built games and simulations, the first serious pass should define the core loop, feel target, camera language, environmental frame, HUD hierarchy, feedback vocabulary, and live tuning hooks together.
+
+Comparison variants are reference material and stress tests, not rescue plans. If another variant exposes a stronger camera model, presentation frame, or tuning workflow, fold that principle back into the Codex process instead of treating taste as someone else's job.
+
 ### Readable Density
 
 Dense is good when it remains readable. The best experiments have enough activity to feel alive while still preserving structure.
@@ -135,13 +141,16 @@ Asteroids has acceptable visual direction, but it needs feel-first iteration.
 Priorities:
 
 - Ship acceleration, drag, rotation, and thrust feel.
+- Camera framing that makes movement and threat direction readable.
 - Shooting cadence and projectile readability.
 - Collision feedback and recovery windows.
 - Enemy and asteroid timing.
 - Powerup identity, timing, and pickup feedback.
 - Scoring pressure and escalation.
 
-Do not add more mechanics until movement and combat feel good.
+`asteroids-composer.html` is a useful comparison because it mostly preserves the Vesper Belt loop while changing the experience frame: chase/wide/tight/drift camera shots, quieter transparent HUDs, shader belt backdrop, nebula dome, film grain, letterboxing, color grading, and live bloom/grade tuning. The lesson is not to hand off taste to another tool. The lesson is that future Codex game passes should include this director layer from the start so movement, camera, combat, and presentation can be judged together.
+
+Do not add more mechanics until movement and combat feel good. Do not let cinematic presentation hide weak movement or shallow pressure.
 
 ### Gravity Loom
 
@@ -238,11 +247,13 @@ Before calling an experiment good, check:
 - Can the user describe what the artifact is, not just what tech it uses?
 - Is there a coherent visual hierarchy?
 - Is dense motion still readable?
+- Are camera, atmosphere, HUD hierarchy, and tuning hooks part of the experience rather than deferred polish?
 - Do controls produce immediate visible consequences?
 - Does the HUD reveal state rather than explain usage?
 - Does the experience have a stronger identity than a generic demo?
 - After playtesting, is the concept itself exciting enough to keep iterating?
 - For games, does the core loop feel good before feature expansion?
+- If a comparison variant taught a lesson, has the principle been absorbed into our process rather than treated as a replacement source?
 - Has the relevant README or guidance file been updated?
 
 ## Development Notes
@@ -253,6 +264,7 @@ Write source experiments in the git repository when possible. In this workspace,
 
 Prefer:
 
+- Explicit experience briefs that include loop, feel, camera, atmosphere, HUD hierarchy, visual risk, and tuning controls.
 - Import maps with pinned Three.js versions.
 - Small procedural generators.
 - Instancing and buffer geometry for dense scenes.
