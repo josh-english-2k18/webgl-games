@@ -146,11 +146,15 @@ Priorities:
 - Collision feedback and recovery windows.
 - Enemy and asteroid timing.
 - Powerup identity, timing, and pickup feedback.
+- Pickup assists should feel diegetic and useful. Vesper Belt's ship-emitted gravity is a better powerup affordance than expecting the player to thread tiny pickups manually during combat.
+- Visual effects should use the game's fiction. A circular map palette that reads as disco is wrong for a space shooter even if the colors are individually attractive.
+- Destruction feedback should expose structure. For Vesper Belt, asteroid kills read better when real triangular shards spin away from the rock, supported by sparks and shock rings.
+- Camera labels should describe real viewpoints. A `1st-Person` mode needs an actual ship-forward camera and first-person-only crosshairs; an external chase view should be labeled `3rd-Person`.
 - Scoring pressure and escalation.
 
 `asteroids-composer.html` is a useful comparison because it mostly preserves the Vesper Belt loop while changing the experience frame: chase/wide/tight/drift camera shots, quieter transparent HUDs, shader belt backdrop, nebula dome, film grain, letterboxing, color grading, and live bloom/grade tuning. The lesson is not to hand off taste to another tool. The lesson is that future Codex game passes should include this director layer from the start so movement, camera, combat, and presentation can be judged together.
 
-Do not add more mechanics until movement and combat feel good. Do not let cinematic presentation hide weak movement or shallow pressure.
+Do not add more mechanics until movement and combat feel good. Do not let cinematic presentation hide weak movement or shallow pressure. Avoid dead guidance elements such as a decorative nose vector; if aiming help is needed, use a reticule that communicates range and direction without being glued to the ship silhouette.
 
 ### Gravity Loom
 

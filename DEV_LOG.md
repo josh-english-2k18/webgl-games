@@ -246,11 +246,15 @@ Iterations tried:
 - Added GPT-5 and Grok 4 variants for comparison.
 - Upgraded the main Asteroids presentation into Vesper Belt.
 - Compared Vesper Belt against the active Vesper Belt Composer variant. The composer file mostly keeps the same gameplay backbone while adding a stronger director layer: chase/wide/tight/drift camera shots, transparent compact HUDs, shader belt backdrop, nebula dome, color grading, film grain, letterboxing, and live bloom/grade tuning.
+- Upgraded the main `asteroids.html` directly with those lessons instead of leaving them in the comparison variant: directed camera modes, atmospheric belt and nebula framing, transparent HUD surfaces, debug bloom/grade tuning, tighter thrust/drag tuning, and chain scoring for consecutive asteroid breaks.
+- Manual playtesting flagged the circular map palette as too flat, the ship silhouette as underdesigned, and the nose vector as pointless. The follow-up pass enriched the field ring palette, sculpted the ship with stronger wings/tail/cockpit/engine pods, replaced the nose vector with a detached aiming reticule, and added a visible ship gravity aura that gently pulls powerups toward the player.
+- Manual playtesting then flagged the ring map as too disco and the engines/explosions as underpowered. The follow-up pass moved the field palette into colder cyan/blue/ice/violet space colors, enlarged the engine pods, added stronger animated thruster cones and exhaust particles, and made destroyed asteroids burst into spinning triangular shard meshes plus cool shock rings.
+- The camera pass replaced the old Tactical overhead framing with a true 1st-person cockpit camera, first-person-only crosshairs, hidden external ship geometry in that mode, and a clearer `3rd-Person` label for the external camera.
 
 Lessons from the comparison:
 
 - The composer variant is better presented, not automatically a better game. The core movement, combat, waves, pickups, heat, shields, and missiles still need the same feel-first playtesting.
-- Camera is part of game design. A readable chase camera and alternate framing modes can make thrust, threat direction, and speed easier to judge.
+- Camera is part of game design. A readable 3rd-person camera and alternate framing modes can make thrust, threat direction, and speed easier to judge.
 - Transparent HUDs, environmental framing, and grading can dramatically raise perceived quality when they support the playfield instead of competing with it.
 - Live visual tuning belongs in the workflow. Bloom, grade, opacity, and framing controls make taste testable instead of hardcoded.
 - The correct process lesson is to fold these principles into Codex-built first passes. External variants should challenge our approach, not become the place where taste lives.

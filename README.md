@@ -58,7 +58,7 @@ See [DESIGN.md](DESIGN.md) for the shared design philosophy, quality rubric, and
 
 `vector-bloom-grok.html` is Vector Bloom Grok, a Grok-built variant that received a professional game-developer upgrade pass. It keeps the particle-instrument identity while adding clearer game-loop feedback, explicit unlink/reset controls, combo and gate milestone feedback, pressure telegraphing, and targeted fixes for shortcut conflicts, node visual rebuilding, and resonance link rendering.
 
-`asteroids.html` is Vesper Belt, a wrap-around 3D asteroids shooter with wave progression, shield and heat management, missile locks, pickup upgrades, and a compact mission-driven HUD.
+`asteroids.html` is Vesper Belt, a wrap-around 3D asteroids shooter with wave progression, shield and heat management, missile locks, pickup upgrades, chain scoring, a first-person default camera with mode-specific crosshairs, a 3rd-person external camera, optional cinematic camera shots, live bloom/grade tuning, atmospheric belt framing, a cold circular field palette, a detached aiming reticule for external views, ship-emitted pickup gravity, animated dual engine pods, triangular asteroid shard explosions, and a compact transparent mission HUD.
 
 `asteroids-composer.html` is Vesper Belt Composer, a cinematic variant with post-processing bloom and color grade, camera shot presets, a shader belt backdrop, nebula dome, denser starfield, film grain, letterboxing, and compact transparent HUD controls. Bloom and grade tuning live in the debug console. Built with Composer 2.5.
 

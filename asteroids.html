@@ -8,14 +8,14 @@
         :root {
             --bg: #030509;
             --ink: #f5f7ff;
-            --muted: rgba(245, 247, 255, 0.62);
-            --line: rgba(245, 247, 255, 0.15);
-            --panel: rgba(8, 12, 18, 0.74);
-            --cyan: #74e8ff;
-            --green: #80ffbd;
-            --gold: #ffd36a;
-            --red: #ff6485;
-            --violet: #bca6ff;
+            --muted: rgba(245, 247, 255, 0.52);
+            --line: rgba(245, 247, 255, 0.09);
+            --panel: rgba(6, 10, 18, 0.18);
+            --cyan: #62eaff;
+            --green: #8dffb4;
+            --gold: #ffd45f;
+            --red: #ff5f8d;
+            --violet: #bd92ff;
             --radius: 8px;
         }
 
@@ -56,88 +56,198 @@
         }
 
         .grain,
-        .vignette {
+        .vignette,
+        .belt-scrim,
+        .scan,
+        .letterbox {
             position: fixed;
             inset: 0;
             pointer-events: none;
         }
 
+        .belt-scrim {
+            opacity: 0.2;
+            background: linear-gradient(90deg, transparent 8%, rgba(98, 234, 255, 0.055) 38%, rgba(125, 140, 255, 0.048) 62%, transparent 92%);
+            mix-blend-mode: screen;
+        }
+
         .grain {
-            opacity: 0.065;
-            background-image:
-                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-            background-size: 58px 58px;
-            mask-image: radial-gradient(circle at 50% 52%, #000 0%, #000 58%, transparent 84%);
+            opacity: 0.034;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+            mix-blend-mode: overlay;
+        }
+
+        .scan {
+            opacity: 0.03;
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent 0,
+                transparent 8px,
+                rgba(255, 255, 255, 0.42) 9px
+            );
+            mix-blend-mode: screen;
         }
 
         .vignette {
             background:
-                linear-gradient(to right, rgba(0, 0, 0, 0.54), transparent 18%, transparent 82%, rgba(0, 0, 0, 0.54)),
-                linear-gradient(to bottom, rgba(0, 0, 0, 0.34), transparent 24%, transparent 72%, rgba(0, 0, 0, 0.72));
+                radial-gradient(ellipse 78% 64% at 50% 46%, transparent 52%, rgba(0, 0, 0, 0.34) 100%),
+                linear-gradient(to right, rgba(0, 0, 0, 0.48), transparent 16%, transparent 84%, rgba(0, 0, 0, 0.44)),
+                linear-gradient(to bottom, rgba(0, 0, 0, 0.28), transparent 20%, transparent 76%, rgba(0, 0, 0, 0.56));
         }
+
+        .letterbox::before,
+        .letterbox::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: clamp(7px, 1.6vh, 18px);
+            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.58), rgba(0, 0, 0, 0.38));
+        }
+
+        .letterbox::before { top: 0; }
+        .letterbox::after { bottom: 0; transform: rotate(180deg); }
+
+        .first-person-crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            z-index: 18;
+            width: 78px;
+            height: 78px;
+            opacity: 0;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            transition: opacity 140ms ease;
+            filter: drop-shadow(0 0 9px rgba(98, 234, 255, 0.42));
+        }
+
+        .first-person-crosshair.visible {
+            opacity: 0.92;
+        }
+
+        .crosshair-ring,
+        .crosshair-dot {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .crosshair-ring {
+            width: 38px;
+            height: 38px;
+            border: 1px solid rgba(167, 217, 255, 0.42);
+            border-radius: 50%;
+            box-shadow: inset 0 0 16px rgba(98, 234, 255, 0.08), 0 0 18px rgba(98, 234, 255, 0.1);
+        }
+
+        .crosshair-dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: rgba(232, 245, 255, 0.88);
+            box-shadow: 0 0 10px rgba(98, 234, 255, 0.76);
+        }
+
+        .crosshair-tick {
+            position: absolute;
+            background: rgba(167, 217, 255, 0.82);
+            box-shadow: 0 0 12px rgba(98, 234, 255, 0.35);
+        }
+
+        .crosshair-tick.north,
+        .crosshair-tick.south {
+            left: 50%;
+            width: 2px;
+            height: 18px;
+            transform: translateX(-50%);
+        }
+
+        .crosshair-tick.east,
+        .crosshair-tick.west {
+            top: 50%;
+            width: 18px;
+            height: 2px;
+            transform: translateY(-50%);
+        }
+
+        .crosshair-tick.north { top: 2px; }
+        .crosshair-tick.south { bottom: 2px; }
+        .crosshair-tick.east { right: 2px; }
+        .crosshair-tick.west { left: 2px; }
 
         .hud {
             position: fixed;
-            top: 18px;
-            left: 18px;
+            top: 12px;
+            left: 12px;
             z-index: 20;
-            max-width: 470px;
+            max-width: 340px;
             pointer-events: none;
         }
 
         .brand {
             display: flex;
             align-items: center;
-            gap: 10px;
-            margin-bottom: 11px;
+            gap: 8px;
+            margin-bottom: 7px;
             color: var(--muted);
-            font-size: 11px;
-            font-weight: 850;
+            font-size: 9px;
+            font-weight: 780;
+            letter-spacing: 0.14em;
             text-transform: uppercase;
         }
 
         .mark {
             position: relative;
-            width: 31px;
-            height: 31px;
-            border: 1px solid rgba(116, 232, 255, 0.84);
+            width: 24px;
+            height: 24px;
+            border: 1px solid rgba(98, 234, 255, 0.68);
             border-radius: 50%;
-            box-shadow: 0 0 22px rgba(116, 232, 255, 0.18), inset 0 0 18px rgba(116, 232, 255, 0.11);
+            box-shadow: 0 0 18px rgba(98, 234, 255, 0.16), inset 0 0 14px rgba(98, 234, 255, 0.1);
         }
 
         .mark::before,
         .mark::after {
             content: "";
             position: absolute;
-            inset: 7px;
-            border: 1px solid rgba(255, 211, 106, 0.72);
+            inset: 5px;
+            border: 1px solid rgba(255, 212, 95, 0.62);
             transform: rotate(45deg);
         }
 
         .mark::after {
-            inset: 12px;
-            border-color: rgba(255, 100, 133, 0.72);
+            inset: 9px;
+            border-color: rgba(255, 95, 141, 0.72);
             border-radius: 50%;
             transform: none;
         }
 
         h1 {
             margin: 0;
-            font-size: 39px;
+            font-size: clamp(24px, 3vw, 36px);
             line-height: 0.95;
             text-transform: uppercase;
-            text-shadow: 0 0 28px rgba(116, 232, 255, 0.2);
+            text-shadow: 0 0 26px rgba(98, 234, 255, 0.18);
+        }
+
+        .subtitle {
+            margin: 4px 0 0;
+            color: rgba(245, 247, 255, 0.42);
+            font-size: 9px;
+            font-weight: 760;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
         }
 
         .readout {
             display: flex;
             flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 12px;
+            gap: 7px 11px;
+            margin-top: 9px;
             color: var(--muted);
-            font-size: 12px;
-            font-weight: 820;
+            font-size: 10px;
+            font-weight: 780;
             font-variant-numeric: tabular-nums;
             text-transform: uppercase;
         }
@@ -146,14 +256,33 @@
             color: var(--ink);
         }
 
+        .timeline {
+            position: relative;
+            height: 2px;
+            max-width: 190px;
+            margin-top: 8px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: rgba(245, 247, 255, 0.06);
+        }
+
+        .timeline-fill {
+            width: 0%;
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--cyan), var(--gold), var(--red));
+            box-shadow: 0 0 10px rgba(98, 234, 255, 0.3);
+            transition: width 220ms ease;
+        }
+
         .side-panel {
             position: fixed;
-            top: 18px;
-            right: 18px;
+            top: 12px;
+            right: 12px;
             z-index: 22;
             display: grid;
-            gap: 12px;
-            width: 350px;
+            gap: 9px;
+            width: 300px;
             pointer-events: none;
         }
 
@@ -161,8 +290,8 @@
             border: 1px solid var(--line);
             border-radius: var(--radius);
             background: var(--panel);
-            backdrop-filter: blur(24px);
-            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.38);
+            backdrop-filter: blur(12px) saturate(115%);
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
             pointer-events: auto;
         }
 
@@ -170,36 +299,36 @@
             display: flex;
             justify-content: space-between;
             gap: 10px;
-            padding: 13px 14px 0;
+            padding: 10px 12px 0;
         }
 
         .panel h2 {
             margin: 0;
-            font-size: 13px;
+            font-size: 12px;
             text-transform: uppercase;
         }
 
         .panel-body {
-            padding: 12px 14px 14px;
+            padding: 10px 12px 12px;
         }
 
         #mission-copy {
             min-height: 42px;
             margin: 0;
             color: var(--muted);
-            font-size: 13px;
+            font-size: 12px;
             line-height: 1.45;
         }
 
         .meter {
             display: grid;
-            grid-template-columns: 72px 1fr 48px;
+            grid-template-columns: 62px 1fr 44px;
             align-items: center;
             gap: 8px;
             margin-top: 12px;
             color: var(--muted);
-            font-size: 11px;
-            font-weight: 850;
+            font-size: 9px;
+            font-weight: 780;
             font-variant-numeric: tabular-nums;
             text-transform: uppercase;
         }
@@ -233,7 +362,7 @@
         .stat-cell {
             min-width: 0;
             padding: 10px;
-            background: rgba(5, 8, 13, 0.72);
+            background: rgba(5, 8, 13, 0.34);
         }
 
         .stat-cell span,
@@ -246,14 +375,14 @@
 
         .stat-cell span {
             color: var(--muted);
-            font-size: 10px;
-            font-weight: 850;
+            font-size: 8px;
+            font-weight: 780;
             text-transform: uppercase;
         }
 
         .stat-cell strong {
             margin-top: 5px;
-            font-size: 15px;
+            font-size: 13px;
             font-variant-numeric: tabular-nums;
         }
 
@@ -264,7 +393,7 @@
 
         .chip {
             display: grid;
-            grid-template-columns: 76px 1fr 42px;
+            grid-template-columns: 66px 1fr 38px;
             align-items: center;
             gap: 8px;
             min-height: 32px;
@@ -273,8 +402,8 @@
             border-radius: 6px;
             background: rgba(255, 255, 255, 0.04);
             color: var(--muted);
-            font-size: 11px;
-            font-weight: 850;
+            font-size: 9px;
+            font-weight: 780;
             text-transform: uppercase;
         }
 
@@ -284,49 +413,84 @@
         }
 
         .chip.active {
-            border-color: rgba(116, 232, 255, 0.52);
-            background: rgba(116, 232, 255, 0.1);
+            border-color: rgba(98, 234, 255, 0.34);
+            background: rgba(98, 234, 255, 0.055);
             color: var(--ink);
         }
 
         .controls {
             position: fixed;
-            right: 18px;
-            bottom: 18px;
-            left: 18px;
+            right: 12px;
+            bottom: 12px;
+            left: 12px;
             z-index: 25;
-            display: flex;
-            flex-wrap: wrap;
+            display: grid;
+            grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
             gap: 8px;
-            max-width: 900px;
+            max-width: 640px;
             margin: 0 auto;
-            padding: 11px;
+            pointer-events: none;
+        }
+
+        .control-panel {
+            display: grid;
+            gap: 7px;
+            padding: 9px;
             border: 1px solid var(--line);
             border-radius: var(--radius);
             background: var(--panel);
-            backdrop-filter: blur(24px);
-            box-shadow: 0 18px 54px rgba(0, 0, 0, 0.38);
+            backdrop-filter: blur(12px) saturate(115%);
+            box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22);
+            pointer-events: auto;
+        }
+
+        .control-title {
+            color: rgba(245, 247, 255, 0.44);
+            font-size: 8px;
+            font-weight: 760;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+        }
+
+        .button-row,
+        .button-grid {
+            display: grid;
+            gap: 6px;
+        }
+
+        .button-row {
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+        }
+
+        .button-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
         .control-btn {
-            min-width: 92px;
-            min-height: 40px;
-            padding: 0 12px;
+            min-width: 0;
+            min-height: 30px;
+            padding: 0 8px;
             border: 1px solid rgba(245, 247, 255, 0.15);
             border-radius: 6px;
-            background: rgba(255, 255, 255, 0.05);
+            background: rgba(255, 255, 255, 0.035);
             color: var(--ink);
             cursor: pointer;
-            font-size: 12px;
-            font-weight: 840;
+            font-size: 9px;
+            font-weight: 760;
+            letter-spacing: 0.06em;
             text-transform: uppercase;
             transition: border-color 150ms ease, background 150ms ease, color 150ms ease;
         }
 
         .control-btn:hover,
         .control-btn.active {
-            border-color: rgba(116, 232, 255, 0.64);
-            background: rgba(116, 232, 255, 0.12);
+            border-color: rgba(98, 234, 255, 0.5);
+            background: rgba(98, 234, 255, 0.085);
+        }
+
+        .control-btn.active {
+            border-color: rgba(255, 212, 95, 0.48);
+            background: rgba(255, 212, 95, 0.075);
         }
 
         .control-btn:disabled {
@@ -334,6 +498,30 @@
             background: rgba(255, 255, 255, 0.025);
             color: rgba(245, 247, 255, 0.32);
             cursor: not-allowed;
+        }
+
+        .slider {
+            display: grid;
+            gap: 4px;
+        }
+
+        .slider label {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .slider label strong {
+            color: rgba(245, 247, 255, 0.8);
+            font-size: 10px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 16px;
+            accent-color: var(--cyan);
         }
 
         .pause-banner {
@@ -419,6 +607,18 @@
             padding: 0 14px 14px;
         }
 
+        .debug-tuning {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            padding: 0 14px 14px;
+            border-top: 1px solid rgba(245, 247, 255, 0.08);
+        }
+
+        .debug-tuning .control-title {
+            grid-column: 1 / -1;
+        }
+
         .debug-stat {
             min-width: 0;
             padding: 10px;
@@ -484,7 +684,7 @@
             .side-panel {
                 top: auto;
                 right: 12px;
-                bottom: 86px;
+                bottom: 112px;
                 left: 12px;
                 width: auto;
                 grid-template-columns: 1fr 1fr;
@@ -511,15 +711,14 @@
             }
 
             .controls {
-                right: 10px;
-                bottom: 10px;
-                left: 10px;
-                padding: 9px;
+                right: 8px;
+                bottom: 8px;
+                left: 8px;
+                grid-template-columns: 1fr;
             }
 
-            .control-btn {
-                flex: 1 1 92px;
-                min-width: 0;
+            .button-row {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
             }
 
             .debug-grid {
@@ -530,18 +729,33 @@
 </head>
 <body>
     <div id="stage"></div>
-    <div class="grain"></div>
-    <div class="vignette"></div>
+    <div class="belt-scrim" aria-hidden="true"></div>
+    <div class="scan" aria-hidden="true"></div>
+    <div class="grain" aria-hidden="true"></div>
+    <div class="vignette" aria-hidden="true"></div>
+    <div class="letterbox" aria-hidden="true"></div>
+    <div id="first-person-crosshair" class="first-person-crosshair" aria-hidden="true">
+        <span class="crosshair-ring"></span>
+        <span class="crosshair-dot"></span>
+        <span class="crosshair-tick north"></span>
+        <span class="crosshair-tick east"></span>
+        <span class="crosshair-tick south"></span>
+        <span class="crosshair-tick west"></span>
+    </div>
 
     <section class="hud" aria-label="Run status">
         <div class="brand"><span class="mark"></span><span>Deep Belt Intercept</span></div>
         <h1>Vesper Belt</h1>
+        <p class="subtitle">Tactical debris corridor</p>
         <div class="readout">
             <span>Score <strong id="score">0</strong></span>
             <span>Wave <strong id="wave">1</strong></span>
             <span>Lives <strong id="lives">3</strong></span>
             <span>Velocity <strong id="velocity">0</strong></span>
+            <span>Chain <strong id="combo">0</strong></span>
+            <span>Shot <strong id="shot-readout">1st-Person</strong></span>
         </div>
+        <div class="timeline" aria-hidden="true"><div id="timeline-fill" class="timeline-fill"></div></div>
     </section>
 
     <aside class="side-panel">
@@ -584,6 +798,7 @@
             </div>
             <div class="panel-body">
                 <div class="arsenal">
+                    <div id="shield-chip" class="chip active"><span>Shield</span><span id="shield-label">standard hull</span><strong id="shield-tier">0</strong></div>
                     <div id="guns-chip" class="chip active"><span>Guns</span><span id="guns-label">single vector</span><strong id="guns">1</strong></div>
                     <div id="missile-chip" class="chip active"><span>Missiles</span><span id="missile-label">tracking</span><strong id="missiles">4</strong></div>
                     <div id="drive-chip" class="chip"><span>Drive</span><span id="drive-label">standard</span><strong id="drive">0.0</strong></div>
@@ -593,11 +808,25 @@
     </aside>
 
     <nav class="controls" aria-label="Game controls">
-        <button id="new-run" class="control-btn" type="button">New Run</button>
-        <button id="fire" class="control-btn" type="button">Fire</button>
-        <button id="missile" class="control-btn" type="button">Missile</button>
-        <button id="pause" class="control-btn" type="button">Pause</button>
-        <button id="debug" class="control-btn" type="button">Debug</button>
+        <section class="control-panel">
+            <div class="control-title">Flight</div>
+            <div class="button-row">
+                <button id="new-run" class="control-btn" type="button">New Run</button>
+                <button id="fire" class="control-btn" type="button">Fire</button>
+                <button id="missile" class="control-btn" type="button">Missile</button>
+                <button id="pause" class="control-btn" type="button">Pause</button>
+                <button id="debug" class="control-btn" type="button">Debug</button>
+            </div>
+        </section>
+        <section class="control-panel">
+            <div class="control-title">Camera</div>
+            <div class="button-grid">
+                <button class="control-btn active" type="button" data-shot="tactical">1st-Person</button>
+                <button class="control-btn" type="button" data-shot="chase">3rd-Person</button>
+                <button class="control-btn" type="button" data-shot="tight">Tight</button>
+                <button class="control-btn" type="button" data-shot="drift">Drift</button>
+            </div>
+        </section>
     </nav>
 
     <div id="pause-banner" class="pause-banner" aria-live="polite">
@@ -618,6 +847,17 @@
                 <div class="debug-stat"><span>Pickups</span><strong id="debug-pickups">0</strong></div>
                 <div class="debug-stat"><span>Shield</span><strong id="debug-shield">100</strong></div>
                 <div class="debug-stat"><span>Heat</span><strong id="debug-heat">0</strong></div>
+            </div>
+            <div class="debug-tuning" aria-label="Post-processing tuning">
+                <div class="control-title">Bloom / Grade</div>
+                <div class="slider">
+                    <label for="bloom-slider"><span>Bloom</span><strong id="bloom-label">34%</strong></label>
+                    <input id="bloom-slider" type="range" min="15" max="100" value="34" step="1">
+                </div>
+                <div class="slider">
+                    <label for="grade-slider"><span>Grade</span><strong id="grade-label">18%</strong></label>
+                    <input id="grade-slider" type="range" min="0" max="80" value="18" step="1">
+                </div>
             </div>
             <div class="debug-actions">
                 <button id="debug-resume" class="debug-btn" type="button">Resume</button>
@@ -649,11 +889,13 @@
         import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
         import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
         const FIELD_HALF = 43;
         const FIELD_SIZE = FIELD_HALF * 2;
         const PLAYER_RADIUS = 1.35;
+        const PARTICLE_LIMIT = 620;
         const FIRE_KEY_CODES = new Set(['KeyF', 'Enter']);
         const MISSILE_KEY_CODES = new Set(['KeyM']);
 
@@ -664,6 +906,7 @@
             wave: document.getElementById('wave'),
             lives: document.getElementById('lives'),
             velocity: document.getElementById('velocity'),
+            combo: document.getElementById('combo'),
             missionTitle: document.getElementById('mission-title'),
             missionCopy: document.getElementById('mission-copy'),
             shield: document.getElementById('shield'),
@@ -677,6 +920,9 @@
             gunsChip: document.getElementById('guns-chip'),
             gunsLabel: document.getElementById('guns-label'),
             guns: document.getElementById('guns'),
+            shieldChip: document.getElementById('shield-chip'),
+            shieldLabel: document.getElementById('shield-label'),
+            shieldTier: document.getElementById('shield-tier'),
             missileChip: document.getElementById('missile-chip'),
             missileLabel: document.getElementById('missile-label'),
             missiles: document.getElementById('missiles'),
@@ -699,7 +945,56 @@
             debugProjectiles: document.getElementById('debug-projectiles'),
             debugPickups: document.getElementById('debug-pickups'),
             debugShield: document.getElementById('debug-shield'),
-            debugHeat: document.getElementById('debug-heat')
+            debugHeat: document.getElementById('debug-heat'),
+            shotReadout: document.getElementById('shot-readout'),
+            firstPersonCrosshair: document.getElementById('first-person-crosshair'),
+            timelineFill: document.getElementById('timeline-fill'),
+            bloomSlider: document.getElementById('bloom-slider'),
+            bloomLabel: document.getElementById('bloom-label'),
+            gradeSlider: document.getElementById('grade-slider'),
+            gradeLabel: document.getElementById('grade-label')
+        };
+
+        const colorGradeShader = {
+            uniforms: {
+                tDiffuse: { value: null },
+                grade: { value: 0.18 }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform float grade;
+                varying vec2 vUv;
+
+                void main() {
+                    vec2 uv = vUv;
+                    vec2 offset = (uv - 0.5) * grade * 0.001;
+                    vec3 color = vec3(
+                        texture2D(tDiffuse, uv + offset).r,
+                        texture2D(tDiffuse, uv).g,
+                        texture2D(tDiffuse, uv - offset).b
+                    );
+                    float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+                    vec3 cool = vec3(0.9, 0.97, 1.05);
+                    vec3 warm = vec3(1.04, 0.98, 0.92);
+                    color *= mix(vec3(1.0), mix(cool, warm, smoothstep(0.24, 0.86, luma)), grade * 0.28);
+                    color = (color - 0.5) * (1.0 + grade * 0.06) + 0.5;
+                    gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+                }
+            `
+        };
+
+        const shotModes = {
+            tactical: { name: '1st-Person', eyeForward: 0.74, eyeUp: 0.62, lookAhead: 28, lookUp: 0.42, lag: 26 },
+            chase: { name: '3rd-Person', back: 12.5, up: 5.4, shoulder: 1.45, lookAhead: 18, lookUp: 0.85, lag: 11.5, drift: 0.05 },
+            tight: { name: 'Tight', height: 42, distance: 48, lead: 0.2, lookLead: 0.32, drift: 0.08 },
+            drift: { name: 'Drift', height: 62, distance: 82, lead: 0.1, lookLead: 0.18, drift: 0.26 }
         };
 
         const state = {
@@ -708,9 +1003,14 @@
             wave: 1,
             lives: 3,
             kills: 0,
+            combo: 0,
+            comboTimer: 0,
             shield: 100,
+            shieldMax: 100,
+            shieldTier: 0,
             heat: 0,
             gunsLevel: 1,
+            missileTier: 0,
             missileAmmo: 4,
             overdriveTimer: 0,
             gunTimer: 0,
@@ -722,7 +1022,12 @@
             debugOpen: false,
             controlsActive: true,
             gameOver: false,
-            missionIndex: 0
+            missionIndex: 0,
+            bloom: 0.34,
+            grade: 0.18,
+            shot: 'tactical',
+            cameraDriftX: 0,
+            cameraDriftY: 0
         };
 
         const input = {
@@ -754,11 +1059,14 @@
         let renderer;
         let composer;
         let bloomPass;
+        let gradePass;
         let clock;
         let player;
         let fieldGroup;
         let effectRoot;
         let starField;
+        let beltBackdrop;
+        let nebulaDome;
         let thrustLight;
 
         const asteroids = [];
@@ -780,6 +1088,44 @@
             overdrive: { color: new THREE.Color(0xbca6ff), label: 'Drive' }
         };
 
+        const upgradeSpecs = {
+            guns: {
+                1: { label: 'single vector', spread: [0], cooldown: 0.23, heat: 10, damage: 1, speed: 36, pierce: 0 },
+                2: { label: 'dual vector', spread: [-0.1, 0.1], cooldown: 0.2, heat: 12, damage: 1, speed: 36, pierce: 0 },
+                3: { label: 'triple arc', spread: [-0.18, 0, 0.18], cooldown: 0.18, heat: 14, damage: 1, speed: 38, pierce: 0 },
+                4: { label: 'quad lattice', spread: [-0.22, -0.08, 0.08, 0.22], cooldown: 0.16, heat: 16, damage: 1, speed: 38, pierce: 0 },
+                5: { label: 'wide burst', spread: [-0.28, -0.14, 0, 0.14, 0.28], cooldown: 0.15, heat: 18, damage: 1, speed: 40, pierce: 0 },
+                6: { label: 'piercing volley', spread: [-0.16, 0, 0.16], cooldown: 0.14, heat: 15, damage: 2, speed: 42, pierce: 1 },
+                7: { label: 'storm lattice', spread: [-0.24, -0.12, -0.04, 0.04, 0.12, 0.24], cooldown: 0.13, heat: 20, damage: 2, speed: 44, pierce: 1 }
+            },
+            shield: {
+                0: { max: 100, restore: 48, regen: 0, absorb: 1, label: 'standard hull' },
+                1: { max: 125, restore: 54, regen: 1.2, absorb: 0.92, label: 'reinforced field' },
+                2: { max: 150, restore: 60, regen: 2, absorb: 0.85, label: 'layered matrix' },
+                3: { max: 180, restore: 68, regen: 2.8, absorb: 0.78, label: 'ablative shell' },
+                4: { max: 220, restore: 76, regen: 3.6, absorb: 0.72, label: 'sovereign ward' }
+            },
+            missiles: {
+                0: { label: 'tracking', salvo: 1, cooldown: 0.52, damage: 2, speed: 24, lockRange: 34, blastRadius: 4.5, capacity: 20, resupply: 5 },
+                1: { label: 'fast lock', salvo: 1, cooldown: 0.46, damage: 2, speed: 28, lockRange: 38, blastRadius: 5, capacity: 24, resupply: 6 },
+                2: { label: 'twin salvo', salvo: 2, cooldown: 0.44, damage: 2, speed: 28, lockRange: 40, blastRadius: 5.5, capacity: 28, resupply: 6 },
+                3: { label: 'breach heads', salvo: 2, cooldown: 0.4, damage: 3, speed: 30, lockRange: 42, blastRadius: 6.5, capacity: 32, resupply: 7 },
+                4: { label: 'siege cluster', salvo: 3, cooldown: 0.36, damage: 3, speed: 32, lockRange: 46, blastRadius: 7.5, capacity: 36, resupply: 8 }
+            }
+        };
+
+        function gunSpec(level = state.gunsLevel) {
+            return upgradeSpecs.guns[clamp(level, 1, 7)];
+        }
+
+        function shieldSpec() {
+            return upgradeSpecs.shield[clamp(state.shieldTier, 0, 4)];
+        }
+
+        function missileSpec() {
+            return upgradeSpecs.missiles[clamp(state.missileTier, 0, 4)];
+        }
+
         try {
             init();
             animate();
@@ -790,9 +1136,9 @@
 
         function init() {
             scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x030509, 0.0062);
+            scene.fog = new THREE.FogExp2(0x020308, 0.0058);
 
-            camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 900);
+            camera = new THREE.PerspectiveCamera(61, window.innerWidth / window.innerHeight, 0.1, 900);
             camera.position.set(0, 58, 66);
             camera.lookAt(0, 0, 0);
 
@@ -801,13 +1147,15 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.outputColorSpace = THREE.SRGBColorSpace;
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
-            renderer.toneMappingExposure = 0.88;
+            renderer.toneMappingExposure = 0.9;
             ui.stage.appendChild(renderer.domElement);
 
             composer = new EffectComposer(renderer);
             composer.addPass(new RenderPass(scene, camera));
-            bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.16, 0.28, 0.78);
+            bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.48, 0.42, 0.2);
             composer.addPass(bloomPass);
+            gradePass = new ShaderPass(colorGradeShader);
+            composer.addPass(gradePass);
             composer.addPass(new OutputPass());
 
             clock = new THREE.Clock();
@@ -818,11 +1166,15 @@
             buildGeometries();
             buildMaterials();
             buildLights();
+            buildBeltBackdrop();
+            buildNebulaDome();
             buildField();
             buildStarfield();
             player = createPlayer();
             resetRun();
+            snapCameraToShot(true);
             bindEvents();
+            updatePostProcessing();
             window.__vesperBeltReady = true;
         }
 
@@ -835,16 +1187,50 @@
             geometries.playerBody = new THREE.ConeGeometry(0.76, 2.7, 4);
             geometries.playerWing = new THREE.BufferGeometry();
             geometries.playerWing.setAttribute('position', new THREE.Float32BufferAttribute([
-                0, 0.07, 0.95,
-                -1.25, 0, -0.68,
-                -0.18, 0.03, -0.34,
-                0, 0.07, 0.95,
-                0.18, 0.03, -0.34,
-                1.25, 0, -0.68
+                0, 0.09, 1.1,
+                -1.48, 0.02, -0.58,
+                -0.18, 0.05, -0.28,
+                0, 0.09, 1.1,
+                0.18, 0.05, -0.28,
+                1.48, 0.02, -0.58,
+                -0.2, 0.06, -0.42,
+                -1.02, 0.01, -1.1,
+                -0.36, 0.04, -0.96,
+                0.2, 0.06, -0.42,
+                0.36, 0.04, -0.96,
+                1.02, 0.01, -1.1
             ], 3));
             geometries.playerWing.computeVertexNormals();
+            geometries.playerTail = new THREE.BufferGeometry();
+            geometries.playerTail.setAttribute('position', new THREE.Float32BufferAttribute([
+                -0.18, 0.12, -0.76,
+                -0.58, 0.04, -1.34,
+                -0.24, 0.02, -1.12,
+                0.18, 0.12, -0.76,
+                0.24, 0.02, -1.12,
+                0.58, 0.04, -1.34,
+                0, 0.16, -0.58,
+                -0.16, 0.03, -1.2,
+                0.16, 0.03, -1.2
+            ], 3));
+            geometries.playerTail.computeVertexNormals();
+            geometries.playerCockpit = new THREE.SphereGeometry(0.34, 18, 10);
+            geometries.playerSpine = new THREE.BoxGeometry(0.16, 0.08, 1.36);
+            geometries.enginePod = new THREE.CylinderGeometry(0.24, 0.32, 0.82, 14);
+            geometries.engineGlow = new THREE.SphereGeometry(0.25, 14, 8);
+            geometries.engineFlame = new THREE.ConeGeometry(0.28, 0.96, 18, 1, true);
             geometries.shield = new THREE.SphereGeometry(1.72, 32, 18);
             geometries.ring = new THREE.TorusGeometry(1, 0.028, 8, 52);
+            geometries.reticule = new THREE.TorusGeometry(0.54, 0.018, 8, 54);
+            geometries.reticuleTick = new THREE.BoxGeometry(0.18, 0.018, 0.035);
+            geometries.gravityWell = new THREE.TorusGeometry(1, 0.014, 8, 72);
+            geometries.asteroidShard = new THREE.BufferGeometry();
+            geometries.asteroidShard.setAttribute('position', new THREE.Float32BufferAttribute([
+                0, 0.56, 0,
+                -0.48, -0.34, 0,
+                0.56, -0.26, 0
+            ], 3));
+            geometries.asteroidShard.computeVertexNormals();
         }
 
         function buildMaterials() {
@@ -856,11 +1242,19 @@
                 emissiveIntensity: 0.32
             });
             materials.playerWing = new THREE.MeshStandardMaterial({
-                color: 0x122032,
+                color: 0x101a2b,
                 roughness: 0.42,
                 metalness: 0.5,
                 emissive: 0x062333,
-                emissiveIntensity: 0.28
+                emissiveIntensity: 0.28,
+                side: THREE.DoubleSide
+            });
+            materials.cockpit = new THREE.MeshStandardMaterial({
+                color: 0x92f4ff,
+                roughness: 0.18,
+                metalness: 0.22,
+                emissive: 0x146176,
+                emissiveIntensity: 0.62
             });
             materials.engine = new THREE.MeshBasicMaterial({
                 color: 0x74e8ff,
@@ -868,6 +1262,14 @@
                 opacity: 0.78,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false
+            });
+            materials.engineFlame = new THREE.MeshBasicMaterial({
+                color: 0x8fb8ff,
+                transparent: true,
+                opacity: 0.32,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                side: THREE.DoubleSide
             });
             materials.shield = new THREE.MeshBasicMaterial({
                 color: 0x74e8ff,
@@ -895,6 +1297,22 @@
                 transparent: true,
                 opacity: 0.22
             });
+            materials.reticule = new THREE.MeshBasicMaterial({
+                color: 0x8dffb4,
+                transparent: true,
+                opacity: 0.42,
+                blending: THREE.AdditiveBlending,
+                depthTest: false,
+                depthWrite: false
+            });
+            materials.gravityAura = new THREE.MeshBasicMaterial({
+                color: 0xbd92ff,
+                transparent: true,
+                opacity: 0.075,
+                blending: THREE.AdditiveBlending,
+                depthTest: false,
+                depthWrite: false
+            });
         }
 
         function buildLights() {
@@ -915,17 +1333,113 @@
             scene.add(thrustLight);
         }
 
+        function buildBeltBackdrop() {
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    colorA: { value: new THREE.Color(0x62eaff) },
+                    colorB: { value: new THREE.Color(0x7d8cff) }
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    void main() {
+                        vUv = uv;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform vec3 colorA;
+                    uniform vec3 colorB;
+                    varying vec2 vUv;
+
+                    void main() {
+                        vec2 uv = vUv - 0.5;
+                        float r = length(uv);
+                        float angle = atan(uv.y, uv.x);
+                        float bands = sin(angle * 5.0 + time * 0.08) * 0.5 + 0.5;
+                        float ripple = sin(r * 28.0 - time * 0.42) * 0.5 + 0.5;
+                        float dust = sin((uv.x + uv.y) * 18.0 + time * 0.16) * sin((uv.x - uv.y) * 14.0 - time * 0.12);
+                        dust = dust * 0.5 + 0.5;
+                        float fade = smoothstep(0.62, 0.08, r);
+                        vec3 color = mix(colorA, colorB, bands * 0.34 + ripple * 0.16);
+                        float alpha = fade * (0.035 + dust * 0.025 + ripple * 0.018);
+                        gl_FragColor = vec4(color, alpha);
+                    }
+                `,
+                transparent: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            });
+            const mesh = new THREE.Mesh(new THREE.CircleGeometry(FIELD_HALF * 1.08, 96), material);
+            mesh.rotation.x = -Math.PI / 2;
+            mesh.position.y = -0.12;
+            mesh.renderOrder = -2;
+            scene.add(mesh);
+            beltBackdrop = { mesh, material };
+        }
+
+        function buildNebulaDome() {
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    colorA: { value: new THREE.Color(0xbd92ff) },
+                    colorB: { value: new THREE.Color(0x62eaff) }
+                },
+                vertexShader: `
+                    varying vec3 vWorld;
+                    void main() {
+                        vec4 world = modelMatrix * vec4(position, 1.0);
+                        vWorld = world.xyz;
+                        gl_Position = projectionMatrix * viewMatrix * world;
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform vec3 colorA;
+                    uniform vec3 colorB;
+                    varying vec3 vWorld;
+
+                    void main() {
+                        vec3 dir = normalize(vWorld);
+                        float h = dir.y * 0.5 + 0.5;
+                        float swirl = sin(dir.x * 8.0 + time * 0.05) * sin(dir.z * 7.0 - time * 0.04);
+                        swirl = swirl * 0.5 + 0.5;
+                        vec3 color = mix(colorA, colorB, h * 0.55 + swirl * 0.25);
+                        float alpha = smoothstep(0.15, 0.72, h) * (0.026 + swirl * 0.016);
+                        gl_FragColor = vec4(color, alpha);
+                    }
+                `,
+                side: THREE.BackSide,
+                transparent: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            });
+            const mesh = new THREE.Mesh(new THREE.SphereGeometry(240, 32, 18), material);
+            mesh.renderOrder = -3;
+            scene.add(mesh);
+            nebulaDome = { mesh, material };
+        }
+
         function buildField() {
-            const grid = new THREE.GridHelper(FIELD_SIZE, 18, 0x74e8ff, 0x35506a);
+            const mapPalette = [
+                { color: 0x4fc8ff, opacity: 0.028 },
+                { color: 0x7b93ff, opacity: 0.024 },
+                { color: 0xa7d9ff, opacity: 0.022 },
+                { color: 0x5df4d6, opacity: 0.018 },
+                { color: 0x9f7dff, opacity: 0.02 },
+                { color: 0xe8f5ff, opacity: 0.016 }
+            ];
+            const grid = new THREE.GridHelper(FIELD_SIZE, 22, 0x4fc8ff, 0x1f3152);
             grid.material.transparent = true;
-            grid.material.opacity = 0.13;
+            grid.material.opacity = 0.055;
             grid.position.y = -0.08;
             fieldGroup.add(grid);
 
             const boundary = new THREE.Mesh(geometries.ring, new THREE.MeshBasicMaterial({
-                color: 0x74e8ff,
+                color: 0xa7d9ff,
                 transparent: true,
-                opacity: 0.14,
+                opacity: 0.18,
                 blending: THREE.AdditiveBlending,
                 depthWrite: false
             }));
@@ -933,16 +1447,35 @@
             boundary.rotation.x = Math.PI / 2;
             fieldGroup.add(boundary);
 
-            for (let i = 0; i < 5; i++) {
+            for (let i = 0; i < mapPalette.length; i++) {
+                const lane = mapPalette[i];
                 const band = new THREE.Mesh(geometries.ring, new THREE.MeshBasicMaterial({
-                    color: i % 2 ? 0xffd36a : 0x74e8ff,
+                    color: lane.color,
                     transparent: true,
-                    opacity: 0.025 + i * 0.008,
+                    opacity: lane.opacity,
+                    blending: THREE.AdditiveBlending,
                     depthWrite: false
                 }));
-                band.scale.setScalar(10 + i * 6.4);
+                band.scale.setScalar(8 + i * 5.8);
                 band.rotation.x = Math.PI / 2;
+                band.rotation.z = i * 0.11;
                 fieldGroup.add(band);
+            }
+
+            for (let i = 0; i < 10; i++) {
+                const lane = mapPalette[(i * 2 + 1) % mapPalette.length];
+                const arc = new THREE.Mesh(geometries.ring, new THREE.MeshBasicMaterial({
+                    color: lane.color,
+                    transparent: true,
+                    opacity: lane.opacity + (i % 2) * 0.01,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                }));
+                const scale = 12.5 + i * 3.15;
+                arc.scale.set(scale, scale, 1);
+                arc.rotation.x = Math.PI / 2;
+                arc.rotation.z = (i / 10) * Math.PI * 2 + (i % 2 ? 0.09 : 0);
+                fieldGroup.add(arc);
             }
         }
 
@@ -950,24 +1483,25 @@
             const positions = [];
             const colors = [];
             const color = new THREE.Color();
-            for (let i = 0; i < 1600; i++) {
+            const count = window.innerWidth < 760 ? 1800 : 2600;
+            for (let i = 0; i < count; i++) {
                 positions.push(
-                    randomRange(-260, 260),
-                    randomRange(-28, 124),
-                    randomRange(-260, 260)
+                    randomRange(-280, 280),
+                    randomRange(-32, 132),
+                    randomRange(-280, 280)
                 );
-                color.setHSL(randomRange(0.53, 0.66), randomRange(0.16, 0.56), randomRange(0.52, 0.92));
+                color.setHSL(randomRange(0.52, 0.68), randomRange(0.14, 0.52), randomRange(0.48, 0.9));
                 colors.push(color.r, color.g, color.b);
             }
             const geometry = new THREE.BufferGeometry();
             geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
             geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
             starField = new THREE.Points(geometry, new THREE.PointsMaterial({
-                size: 0.72,
+                size: 0.68,
                 map: createSoftDotTexture(),
                 vertexColors: true,
                 transparent: true,
-                opacity: 0.8,
+                opacity: 0.72,
                 blending: THREE.AdditiveBlending,
                 sizeAttenuation: true,
                 depthWrite: false
@@ -997,26 +1531,76 @@
 
             const body = new THREE.Mesh(geometries.playerBody, materials.player);
             body.rotation.x = Math.PI / 2;
-            body.scale.set(0.9, 1.0, 1.18);
+            body.scale.set(0.82, 1.0, 1.28);
             group.add(body);
 
             const wing = new THREE.Mesh(geometries.playerWing, materials.playerWing);
             group.add(wing);
 
-            const engine = new THREE.Mesh(new THREE.SphereGeometry(0.26, 14, 8), materials.engine);
-            engine.position.set(0, 0, -1.14);
-            engine.scale.set(1, 0.72, 1.45);
+            const tail = new THREE.Mesh(geometries.playerTail, materials.playerWing);
+            group.add(tail);
+
+            const cockpit = new THREE.Mesh(geometries.playerCockpit, materials.cockpit);
+            cockpit.position.set(0, 0.16, 0.28);
+            cockpit.scale.set(0.72, 0.32, 1.05);
+            group.add(cockpit);
+
+            const spine = new THREE.Mesh(geometries.playerSpine, materials.playerWing);
+            spine.position.set(0, 0.12, -0.18);
+            group.add(spine);
+
+            const engine = new THREE.Group();
+            engine.userData.glows = [];
+            engine.userData.flames = [];
+            for (const x of [-0.48, 0.48]) {
+                const pod = new THREE.Mesh(geometries.enginePod, materials.playerWing);
+                pod.rotation.x = Math.PI / 2;
+                pod.position.set(x, 0.01, -1.12);
+                const glow = new THREE.Mesh(geometries.engineGlow, materials.engine.clone());
+                glow.position.set(x, 0.01, -1.62);
+                glow.scale.set(1.1, 0.74, 1.5);
+                const flame = new THREE.Mesh(geometries.engineFlame, materials.engineFlame.clone());
+                flame.rotation.x = -Math.PI / 2;
+                flame.position.set(x, 0.01, -1.92);
+                flame.scale.set(0.72, 0.72, 0.72);
+                engine.userData.glows.push(glow);
+                engine.userData.flames.push(flame);
+                engine.add(pod, glow, flame);
+            }
             group.add(engine);
 
             const shield = new THREE.Mesh(geometries.shield, materials.shield);
             shield.visible = true;
             group.add(shield);
 
+            const gravityAura = new THREE.Mesh(geometries.gravityWell, materials.gravityAura);
+            gravityAura.rotation.x = Math.PI / 2;
+            gravityAura.scale.setScalar(5.4);
+            gravityAura.renderOrder = 2;
+            group.add(gravityAura);
+
+            const reticule = new THREE.Group();
+            const reticuleRing = new THREE.Mesh(geometries.reticule, materials.reticule);
+            reticuleRing.rotation.x = Math.PI / 2;
+            reticule.add(reticuleRing);
+            for (let i = 0; i < 4; i++) {
+                const tick = new THREE.Mesh(geometries.reticuleTick, materials.reticule);
+                const angle = i * Math.PI / 2;
+                tick.position.set(Math.sin(angle) * 0.74, 0, Math.cos(angle) * 0.74);
+                tick.rotation.y = angle;
+                reticule.add(tick);
+            }
+            reticule.position.set(0, 0.2, 9.5);
+            reticule.renderOrder = 5;
+            scene.add(reticule);
+
             scene.add(group);
             return {
                 group,
                 shield,
                 engine,
+                gravityAura,
+                reticule,
                 position: new THREE.Vector3(0, 0.82, 0),
                 velocity: new THREE.Vector3(),
                 rotation: 0,
@@ -1044,6 +1628,21 @@
             document.querySelectorAll('[data-action]').forEach((button) => {
                 button.addEventListener('click', () => runDebugAction(button.dataset.action));
             });
+            document.querySelectorAll('[data-shot]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    setShotMode(button.dataset.shot);
+                });
+            });
+            ui.bloomSlider?.addEventListener('input', () => {
+                state.bloom = Number(ui.bloomSlider.value) / 100;
+                ui.bloomLabel.textContent = `${Math.round(state.bloom * 100)}%`;
+                updatePostProcessing();
+            });
+            ui.gradeSlider?.addEventListener('input', () => {
+                state.grade = Number(ui.gradeSlider.value) / 100;
+                ui.gradeLabel.textContent = `${Math.round(state.grade * 100)}%`;
+                updatePostProcessing();
+            });
         }
 
         function resetRun() {
@@ -1060,9 +1659,14 @@
                 wave: 1,
                 lives: 3,
                 kills: 0,
+                combo: 0,
+                comboTimer: 0,
                 shield: 100,
+                shieldMax: 100,
+                shieldTier: 0,
                 heat: 0,
                 gunsLevel: 1,
+                missileTier: 0,
                 missileAmmo: 4,
                 overdriveTimer: 0,
                 gunTimer: 0,
@@ -1074,7 +1678,12 @@
                 debugOpen: false,
                 controlsActive: true,
                 gameOver: false,
-                missionIndex: 0
+                missionIndex: 0,
+                bloom: 0.34,
+                grade: 0.18,
+                shot: 'tactical',
+                cameraDriftX: 0,
+                cameraDriftY: 0
             });
 
             player.position.set(0, 0.82, 0);
@@ -1082,9 +1691,14 @@
             player.rotation = 0;
             player.group.position.copy(player.position);
             player.group.rotation.set(0, 0, 0);
+            if (ui.bloomSlider) ui.bloomSlider.value = '34';
+            if (ui.gradeSlider) ui.gradeSlider.value = '18';
+            syncShotControls();
+            snapCameraToShot(true);
             spawnWave(1);
             ui.debugModal.classList.remove('visible');
             refreshPauseBanner();
+            updatePostProcessing();
             updateUi();
         }
 
@@ -1168,6 +1782,13 @@
                 updateRings(dt * 0.35);
             }
             updateCamera(dt);
+            updatePostProcessing();
+            if (beltBackdrop) {
+                beltBackdrop.material.uniforms.time.value = state.elapsed;
+            }
+            if (nebulaDome) {
+                nebulaDome.material.uniforms.time.value = state.elapsed;
+            }
             updateUi();
             updateDebugReadout();
             composer.render();
@@ -1180,8 +1801,18 @@
             state.autoTimer = Math.max(0, state.autoTimer - dt);
             state.invulnerable = Math.max(0, state.invulnerable - dt);
             state.overdriveTimer = Math.max(0, state.overdriveTimer - dt);
+            const hadCombo = state.comboTimer > 0;
+            state.comboTimer = Math.max(0, state.comboTimer - dt);
+            if (hadCombo && state.comboTimer <= 0) {
+                state.combo = 0;
+            }
             state.heat = Math.max(0, state.heat - dt * (state.overdriveTimer > 0 ? 32 : 21));
             state.shake = Math.max(0, state.shake - dt * 3.2);
+
+            const shieldUpgrade = shieldSpec();
+            if (state.shield < state.shieldMax && state.heat < 88 && shieldUpgrade.regen > 0) {
+                state.shield = Math.min(state.shieldMax, state.shield + shieldUpgrade.regen * dt);
+            }
 
             updatePlayer(dt);
             updateAsteroids(dt);
@@ -1210,32 +1841,65 @@
         function updatePlayer(dt) {
             const boost = state.overdriveTimer > 0 ? 1.42 : 1;
             const rotate = (input.keys.KeyA || input.keys.ArrowLeft ? 1 : 0) - (input.keys.KeyD || input.keys.ArrowRight ? 1 : 0);
-            player.rotation += rotate * dt * 3.9;
+            const speed = player.velocity.length();
+            player.rotation += rotate * dt * (4.05 + speed * 0.012);
 
             const forward = getForward(player.rotation);
             input.thrusting = Boolean(input.keys.KeyW || input.keys.ArrowUp);
             if (input.thrusting) {
-                player.velocity.addScaledVector(forward, dt * 17.8 * boost);
+                player.velocity.addScaledVector(forward, dt * 19.2 * boost);
                 spawnEngineTrail(forward);
             }
             if (input.keys.KeyS || input.keys.ArrowDown) {
-                player.velocity.multiplyScalar(Math.pow(0.04, dt));
+                player.velocity.multiplyScalar(Math.pow(0.028, dt));
             }
 
-            player.velocity.multiplyScalar(Math.pow(0.68, dt));
-            player.velocity.clampLength(0, state.overdriveTimer > 0 ? 22 : 16);
+            player.velocity.multiplyScalar(Math.pow(input.thrusting ? 0.74 : 0.66, dt));
+            player.velocity.clampLength(0, state.overdriveTimer > 0 ? 24 : 17.5);
             player.position.addScaledVector(player.velocity, dt);
             wrapPosition(player.position);
             player.group.position.copy(player.position);
+            player.group.visible = state.shot !== 'tactical';
             player.group.rotation.y = player.rotation;
             player.group.rotation.z = -rotate * 0.28 - player.velocity.x * 0.006;
             player.group.rotation.x = player.velocity.z * 0.004;
-            player.engine.scale.setScalar(1 + (input.thrusting ? Math.sin(state.elapsed * 30) * 0.18 + 0.32 : 0));
+            updateEngineAnimation();
             player.shield.visible = state.shield > 0 || state.invulnerable > 0;
-            player.shield.material.opacity = (state.invulnerable > 0 ? 0.2 : 0.08) + clamp(state.shield / 100, 0, 1) * 0.08;
-            player.shield.scale.setScalar(1 + Math.sin(state.elapsed * 7.8) * 0.035);
+            player.shield.material.opacity = (state.invulnerable > 0 ? 0.2 : 0.08) + clamp(state.shield / state.shieldMax, 0, 1) * 0.08;
+            player.shield.scale.setScalar(1 + Math.sin(state.elapsed * 7.8) * 0.035 + state.shieldTier * 0.018);
+            const gravityPulse = 1 + Math.sin(state.elapsed * 5.2) * 0.035 + (state.overdriveTimer > 0 ? 0.08 : 0);
+            player.gravityAura.scale.setScalar(5.4 * gravityPulse);
+            player.gravityAura.material.opacity = state.overdriveTimer > 0 ? 0.12 : 0.075;
+            const reticuleDistance = 8.6 + Math.min(4.4, speed * 0.28);
+            player.reticule.visible = state.shot !== 'tactical';
+            player.reticule.position.copy(player.position).addScaledVector(forward, reticuleDistance);
+            player.reticule.position.y = 0.2;
+            wrapPosition(player.reticule.position);
+            player.reticule.rotation.y = player.rotation;
+            player.reticule.scale.setScalar(clamp(1.06 - state.heat * 0.0025, 0.78, 1.08));
+            materials.reticule.opacity = clamp(0.42 - state.heat * 0.002 + (input.thrusting ? 0.05 : 0), 0.22, 0.48);
             thrustLight.position.copy(player.position).addScaledVector(forward, -2.2);
-            thrustLight.intensity = input.thrusting ? 3.1 : 1.2;
+            thrustLight.intensity = input.thrusting ? 4.4 : 1.35;
+        }
+
+        function updateEngineAnimation() {
+            const thrust = input.thrusting ? 1 : 0;
+            const idle = 0.34 + Math.sin(state.elapsed * 10) * 0.05;
+            const burn = thrust ? 1 + Math.sin(state.elapsed * 44) * 0.18 : idle;
+            const glowOpacity = thrust ? 0.72 + burn * 0.18 : 0.28 + idle * 0.16;
+            const flameOpacity = thrust ? 0.3 + burn * 0.2 : 0.045 + idle * 0.05;
+            player.engine.userData.glows.forEach((glow, index) => {
+                const phase = Math.sin(state.elapsed * 38 + index * 1.7) * 0.12;
+                const energy = Math.max(0.1, burn + phase);
+                glow.scale.set(1.06 + energy * 0.28, 0.72 + energy * 0.1, 1.42 + energy * 0.62);
+                glow.material.opacity = glowOpacity;
+            });
+            player.engine.userData.flames.forEach((flame, index) => {
+                const phase = Math.sin(state.elapsed * 52 + index * 2.1) * 0.16;
+                const energy = Math.max(0.08, burn + phase);
+                flame.scale.set(0.64 + energy * 0.26, 0.42 + energy * (thrust ? 1.08 : 0.22), 0.64 + energy * 0.26);
+                flame.material.opacity = flameOpacity;
+            });
         }
 
         function updateAsteroids(dt) {
@@ -1265,9 +1929,9 @@
             for (let i = missiles.length - 1; i >= 0; i--) {
                 const missile = missiles[i];
                 missile.life -= dt;
-                const target = findClosestAsteroid(missile.group.position, 34);
+                const target = findClosestAsteroid(missile.group.position, missile.lockRange);
                 if (target) {
-                    tempVec.subVectors(target.group.position, missile.group.position).normalize().multiplyScalar(24);
+                    tempVec.subVectors(target.group.position, missile.group.position).normalize().multiplyScalar(missile.speed);
                     missile.velocity.lerp(tempVec, 1 - Math.pow(0.02, dt));
                 }
                 missile.group.position.addScaledVector(missile.velocity, dt);
@@ -1286,12 +1950,23 @@
             for (let i = pickups.length - 1; i >= 0; i--) {
                 const pickup = pickups[i];
                 pickup.life -= dt;
+                getWrappedPlanarDelta(player.position, pickup.group.position, tempVec);
+                const distance = tempVec.length();
+                const gravityRange = state.overdriveTimer > 0 ? 27 : 22;
+                if (distance > 0.001 && distance < gravityRange) {
+                    const falloff = 1 - distance / gravityRange;
+                    const pullStrength = (12 + state.shieldTier * 0.8 + (state.overdriveTimer > 0 ? 4 : 0)) * falloff * falloff;
+                    pickup.velocity.addScaledVector(tempVec.normalize(), pullStrength * dt);
+                    pickup.velocity.multiplyScalar(Math.pow(0.9, dt));
+                    pickup.velocity.clampLength(0, 8.6);
+                }
                 pickup.group.position.addScaledVector(pickup.velocity, dt);
                 wrapPosition(pickup.group.position);
                 pickup.group.rotation.y += dt * 1.4;
                 pickup.group.rotation.z -= dt * 0.92;
                 pickup.group.scale.setScalar(1 + Math.sin(state.elapsed * 5.4 + pickup.phase) * 0.09);
-                if (pickup.group.position.distanceTo(player.position) < pickup.radius + player.radius) {
+                getWrappedPlanarDelta(player.position, pickup.group.position, tempVec);
+                if (tempVec.length() < pickup.radius + player.radius) {
                     applyPickup(pickup.type, pickup.group.position);
                     removePickup(i);
                     continue;
@@ -1306,11 +1981,20 @@
             for (let i = particles.length - 1; i >= 0; i--) {
                 const particle = particles[i];
                 particle.life -= dt;
-                particle.velocity.multiplyScalar(Math.pow(0.54, dt));
+                particle.velocity.multiplyScalar(Math.pow(particle.drag ?? 0.54, dt));
                 particle.group.position.addScaledVector(particle.velocity, dt);
+                if (particle.angularVelocity) {
+                    particle.group.rotation.x += particle.angularVelocity.x * dt;
+                    particle.group.rotation.y += particle.angularVelocity.y * dt;
+                    particle.group.rotation.z += particle.angularVelocity.z * dt;
+                }
                 const alpha = clamp(particle.life / particle.maxLife, 0, 1);
                 particle.material.opacity = alpha * particle.opacity;
-                particle.group.scale.setScalar(particle.size * (0.75 + (1 - alpha) * 0.5));
+                const progress = 1 - alpha;
+                const scale = particle.kind === 'shard'
+                    ? particle.size * (0.64 + alpha * 0.44)
+                    : particle.size * (0.75 + progress * 0.5);
+                particle.group.scale.setScalar(scale);
                 if (particle.life <= 0) {
                     effectRoot.remove(particle.group);
                     particle.material.dispose();
@@ -1335,21 +2019,191 @@
         }
 
         function updateField(dt) {
-            fieldGroup.rotation.y += dt * 0.018;
-            starField.rotation.y += dt * 0.006;
-            starField.rotation.z -= dt * 0.003;
+            fieldGroup.rotation.y += dt * 0.014;
+            starField.rotation.y += dt * 0.005;
+            starField.rotation.z -= dt * 0.002;
         }
 
-        function updateCamera(dt) {
+        function updatePostProcessing() {
+            if (!bloomPass) {
+                return;
+            }
+            const bloomBase = 0.38 + state.bloom * 0.24 + state.shake * 0.06 + Math.min(state.combo, 12) * 0.006;
+            bloomPass.strength = bloomBase;
+            bloomPass.radius = 0.38 + state.bloom * 0.1;
+            bloomPass.threshold = 0.17 + state.bloom * 0.11;
+            if (gradePass) {
+                gradePass.uniforms.grade.value = state.grade;
+            }
+        }
+
+        function getRight(rotation) {
+            return new THREE.Vector3(Math.cos(rotation), 0, -Math.sin(rotation));
+        }
+
+        function setShotMode(shotKey, instant = false) {
+            if (!shotModes[shotKey]) return;
+            state.shot = shotKey;
+            state.cameraDriftX = 0;
+            state.cameraDriftY = 0;
+            syncShotControls();
+            snapCameraToShot(instant);
+        }
+
+        function syncShotControls() {
+            document.querySelectorAll('[data-shot]').forEach((button) => {
+                button.classList.toggle('active', button.dataset.shot === state.shot);
+            });
+            if (ui.shotReadout) {
+                ui.shotReadout.textContent = shotModes[state.shot]?.name || '1st-Person';
+            }
+            if (ui.firstPersonCrosshair) {
+                ui.firstPersonCrosshair.classList.toggle('visible', state.shot === 'tactical');
+            }
+            if (player) {
+                player.group.visible = state.shot !== 'tactical';
+                player.reticule.visible = state.shot !== 'tactical';
+            }
+        }
+
+        function snapCameraToShot(instant = false) {
+            if (state.shot === 'tactical') {
+                updateFirstPersonCamera(1 / 60, instant);
+                return;
+            }
+
+            if (state.shot === 'chase') {
+                const shot = shotModes.chase;
+                const forward = getForward(player.rotation);
+                const right = getRight(player.rotation);
+                const speed = player.velocity.length();
+
+                tempVec.copy(player.position)
+                    .addScaledVector(forward, -(shot.back + speed * 0.08))
+                    .addScaledVector(right, shot.shoulder);
+                tempVec.y = player.position.y + shot.up;
+
+                tempVecB.copy(player.position)
+                    .addScaledVector(forward, shot.lookAhead);
+                tempVecB.y = player.position.y + shot.lookUp;
+
+                if (instant) {
+                    camera.position.copy(tempVec);
+                } else {
+                    camera.position.lerp(tempVec, 0.35);
+                }
+                camera.lookAt(tempVecB);
+                return;
+            }
+
+            const shot = shotModes[state.shot] || shotModes.tactical;
             const speed = player.velocity.length();
-            tempVec.set(player.position.x * 0.12, 58 + speed * 0.08, 66 + player.position.z * 0.1);
+            tempVec.set(
+                player.position.x * shot.lead,
+                shot.height + speed * 0.08,
+                shot.distance + player.position.z * 0.1
+            );
+            tempVecB.set(player.position.x * shot.lookLead, 0, player.position.z * 0.18);
+            if (instant) {
+                camera.position.copy(tempVec);
+            } else {
+                camera.position.lerp(tempVec, 0.35);
+            }
+            camera.lookAt(tempVecB);
+        }
+
+        function updateChaseCamera(dt) {
+            const shot = shotModes.chase;
+            const forward = getForward(player.rotation);
+            const right = getRight(player.rotation);
+            const speed = player.velocity.length();
+
+            const driftShoulder = Math.sin(state.elapsed * 0.11) * shot.drift;
+            const driftBack = Math.cos(state.elapsed * 0.09) * shot.drift * 0.75;
+            const blend = 1 - Math.exp(-dt * 2.2);
+            state.cameraDriftX = lerp(state.cameraDriftX, driftShoulder, blend);
+            state.cameraDriftY = lerp(state.cameraDriftY, driftBack, blend);
+
+            tempVec.copy(player.position)
+                .addScaledVector(forward, -(shot.back + speed * 0.08 + state.cameraDriftY))
+                .addScaledVector(right, shot.shoulder + state.cameraDriftX);
+            tempVec.y = player.position.y + shot.up + Math.abs(state.cameraDriftX) * 0.12;
+
+            if (state.shake > 0) {
+                tempVec.x += randomRange(-1, 1) * state.shake * 0.32;
+                tempVec.y += randomRange(-0.25, 0.25) * state.shake * 0.28;
+                tempVec.z += randomRange(-1, 1) * state.shake * 0.32;
+            }
+
+            camera.position.lerp(tempVec, 1 - Math.exp(-dt * shot.lag));
+            tempVecB.copy(player.position).addScaledVector(forward, shot.lookAhead + speed * 0.18);
+            tempVecB.y = player.position.y + shot.lookUp;
+            camera.lookAt(tempVecB);
+        }
+
+        function updateFirstPersonCamera(dt, instant = false) {
+            const shot = shotModes.tactical;
+            const forward = getForward(player.rotation);
+            const right = getRight(player.rotation);
+            const speed = player.velocity.length();
+            const thrustBob = input.thrusting ? Math.sin(state.elapsed * 18) * 0.045 : Math.sin(state.elapsed * 7.5) * 0.018;
+            const blend = instant ? 1 : 1 - Math.exp(-dt * shot.lag);
+
+            tempVec.copy(player.position)
+                .addScaledVector(forward, shot.eyeForward + speed * 0.016)
+                .addScaledVector(right, Math.sin(state.elapsed * 3.7) * 0.018);
+            tempVec.y = player.position.y + shot.eyeUp + thrustBob;
+
+            if (state.shake > 0) {
+                tempVec.x += randomRange(-0.28, 0.28) * state.shake;
+                tempVec.y += randomRange(-0.12, 0.12) * state.shake;
+                tempVec.z += randomRange(-0.28, 0.28) * state.shake;
+            }
+
+            if (instant) {
+                camera.position.copy(tempVec);
+            } else {
+                camera.position.lerp(tempVec, blend);
+            }
+
+            tempVecB.copy(player.position)
+                .addScaledVector(forward, shot.lookAhead + speed * 0.28)
+                .addScaledVector(right, player.velocity.dot(right) * 0.018);
+            tempVecB.y = player.position.y + shot.lookUp + thrustBob * 0.4;
+            camera.lookAt(tempVecB);
+        }
+
+        function updateBroadcastCamera(dt) {
+            const shot = shotModes[state.shot] || shotModes.tactical;
+            const speed = player.velocity.length();
+            const driftX = Math.sin(state.elapsed * 0.11) * shot.drift * 2.2;
+            const driftY = Math.cos(state.elapsed * 0.09) * shot.drift * 1.4;
+            const blend = 1 - Math.exp(-dt * 2.2);
+            state.cameraDriftX = lerp(state.cameraDriftX, driftX, blend);
+            state.cameraDriftY = lerp(state.cameraDriftY, driftY, blend);
+
+            tempVec.set(
+                player.position.x * shot.lead + state.cameraDriftX,
+                shot.height + speed * 0.08 + state.cameraDriftY * 0.4,
+                shot.distance + player.position.z * 0.1 + state.cameraDriftY
+            );
             if (state.shake > 0) {
                 tempVec.x += randomRange(-1, 1) * state.shake;
                 tempVec.y += randomRange(-0.4, 0.4) * state.shake;
             }
             camera.position.lerp(tempVec, 1 - Math.pow(0.002, dt));
-            tempVecB.set(player.position.x * 0.2, 0, player.position.z * 0.18);
+            tempVecB.set(player.position.x * shot.lookLead, 0, player.position.z * 0.18);
             camera.lookAt(tempVecB);
+        }
+
+        function updateCamera(dt) {
+            if (state.shot === 'tactical') {
+                updateFirstPersonCamera(dt);
+            } else if (state.shot === 'chase') {
+                updateChaseCamera(dt);
+            } else {
+                updateBroadcastCamera(dt);
+            }
         }
 
         function checkCollisions() {
@@ -1357,10 +2211,14 @@
                 const shot = shots[i];
                 const asteroidIndex = findProjectileHit(shot.group.position, shot.radius);
                 if (asteroidIndex !== -1) {
-                    const asteroid = asteroids[asteroidIndex];
+                    const shot = shots[i];
                     destroyAsteroid(asteroidIndex, shot.group.position, shot.damage, false);
-                    scene.remove(shot.group);
-                    shots.splice(i, 1);
+                    if (shot.pierce > 0) {
+                        shot.pierce -= 1;
+                    } else {
+                        scene.remove(shot.group);
+                        shots.splice(i, 1);
+                    }
                 }
             }
 
@@ -1368,7 +2226,8 @@
                 const missile = missiles[i];
                 const asteroidIndex = findProjectileHit(missile.group.position, missile.radius);
                 if (asteroidIndex !== -1) {
-                    destroyAsteroid(asteroidIndex, missile.group.position, missile.damage, true);
+                    const missile = missiles[i];
+                    destroyAsteroid(asteroidIndex, missile.group.position, missile.damage, true, missile.blastRadius);
                     scene.remove(missile.group);
                     missiles.splice(i, 1);
                 }
@@ -1395,18 +2254,28 @@
             return -1;
         }
 
-        function destroyAsteroid(index, impactPosition, damage, explosive) {
+        function destroyAsteroid(index, impactPosition, damage, explosive, blastRadius = 4.5) {
             const asteroid = asteroids[index];
             if (!asteroid) return;
 
             const position = asteroid.group.position.clone();
             const velocity = asteroid.velocity.clone();
-            const color = asteroid.size === 'large' ? new THREE.Color(0x9fb7c8) : asteroid.size === 'medium' ? new THREE.Color(0xffd36a) : new THREE.Color(0x80ffbd);
+            const color = asteroid.size === 'large' ? new THREE.Color(0xa7d9ff) : asteroid.size === 'medium' ? new THREE.Color(0x8ba2ff) : new THREE.Color(0x62eaff);
             spawnParticles(impactPosition || position, color, explosive ? 26 : 12, asteroid.radius * 0.34, explosive ? 1.0 : 0.62);
+            spawnParticles(position, new THREE.Color(0xa7d9ff), explosive ? 18 : 10, asteroid.radius * 0.2, explosive ? 0.82 : 0.48);
+            spawnAsteroidShards(asteroid, position, color, explosive);
             spawnRing(position, color, asteroid.radius * 1.1, explosive ? 0.72 : 0.42);
-            state.score += asteroid.score + Math.floor(state.wave * 7);
+            spawnRing(position, new THREE.Color(0x4fc8ff), asteroid.radius * 1.55, explosive ? 0.42 : 0.24);
+            state.combo = state.comboTimer > 0 ? Math.min(99, state.combo + 1) : 1;
+            state.comboTimer = clamp(2.3 - state.combo * 0.018, 1.25, 2.3);
+            const comboBonus = Math.max(0, state.combo - 1) * 8;
+            state.score += asteroid.score + Math.floor(state.wave * 7) + comboBonus;
             state.kills += 1;
             state.shake = Math.max(state.shake, explosive ? 1.1 : 0.42);
+            if (state.combo > 1 && state.combo % 5 === 0) {
+                spawnRing(position, new THREE.Color(0xe8f5ff), asteroid.radius * 1.8, 0.44);
+                spawnParticles(position, new THREE.Color(0x9f7dff), 16, asteroid.radius * 0.3, 0.68);
+            }
 
             if (asteroid.size === 'large') {
                 for (let i = 0; i < 2; i++) {
@@ -1422,7 +2291,7 @@
                 for (let i = asteroids.length - 1; i >= 0; i--) {
                     if (i === index) continue;
                     const other = asteroids[i];
-                    if (other.group.position.distanceTo(position) < asteroid.radius + other.radius + 4.5) {
+                    if (other.group.position.distanceTo(position) < asteroid.radius + other.radius + blastRadius) {
                         other.velocity.add(randomPlanarVector(4.5));
                     }
                 }
@@ -1444,7 +2313,8 @@
             if (!asteroid) return;
 
             if (state.shield > 0) {
-                state.shield = Math.max(0, state.shield - Math.ceil(asteroid.radius * 9));
+                const shieldUpgrade = shieldSpec();
+                state.shield = Math.max(0, state.shield - Math.ceil(asteroid.radius * 9 * shieldUpgrade.absorb));
                 state.invulnerable = 0.72;
                 state.shake = 1.35;
                 spawnParticles(player.position, new THREE.Color(0x74e8ff), 24, 1.4, 0.9);
@@ -1468,24 +2338,30 @@
             player.position.set(0, 0.82, 0);
             player.velocity.set(0, 0, 0);
             player.rotation = 0;
-            state.shield = Math.max(state.shield, 34);
+            snapCameraToShot(true);
+            state.shield = Math.max(state.shield, Math.round(state.shieldMax * 0.34));
         }
 
         function fireGuns(auto = false) {
             if (state.paused || state.debugOpen || state.gameOver) return;
             if (state.gunTimer > 0 || state.heat > 96) return;
 
-            const level = state.gunsLevel;
-            const spread = level === 1 ? [0] : level === 2 ? [-0.1, 0.1] : level === 3 ? [-0.18, 0, 0.18] : [-0.22, -0.08, 0.08, 0.22];
-            for (const offset of spread) {
-                createShot(player.rotation + offset);
+            const spec = gunSpec();
+            for (const offset of spec.spread) {
+                createShot(player.rotation + offset, spec);
             }
-            state.heat = Math.min(100, state.heat + (auto ? 5 : 8 + level * 2));
-            state.gunTimer = Math.max(0.11, 0.23 - level * 0.032);
-            spawnParticles(player.position.clone().addScaledVector(getForward(player.rotation), 1.9), new THREE.Color(0x80ffbd), 4, 0.38, 0.34);
+            state.heat = Math.min(100, state.heat + (auto ? 5 : spec.heat));
+            state.gunTimer = Math.max(0.1, spec.cooldown);
+            spawnParticles(
+                player.position.clone().addScaledVector(getForward(player.rotation), 1.9),
+                new THREE.Color(0x80ffbd),
+                4 + Math.floor(state.gunsLevel / 2),
+                0.38,
+                0.34
+            );
         }
 
-        function createShot(rotation) {
+        function createShot(rotation, spec = gunSpec()) {
             const group = new THREE.Group();
             const mesh = new THREE.Mesh(geometries.shot, materials.shot);
             mesh.rotation.x = Math.PI / 2;
@@ -1496,10 +2372,37 @@
             scene.add(group);
             shots.push({
                 group,
-                velocity: forward.multiplyScalar(36).add(player.velocity.clone().multiplyScalar(0.32)),
-                life: 0.96,
-                radius: 0.58,
-                damage: 1
+                velocity: forward.multiplyScalar(spec.speed).add(player.velocity.clone().multiplyScalar(0.32)),
+                life: 0.96 + spec.pierce * 0.08,
+                radius: 0.58 + spec.damage * 0.04,
+                damage: spec.damage,
+                pierce: spec.pierce
+            });
+        }
+
+        function createMissile(rotation, spec, spreadIndex, salvoSize) {
+            const offset = salvoSize === 1 ? 0 : (spreadIndex - (salvoSize - 1) / 2) * 0.12;
+            const aim = rotation + offset;
+            const forward = getForward(aim);
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(geometries.missileBody, materials.missile);
+            body.rotation.x = Math.PI / 2;
+            body.scale.setScalar(1 + state.missileTier * 0.04);
+            const glow = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 8), materials.missile);
+            glow.position.z = -0.42;
+            group.add(body, glow);
+            group.position.copy(player.position).addScaledVector(forward, 1.8 + spreadIndex * 0.08);
+            group.rotation.y = aim;
+            scene.add(group);
+            missiles.push({
+                group,
+                velocity: forward.multiplyScalar(spec.speed).add(player.velocity.clone().multiplyScalar(0.25)),
+                life: 3.8 + state.missileTier * 0.18,
+                radius: 0.9 + state.missileTier * 0.05,
+                damage: spec.damage,
+                speed: spec.speed,
+                lockRange: spec.lockRange,
+                blastRadius: spec.blastRadius
             });
         }
 
@@ -1507,32 +2410,36 @@
             if (state.paused || state.debugOpen || state.gameOver) return;
             if (state.missileTimer > 0 || state.missileAmmo <= 0) return;
 
-            const forward = getForward(player.rotation);
-            const group = new THREE.Group();
-            const body = new THREE.Mesh(geometries.missileBody, materials.missile);
-            body.rotation.x = Math.PI / 2;
-            const glow = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 8), materials.missile);
-            glow.position.z = -0.42;
-            group.add(body, glow);
-            group.position.copy(player.position).addScaledVector(forward, 1.8);
-            group.rotation.y = player.rotation;
-            scene.add(group);
-            missiles.push({
-                group,
-                velocity: forward.multiplyScalar(24).add(player.velocity.clone().multiplyScalar(0.25)),
-                life: 3.8,
-                radius: 0.9,
-                damage: 2
-            });
+            const spec = missileSpec();
+            for (let i = 0; i < spec.salvo; i++) {
+                createMissile(player.rotation, spec, i, spec.salvo);
+            }
             state.missileAmmo -= 1;
-            state.missileTimer = 0.52;
-            state.heat = Math.min(100, state.heat + 5);
-            spawnParticles(group.position, new THREE.Color(0xffd36a), 8, 0.55, 0.45);
+            state.missileTimer = spec.cooldown;
+            state.heat = Math.min(100, state.heat + 4 + spec.salvo);
+            spawnParticles(player.position.clone().addScaledVector(getForward(player.rotation), 1.8), new THREE.Color(0xffd36a), 6 + spec.salvo * 2, 0.55, 0.45);
+        }
+
+        function choosePickupType() {
+            const missileUpgrade = missileSpec();
+            const entries = [
+                { type: 'shield', weight: state.shield < state.shieldMax * 0.62 || state.shieldTier < 4 ? 1.35 : 0.85 },
+                { type: 'guns', weight: state.gunsLevel < 7 ? 1.3 : 0.45 },
+                { type: 'missiles', weight: state.missileTier < 4 || state.missileAmmo < missileUpgrade.capacity * 0.45 ? 1.25 : 0.8 },
+                { type: 'overdrive', weight: 1 }
+            ];
+            let roll = Math.random() * entries.reduce((sum, entry) => sum + entry.weight, 0);
+            for (const entry of entries) {
+                roll -= entry.weight;
+                if (roll <= 0) {
+                    return entry.type;
+                }
+            }
+            return entries[0].type;
         }
 
         function spawnPickup(position) {
-            const types = ['shield', 'guns', 'missiles', 'overdrive'];
-            const type = types[Math.floor(Math.random() * types.length)];
+            const type = choosePickupType();
             const spec = pickupSpecs[type];
             const group = new THREE.Group();
             const core = new THREE.Mesh(geometries.pickupCore, new THREE.MeshBasicMaterial({
@@ -1568,18 +2475,51 @@
 
         function applyPickup(type, position) {
             const spec = pickupSpecs[type] || pickupSpecs.shield;
-            if (type === 'shield') state.shield = Math.min(100, state.shield + 48);
-            if (type === 'guns') state.gunsLevel = Math.min(4, state.gunsLevel + 1);
-            if (type === 'missiles') state.missileAmmo = Math.min(18, state.missileAmmo + 5);
+            if (type === 'shield') {
+                const shieldUpgrade = shieldSpec();
+                if (state.shield >= state.shieldMax * 0.94 && state.shieldTier < 4) {
+                    state.shieldTier += 1;
+                    state.shieldMax = shieldSpec().max;
+                    state.shield = state.shieldMax;
+                    state.score += 120;
+                } else {
+                    state.shield = Math.min(state.shieldMax, state.shield + shieldUpgrade.restore);
+                }
+            }
+            if (type === 'guns') {
+                if (state.gunsLevel < 7) {
+                    state.gunsLevel += 1;
+                    state.score += 80;
+                } else {
+                    state.shield = Math.min(state.shieldMax, state.shield + 24);
+                }
+            }
+            if (type === 'missiles') {
+                const missileUpgrade = missileSpec();
+                state.missileAmmo = Math.min(missileUpgrade.capacity, state.missileAmmo + missileUpgrade.resupply);
+                if (state.missileAmmo >= missileUpgrade.capacity * 0.92 && state.missileTier < 4) {
+                    state.missileTier += 1;
+                    state.missileAmmo = Math.min(missileSpec().capacity, state.missileAmmo + 2);
+                    state.score += 140;
+                }
+            }
             if (type === 'overdrive') state.overdriveTimer = Math.max(state.overdriveTimer, 9.5);
             spawnParticles(position, spec.color, 20, 1.0, 0.7);
             spawnRing(position, spec.color, 2.6, 0.5);
         }
 
         function spawnEngineTrail(forward) {
-            if (Math.random() > 0.7) return;
-            const position = player.position.clone().addScaledVector(forward, -1.55);
-            spawnParticles(position, new THREE.Color(0x74e8ff), 1, 0.18, 0.22);
+            if (Math.random() > 0.58) return;
+            const right = getRight(player.rotation);
+            for (const shoulder of [-0.48, 0.48]) {
+                const position = player.position.clone()
+                    .addScaledVector(forward, -1.9)
+                    .addScaledVector(right, shoulder);
+                spawnParticles(position, new THREE.Color(0x74e8ff), 2, 0.16, 0.32);
+                if (Math.random() < 0.34) {
+                    spawnParticles(position, new THREE.Color(0x9fb7ff), 1, 0.08, 0.22);
+                }
+            }
         }
 
         function spawnParticles(position, color, count, spread, power) {
@@ -1606,10 +2546,60 @@
                     life,
                     maxLife: life,
                     size,
-                    opacity: randomRange(0.28, 0.54)
+                    opacity: randomRange(0.28, 0.54),
+                    drag: 0.54
                 });
             }
-            while (particles.length > 320) {
+            trimParticles();
+        }
+
+        function spawnAsteroidShards(asteroid, position, color, explosive) {
+            const count = asteroid.size === 'large' ? 38 : asteroid.size === 'medium' ? 28 : 18;
+            const blast = explosive ? 1.25 : 1;
+            for (let i = 0; i < count; i++) {
+                const material = new THREE.MeshBasicMaterial({
+                    color: color.clone().lerp(new THREE.Color(0xe8f5ff), randomRange(0.18, 0.52)),
+                    transparent: true,
+                    opacity: randomRange(0.46, 0.82),
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false,
+                    side: THREE.DoubleSide
+                });
+                const shard = new THREE.Mesh(geometries.asteroidShard, material);
+                const direction = randomPlanarVector(1).add(new THREE.Vector3(0, randomRange(-0.22, 0.72), 0)).normalize();
+                shard.position.copy(position).addScaledVector(direction, randomRange(0.2, asteroid.radius * 0.58));
+                shard.position.y += randomRange(-0.16, 0.46);
+                shard.rotation.set(
+                    randomRange(0, Math.PI * 2),
+                    randomRange(0, Math.PI * 2),
+                    randomRange(0, Math.PI * 2)
+                );
+                const size = randomRange(0.18, 0.42) * asteroid.radius * blast;
+                shard.scale.setScalar(size);
+                effectRoot.add(shard);
+                const life = randomRange(0.72, 1.35) * (explosive ? 1.12 : 1);
+                particles.push({
+                    kind: 'shard',
+                    group: shard,
+                    material,
+                    velocity: direction.multiplyScalar(randomRange(5.2, 12.5) * blast).add(asteroid.velocity.clone().multiplyScalar(0.28)),
+                    angularVelocity: new THREE.Vector3(
+                        randomRange(-8.5, 8.5),
+                        randomRange(-10.5, 10.5),
+                        randomRange(-8.5, 8.5)
+                    ),
+                    life,
+                    maxLife: life,
+                    size,
+                    opacity: material.opacity,
+                    drag: 0.78
+                });
+            }
+            trimParticles();
+        }
+
+        function trimParticles() {
+            while (particles.length > PARTICLE_LIMIT) {
                 const old = particles.shift();
                 effectRoot.remove(old.group);
                 old.material.dispose();
@@ -1778,28 +2768,52 @@
             ui.wave.textContent = String(state.wave);
             ui.lives.textContent = String(state.lives);
             ui.velocity.textContent = String(speed);
+            ui.combo.textContent = state.combo > 1 ? `${state.combo}x` : '0';
             ui.missionTitle.textContent = state.gameOver ? 'Run Complete' : mission.title;
             ui.missionCopy.textContent = state.gameOver ? `Final score ${state.score}. The next belt run is ready.` : mission.copy;
-            ui.shield.textContent = String(Math.round(state.shield));
+            ui.shield.textContent = `${Math.round(state.shield)}/${state.shieldMax}`;
             ui.heat.textContent = String(Math.round(state.heat));
-            ui.shieldFill.style.width = `${clamp(state.shield, 0, 100)}%`;
+            ui.shieldFill.style.width = `${clamp(state.shield / state.shieldMax * 100, 0, 100)}%`;
             ui.heatFill.style.width = `${clamp(state.heat, 0, 100)}%`;
+            if (ui.shieldLabel) {
+                ui.shieldLabel.textContent = shieldSpec().label;
+            }
+            if (ui.shieldTier) {
+                ui.shieldTier.textContent = String(state.shieldTier);
+            }
+            if (ui.shieldChip) {
+                ui.shieldChip.classList.toggle('active', state.shieldTier > 0 || state.shield > 0);
+            }
             ui.asteroidCount.textContent = String(asteroids.length);
             ui.kills.textContent = String(state.kills);
             ui.elapsed.textContent = formatTime(state.elapsed);
             ui.stateLabel.textContent = state.debugOpen ? 'Debug' : state.paused ? 'Paused' : state.controlsActive ? 'Running' : 'Idle';
             ui.guns.textContent = String(state.gunsLevel);
-            ui.gunsLabel.textContent = state.gunsLevel >= 3 ? 'auto vector' : state.gunsLevel === 2 ? 'dual vector' : 'single vector';
+            ui.gunsLabel.textContent = gunSpec().label;
             ui.gunsChip.classList.toggle('active', state.gunsLevel > 1);
-            ui.missiles.textContent = String(state.missileAmmo);
-            ui.missileLabel.textContent = state.missileAmmo > 0 ? 'tracking' : 'empty';
-            ui.missileChip.classList.toggle('active', state.missileAmmo > 0);
+            const missileUpgrade = missileSpec();
+            ui.missiles.textContent = `${state.missileAmmo}/${missileUpgrade.capacity}`;
+            ui.missileLabel.textContent = state.missileAmmo > 0 ? missileUpgrade.label : 'empty';
+            ui.missileChip.classList.toggle('active', state.missileAmmo > 0 || state.missileTier > 0);
             ui.drive.textContent = state.overdriveTimer.toFixed(1);
             ui.driveLabel.textContent = state.overdriveTimer > 0 ? 'overdrive' : 'standard';
             ui.driveChip.classList.toggle('active', state.overdriveTimer > 0);
             ui.pause.textContent = state.paused ? 'Resume' : 'Pause';
             ui.fire.disabled = state.gameOver || state.paused || state.debugOpen || state.heat > 96;
             ui.missile.disabled = state.gameOver || state.paused || state.debugOpen || state.missileAmmo <= 0;
+            if (ui.shotReadout) {
+                ui.shotReadout.textContent = shotModes[state.shot]?.name || '1st-Person';
+            }
+            if (ui.timelineFill) {
+                const waveProgress = Math.min(100, (state.kills * 4 + state.score * 0.055 + state.wave * 7 + state.combo * 4) % 100);
+                ui.timelineFill.style.width = `${waveProgress}%`;
+            }
+            if (ui.bloomLabel) {
+                ui.bloomLabel.textContent = `${Math.round(state.bloom * 100)}%`;
+            }
+            if (ui.gradeLabel) {
+                ui.gradeLabel.textContent = `${Math.round(state.grade * 100)}%`;
+            }
         }
 
         function updateDebugReadout() {
@@ -1836,6 +2850,16 @@
             if (position.z < -FIELD_HALF) position.z += FIELD_SIZE;
         }
 
+        function getWrappedPlanarDelta(target, source, out) {
+            out.subVectors(target, source);
+            out.y = 0;
+            if (out.x > FIELD_HALF) out.x -= FIELD_SIZE;
+            if (out.x < -FIELD_HALF) out.x += FIELD_SIZE;
+            if (out.z > FIELD_HALF) out.z -= FIELD_SIZE;
+            if (out.z < -FIELD_HALF) out.z += FIELD_SIZE;
+            return out;
+        }
+
         function findClosestAsteroid(position, maxDistance = Infinity) {
             let best = null;
             let bestDistance = maxDistance;
@@ -1850,7 +2874,7 @@
         }
 
         function pickupChance() {
-            return clamp(0.12 + state.wave * 0.012, 0.12, 0.28);
+            return clamp(0.16 + state.wave * 0.014 + state.kills * 0.0015, 0.16, 0.34);
         }
 
         function randomRange(min, max) {
@@ -1859,6 +2883,10 @@
 
         function clamp(value, min, max) {
             return Math.max(min, Math.min(max, value));
+        }
+
+        function lerp(a, b, t) {
+            return a + (b - a) * t;
         }
 
         function formatTime(seconds) {
@@ -1877,6 +2905,7 @@
             renderer.setSize(width, height);
             composer.setSize(width, height);
             bloomPass.setSize(width, height);
+            updatePostProcessing();
         }
     </script>
 </body>
