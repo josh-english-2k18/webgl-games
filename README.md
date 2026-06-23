@@ -15,6 +15,7 @@ See [DESIGN.md](DESIGN.md) for the shared design philosophy, quality rubric, and
 - [Vector Bloom Grok](https://josh-english-2k18.github.io/webgl-games/vector-bloom-grok.html) (`vector-bloom-grok.html`)
 - [Vesper Belt](https://josh-english-2k18.github.io/webgl-games/asteroids.html) (`asteroids.html`)
 - [Vesper Belt Composer](https://josh-english-2k18.github.io/webgl-games/asteroids-composer.html) (`asteroids-composer.html`)
+- [Glassquall](https://josh-english-2k18.github.io/webgl-games/asteroids-claude.html) (`asteroids-claude.html`)
 - [Crownfield Chess](https://josh-english-2k18.github.io/webgl-games/chess.html) (`chess.html`)
 - [Crownline Checkers](https://josh-english-2k18.github.io/webgl-games/checkers.html) (`checkers.html`)
 - [Umbra Meridian Othello](https://josh-english-2k18.github.io/webgl-games/othello.html) (`othello.html`)
@@ -63,6 +64,8 @@ See [DESIGN.md](DESIGN.md) for the shared design philosophy, quality rubric, and
 `asteroids-composer.html` is Vesper Belt Composer, a cinematic variant with post-processing bloom and color grade, camera shot presets, a shader belt backdrop, nebula dome, denser starfield, film grain, letterboxing, and compact transparent HUD controls. Bloom and grade tuning live in the debug console. Built with Composer 2.5.
 
 The Vesper Belt comparison sharpened the process lesson: Codex should not build a plain game and wait for a separate presentation pass to add taste. Future game experiments should include the director layer up front: camera grammar, atmospheric frame, transparent HUD hierarchy, feedback language, and live tuning controls alongside movement and combat feel.
+
+`asteroids-claude.html` is Glassquall, a Claude-built asteroids variant that keeps the full Vesper Belt backbone (thrust/rotate/brake/fire/wrap, large→medium→small splits, waves, shield, overload heat, homing missiles, ship-gravity pickups, mission HUD) and concentrates every system on the half-second around each kill. Its identity is time: every normal kill fires a tuned micro-hitstop plus a white pre-shatter flash, chaining warms the entire screen palette (combo HEAT), and the signature verb — the PHASE LANCE — charges by holding fire, then releases a bullet-time dash that punches a glowing spear through a whole lane of rocks in a staggered ratatat of glass-breaks while doubling as an i-frame dodge. It adds a small legible enemy roster (shardlings, homing Singers, a Prism-Core mini-boss every fifth wave, tough iron-vein rocks), off-screen rim threat arrows, four honest cameras (Pursuit 3rd-person, Cockpit 1st-person, Sweep, Drift), full touch controls, and a director console with live feel/movement/presentation sliders. Particle hygiene holds: sparks and starfield are size-capped circular-discard shader points, and shards/rings/spear are real geometry. Readiness flag: `window.__glassquallReady`. Built by Claude (Opus 4.8) with a scout/design workflow and an adversarial review-and-harden pass.
 
 ## License
 
