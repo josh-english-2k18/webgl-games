@@ -1,0 +1,3429 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Sunseed</title>
+    <style>
+        :root {
+            --bg: #08050f;
+            --ink: #fff3e4;
+            --muted: rgba(255, 243, 228, 0.52);
+            --line: rgba(255, 243, 228, 0.09);
+            --panel: rgba(18, 11, 26, 0.26);
+            --ember: #ffab5e;
+            --gold: #ffd98a;
+            --coral: #ff7e62;
+            --teal: #8fd8ff;
+            --violet: #a98cff;
+            --green: #9dffc4;
+            --red: #ff6272;
+            --radius: 9px;
+            --kindle: 0;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button { font: inherit; }
+
+        /* Kill double-tap zoom, tap delay, and gesture recognition on the play surface + controls */
+        #stage, .controls, .control-btn, .touch-btn { touch-action: none; }
+
+        #stage {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background:
+                radial-gradient(circle at 50% 118%, rgba(255, 140, 70, 0.14), transparent 46%),
+                radial-gradient(circle at 78% 12%, rgba(110, 90, 200, 0.1), transparent 34%),
+                linear-gradient(180deg, #0a0716 0%, #08050f 58%, #05030a 100%);
+        }
+
+        #stage canvas { display: block; width: 100%; height: 100%; }
+
+        .grain, .vignette, .letterbox, .kindle-glow, .erupt-flash, .hurt-flash {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        /* The buried star warms the bottom of the frame as kindling climbs */
+        .kindle-glow {
+            z-index: 6;
+            opacity: calc(var(--kindle) * 0.5);
+            background:
+                radial-gradient(ellipse 130% 58% at 50% 118%, rgba(255, 168, 90, 0.34), transparent 62%),
+                linear-gradient(to top, rgba(255, 128, 60, 0.1), transparent 22%);
+            mix-blend-mode: screen;
+            transition: opacity 0.22s linear;
+        }
+
+        .erupt-flash {
+            z-index: 7;
+            opacity: 0;
+            background: radial-gradient(circle at 50% 72%, rgba(255, 226, 170, 0.6), transparent 62%);
+            mix-blend-mode: screen;
+        }
+
+        .hurt-flash {
+            z-index: 7;
+            opacity: 0;
+            background: radial-gradient(ellipse 120% 90% at 50% 50%, transparent 42%, rgba(255, 70, 84, 0.34) 100%);
+            mix-blend-mode: screen;
+        }
+
+        .grain {
+            z-index: 8;
+            opacity: 0.03;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.84' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+            mix-blend-mode: overlay;
+        }
+
+        .vignette {
+            z-index: 9;
+            background:
+                radial-gradient(ellipse 82% 68% at 50% 46%, transparent 54%, rgba(2, 1, 6, 0.42) 100%),
+                linear-gradient(to right, rgba(2, 1, 6, 0.48), transparent 14%, transparent 86%, rgba(2, 1, 6, 0.44));
+        }
+
+        .letterbox::before, .letterbox::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: clamp(6px, 1.4vh, 16px);
+            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.58), rgba(0, 0, 0, 0.34));
+            z-index: 9;
+        }
+        .letterbox::before { top: 0; }
+        .letterbox::after { bottom: 0; transform: rotate(180deg); }
+
+        /* ---- Rim threat arrows (offscreen + over-horizon) ---- */
+        #rim-arrows { position: fixed; inset: 0; z-index: 12; pointer-events: none; }
+        .rim-arrow {
+            position: absolute;
+            top: 0; left: 0;
+            width: 0; height: 0;
+            margin: -9px 0 0 -7px;
+            border-left: 7px solid transparent;
+            border-right: 7px solid transparent;
+            border-bottom: 15px solid var(--ember);
+            opacity: 0;
+            transition: opacity 0.12s linear;
+            filter: drop-shadow(0 0 5px currentColor);
+        }
+
+        /* ---- Score popups ---- */
+        #popups { position: fixed; inset: 0; z-index: 13; pointer-events: none; overflow: hidden; }
+        .popup {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            color: var(--gold);
+            text-shadow: 0 0 10px rgba(255, 217, 138, 0.7);
+            animation: pop 0.85s ease-out forwards;
+            white-space: nowrap;
+        }
+        .popup.cool { color: var(--teal); text-shadow: 0 0 10px rgba(143, 216, 255, 0.7); }
+        .popup.hot { color: var(--coral); text-shadow: 0 0 12px rgba(255, 126, 98, 0.85); }
+        @keyframes pop {
+            0% { opacity: 0; transform: translate(-50%, -40%) scale(0.7); }
+            18% { opacity: 1; transform: translate(-50%, -55%) scale(1.12); }
+            100% { opacity: 0; transform: translate(-50%, -150%) scale(1); }
+        }
+
+        /* ---- Cockpit crosshair ---- */
+        .crosshair {
+            position: fixed;
+            top: 50%; left: 50%;
+            z-index: 14;
+            width: 72px; height: 72px;
+            opacity: 0;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            transition: opacity 0.2s linear;
+            filter: drop-shadow(0 0 6px rgba(255, 171, 94, 0.7));
+        }
+        .crosshair::before, .crosshair::after {
+            content: "";
+            position: absolute;
+            background: rgba(255, 217, 138, 0.85);
+        }
+        .crosshair::before { top: 50%; left: 0; width: 100%; height: 1px; transform: translateY(-50%); }
+        .crosshair::after { left: 50%; top: 0; height: 100%; width: 1px; transform: translateX(-50%); }
+        .crosshair .ring {
+            position: absolute; inset: 22px;
+            border: 1px solid rgba(255, 171, 94, 0.7);
+            border-radius: 50%;
+        }
+        .crosshair .dot {
+            position: absolute; top: 50%; left: 50%;
+            width: 4px; height: 4px; margin: -2px 0 0 -2px;
+            background: var(--teal); border-radius: 50%;
+        }
+
+        /* ---- Top-center ember chain ---- */
+        .chain-wrap {
+            position: fixed;
+            top: clamp(14px, 3vh, 30px);
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 15;
+            text-align: center;
+            pointer-events: none;
+        }
+        .chain-mult {
+            font-size: clamp(34px, 6vw, 58px);
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: -0.02em;
+            color: var(--gold);
+            text-shadow: 0 0 18px rgba(255, 217, 138, 0.5);
+            transition: color 0.16s linear, text-shadow 0.16s linear;
+        }
+        .chain-label {
+            margin-top: 4px;
+            font-size: 10px;
+            letter-spacing: 0.42em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+        .chain-track {
+            margin: 8px auto 0;
+            width: clamp(150px, 20vw, 220px);
+            height: 4px;
+            border-radius: 99px;
+            background: rgba(255, 243, 228, 0.1);
+            overflow: hidden;
+        }
+        .chain-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 99px;
+            background: linear-gradient(90deg, var(--teal), var(--gold) 55%, var(--coral));
+            box-shadow: 0 0 10px rgba(255, 190, 110, 0.5);
+        }
+
+        /* ---- Kindling ring (bottom center): the star's eruption gauge ---- */
+        .kindling-wrap {
+            position: fixed;
+            bottom: clamp(96px, 16vh, 150px);
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 15;
+            pointer-events: none;
+            text-align: center;
+        }
+        .kindling-ring {
+            width: 78px; height: 78px;
+            border-radius: 50%;
+            margin: 0 auto;
+            background:
+                conic-gradient(var(--ember) calc(var(--kindle-fill, 0) * 360deg), rgba(255, 243, 228, 0.08) 0deg);
+            -webkit-mask: radial-gradient(transparent 56%, #000 57%);
+            mask: radial-gradient(transparent 56%, #000 57%);
+            opacity: 0.62;
+            transition: opacity 0.15s linear, filter 0.15s linear;
+        }
+        .kindling-wrap.stirring .kindling-ring { opacity: 0.85; filter: drop-shadow(0 0 8px rgba(255, 171, 94, 0.5)); }
+        .kindling-wrap.erupting .kindling-ring {
+            opacity: 1;
+            background: conic-gradient(#fff0d2 360deg, #fff0d2 0deg);
+            filter: drop-shadow(0 0 18px rgba(255, 230, 170, 0.9));
+        }
+        .kindling-label {
+            margin-top: 7px;
+            font-size: 9px;
+            letter-spacing: 0.34em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+        .kindling-wrap.stirring .kindling-label { color: var(--ember); }
+        .kindling-wrap.erupting .kindling-label { color: #fff0d2; }
+
+        /* ---- Side rails ---- */
+        .rail {
+            position: fixed;
+            top: clamp(14px, 3vh, 28px);
+            z-index: 15;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: clamp(178px, 19vw, 222px);
+        }
+        .rail.left { left: clamp(14px, 2.4vw, 30px); }
+        .rail.right { right: clamp(14px, 2.4vw, 30px); align-items: stretch; }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            margin-bottom: 2px;
+        }
+        .brand-mark {
+            width: 22px; height: 22px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 42% 38%, #fff0d2, var(--ember) 46%, #7a2c12 100%);
+            box-shadow: 0 0 14px rgba(255, 171, 94, 0.55);
+        }
+        .brand h1 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+        }
+        .brand .sub { font-size: 9px; letter-spacing: 0.3em; color: var(--muted); text-transform: uppercase; }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            padding: 11px 13px;
+            backdrop-filter: blur(7px);
+            -webkit-backdrop-filter: blur(7px);
+        }
+        .panel .head {
+            font-size: 9px;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 7px;
+        }
+        .panel .mission-title { font-size: 14px; font-weight: 700; margin-bottom: 3px; }
+        .panel .mission-copy { font-size: 11px; line-height: 1.45; color: var(--muted); }
+
+        .hull-row {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            margin-bottom: 10px;
+        }
+        .hull-row .k { font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); flex: 1; }
+        .heart {
+            width: 12px; height: 12px;
+            transform: rotate(45deg);
+            border-radius: 2px;
+            background: rgba(255, 243, 228, 0.1);
+            transition: background 0.18s, box-shadow 0.18s;
+        }
+        .heart.lit { background: var(--coral); box-shadow: 0 0 9px rgba(255, 126, 98, 0.7); }
+
+        .meter { margin-bottom: 9px; }
+        .meter:last-child { margin-bottom: 0; }
+        .meter .row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+        .meter .row b { color: var(--ink); font-weight: 600; }
+        .track { height: 6px; border-radius: 99px; background: rgba(255, 243, 228, 0.1); overflow: hidden; }
+        .fill { height: 100%; width: 0%; border-radius: 99px; transition: width 0.14s linear; }
+        .fill.lumen { background: linear-gradient(90deg, var(--teal), var(--gold)); box-shadow: 0 0 10px rgba(255, 217, 138, 0.45); }
+        .fill.lumen.ready { background: linear-gradient(90deg, var(--gold), #fff0d2); box-shadow: 0 0 14px rgba(255, 230, 170, 0.7); }
+        .fill.kindling { background: linear-gradient(90deg, #8a3a16, var(--ember) 60%, var(--gold)); box-shadow: 0 0 10px rgba(255, 160, 80, 0.4); }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 12px;
+        }
+        .stat .k { font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+        .stat .v { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .stat .v.gold { color: var(--gold); }
+        .stat .v.ember { color: var(--ember); }
+
+        .score-panel { text-align: right; }
+        .score-panel .v { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; color: var(--gold); }
+
+        .star-state {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-top: 8px;
+            font-size: 10px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+        .star-state b { color: var(--ember); font-weight: 700; letter-spacing: 0.18em; }
+        .star-state b.occluded { color: var(--violet); }
+        .star-state b.erupting { color: #fff0d2; }
+
+        /* ---- Controls ---- */
+        .controls {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 16;
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: min(94vw, 880px);
+            bottom: calc(clamp(12px, 2.4vh, 24px) + env(safe-area-inset-bottom, 0px));
+        }
+        .control-panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            padding: 9px 11px;
+            backdrop-filter: blur(7px);
+            -webkit-backdrop-filter: blur(7px);
+        }
+        .control-panel .head { font-size: 8px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; text-align: center; }
+        .btn-row { display: flex; gap: 7px; }
+        .control-btn {
+            appearance: none;
+            border: 1px solid var(--line);
+            background: rgba(255, 243, 228, 0.04);
+            color: var(--ink);
+            border-radius: 7px;
+            padding: 8px 12px;
+            font-size: 11px;
+            letter-spacing: 0.06em;
+            cursor: pointer;
+            transition: background 0.14s, border-color 0.14s, transform 0.08s;
+            white-space: nowrap;
+        }
+        .control-btn:hover { background: rgba(255, 171, 94, 0.12); border-color: rgba(255, 171, 94, 0.42); }
+        .control-btn:active { transform: translateY(1px); }
+        .control-btn.primary { background: rgba(255, 171, 94, 0.16); border-color: rgba(255, 171, 94, 0.5); }
+        .control-btn.gold { background: rgba(255, 217, 138, 0.13); border-color: rgba(255, 217, 138, 0.42); }
+        .control-btn.active { background: rgba(255, 171, 94, 0.22); border-color: rgba(255, 171, 94, 0.62); }
+
+        /* ---- Pause banner ---- */
+        .banner {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.96);
+            z-index: 20;
+            text-align: center;
+            padding: 26px 40px;
+            border-radius: 14px;
+            background: rgba(14, 8, 20, 0.74);
+            border: 1px solid var(--line);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s, transform 0.2s;
+        }
+        .banner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        .banner h2 { margin: 0 0 8px; font-size: 24px; letter-spacing: 0.12em; text-transform: uppercase; }
+        .banner p { margin: 0; font-size: 12px; color: var(--muted); }
+
+        .wave-flash {
+            position: fixed;
+            top: 38%; left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 17;
+            text-align: center;
+            pointer-events: none;
+            opacity: 0;
+        }
+        .wave-flash.show { animation: waveflash 2.1s ease-out forwards; }
+        .wave-flash .t { font-size: clamp(22px, 4vw, 38px); font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; text-shadow: 0 0 22px rgba(255, 171, 94, 0.5); }
+        .wave-flash .s { font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--ember); margin-top: 6px; }
+        @keyframes waveflash {
+            0% { opacity: 0; transform: translate(-50%, -36%); }
+            16% { opacity: 1; transform: translate(-50%, -50%); }
+            74% { opacity: 1; transform: translate(-50%, -50%); }
+            100% { opacity: 0; transform: translate(-50%, -64%); }
+        }
+
+        /* ---- Debug modal ---- */
+        .debug-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 30;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(4, 2, 9, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+        .debug-modal.show { display: flex; }
+        .debug-panel {
+            width: min(92vw, 560px);
+            max-height: 86vh;
+            overflow-y: auto;
+            background: rgba(16, 9, 24, 0.95);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 20px 22px;
+        }
+        .debug-panel h3 { margin: 0 0 4px; font-size: 16px; letter-spacing: 0.1em; }
+        .debug-panel .desc { font-size: 11px; color: var(--muted); margin-bottom: 16px; }
+        .debug-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 9px;
+            margin-bottom: 16px;
+        }
+        .debug-stat { background: rgba(255, 243, 228, 0.04); border-radius: 8px; padding: 8px 10px; }
+        .debug-stat .k { font-size: 8px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+        .debug-stat .v { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .debug-section-title { font-size: 9px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--muted); margin: 14px 0 8px; }
+        .debug-tuning { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 16px; }
+        .tune label { display: block; font-size: 10px; color: var(--muted); margin-bottom: 4px; letter-spacing: 0.06em; }
+        .tune label b { color: var(--ink); font-variant-numeric: tabular-nums; }
+        .debug-actions { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0; }
+        .debug-btn {
+            border: 1px solid var(--line);
+            background: rgba(255, 243, 228, 0.04);
+            color: var(--ink);
+            border-radius: 7px;
+            padding: 7px 10px;
+            font-size: 10px;
+            cursor: pointer;
+            letter-spacing: 0.05em;
+        }
+        .debug-btn:hover { background: rgba(255, 171, 94, 0.12); border-color: rgba(255, 171, 94, 0.42); }
+        .debug-foot { display: flex; gap: 9px; justify-content: flex-end; margin-top: 6px; }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 4px;
+            border-radius: 99px;
+            background: rgba(255, 243, 228, 0.16);
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: var(--ember);
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(255, 171, 94, 0.6);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 14px; height: 14px; border: none; border-radius: 50%;
+            background: var(--ember); cursor: pointer;
+        }
+
+        #fallback {
+            position: fixed;
+            inset: 0;
+            z-index: 40;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 30px;
+            background: var(--bg);
+        }
+        #fallback.show { display: flex; }
+        #fallback div { max-width: 440px; }
+        #fallback h2 { font-size: 20px; margin: 0 0 10px; }
+        #fallback p { color: var(--muted); font-size: 13px; line-height: 1.5; }
+
+        /* Touch pad — left thumb steers, right thumb brake/thrust/flare. Fire = tap the field. */
+        .touch-pad {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+            z-index: 16;
+            display: none;
+            justify-content: space-between;
+            padding: 0 max(14px, env(safe-area-inset-left, 0px)) 0 max(14px, env(safe-area-inset-right, 0px));
+            pointer-events: none;
+        }
+        .touch-cluster { display: flex; gap: 12px; pointer-events: auto; }
+        .touch-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 1px solid var(--line);
+            background: rgba(255, 243, 228, 0.07);
+            color: var(--ink);
+            font-size: 21px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+        }
+        .touch-btn:active { background: rgba(255, 171, 94, 0.24); border-color: rgba(255, 171, 94, 0.6); }
+        .touch-btn.flare { color: var(--gold); border-color: rgba(255, 217, 138, 0.4); }
+        @media (pointer: coarse), (max-width: 720px) {
+            .touch-pad { display: flex; }
+        }
+
+        @media (max-width: 940px) {
+            .rail { width: clamp(150px, 30vw, 200px); }
+            .chain-mult { font-size: clamp(30px, 9vw, 46px); }
+        }
+        @media (max-width: 720px) {
+            .rail.right { display: none; }
+            .rail.left { display: none; }
+            .kindling-wrap { bottom: 150px; }
+            .controls { gap: 7px; }
+            .btn-row { flex-wrap: wrap; justify-content: center; }
+            .control-btn { padding: 9px 11px; }
+            .debug-grid { grid-template-columns: repeat(2, 1fr); }
+            .debug-tuning { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div id="stage"></div>
+    <div class="kindle-glow"></div>
+    <div class="erupt-flash" id="erupt-flash"></div>
+    <div class="hurt-flash" id="hurt-flash"></div>
+    <div class="grain"></div>
+    <div class="vignette"></div>
+    <div class="letterbox"></div>
+
+    <div id="rim-arrows"></div>
+    <div id="popups"></div>
+
+    <div class="crosshair" id="crosshair">
+        <div class="ring"></div>
+        <div class="dot"></div>
+    </div>
+
+    <div class="chain-wrap">
+        <div class="chain-mult" id="chain-mult">x1</div>
+        <div class="chain-label">Ember Chain</div>
+        <div class="chain-track"><div class="chain-fill" id="chain-fill"></div></div>
+    </div>
+
+    <div class="kindling-wrap" id="kindling-wrap">
+        <div class="kindling-ring" id="kindling-ring"></div>
+        <div class="kindling-label" id="kindling-label">Kindling</div>
+    </div>
+
+    <div class="rail left">
+        <div class="brand">
+            <div class="brand-mark"></div>
+            <div>
+                <h1>Sunseed</h1>
+                <div class="sub">Caul Skiff</div>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="head">Skiff</div>
+            <div class="hull-row">
+                <span class="k">Hull</span>
+                <div class="heart lit" id="heart-1"></div>
+                <div class="heart lit" id="heart-2"></div>
+                <div class="heart lit" id="heart-3"></div>
+            </div>
+            <div class="meter">
+                <div class="row"><span>Lumen</span><b id="lumen-val">0</b></div>
+                <div class="track"><div class="fill lumen" id="lumen-fill"></div></div>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="head">Mission</div>
+            <div class="mission-title" id="mission-title">First Light</div>
+            <div class="mission-copy" id="mission-copy">Crack the caul. Let the embers fall.</div>
+        </div>
+    </div>
+
+    <div class="rail right">
+        <div class="panel score-panel">
+            <div class="head">Score</div>
+            <div class="v" id="score-val">0</div>
+        </div>
+        <div class="panel">
+            <div class="head">Shell</div>
+            <div class="stat-grid">
+                <div class="stat"><div class="k">Wave</div><div class="v" id="wave-val">1</div></div>
+                <div class="stat"><div class="k">Rocks</div><div class="v" id="rocks-val">0</div></div>
+                <div class="stat"><div class="k">Velocity</div><div class="v gold" id="vel-val">0</div></div>
+                <div class="stat"><div class="k">Best Chain</div><div class="v ember" id="best-val">0</div></div>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="head">Star</div>
+            <div class="meter">
+                <div class="row"><span>Kindling</span><b id="kindling-val">0</b></div>
+                <div class="track"><div class="fill kindling" id="kindling-fill"></div></div>
+            </div>
+            <div class="star-state">
+                <span>Embers Banked <b id="embers-val" style="color: var(--gold)">0</b></span>
+                <b id="star-state">Dormant</b>
+            </div>
+        </div>
+    </div>
+
+    <div class="touch-pad" id="touch-pad">
+        <div class="touch-cluster">
+            <button class="touch-btn" id="mv-left" aria-label="Turn left">&#9664;</button>
+            <button class="touch-btn" id="mv-right" aria-label="Turn right">&#9654;</button>
+        </div>
+        <div class="touch-cluster">
+            <button class="touch-btn flare" id="mv-flare" aria-label="Flare strike">&#10022;</button>
+            <button class="touch-btn" id="mv-brake" aria-label="Brake">&#9660;</button>
+            <button class="touch-btn" id="mv-thrust" aria-label="Thrust">&#9650;</button>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="control-panel">
+            <div class="head">Flight</div>
+            <div class="btn-row">
+                <button class="control-btn primary" id="new-run">New Run</button>
+                <button class="control-btn gold" id="fire" title="Tap or hold: fire the seed-guns">Fire</button>
+                <button class="control-btn" id="flare" title="Spend 40 lumen: the star strikes your reticle from below">Flare</button>
+                <button class="control-btn" id="pause">Pause</button>
+                <button class="control-btn" id="debug">Debug</button>
+            </div>
+        </div>
+        <div class="control-panel">
+            <div class="head">Camera</div>
+            <div class="btn-row">
+                <button class="control-btn" data-shot="skim">Skim</button>
+                <button class="control-btn" data-shot="cockpit">Cockpit</button>
+                <button class="control-btn" data-shot="halo">Halo</button>
+                <button class="control-btn" data-shot="drift">Drift</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="banner" id="banner">
+        <h2 id="banner-title">Paused</h2>
+        <p id="banner-copy">Press Space to resume.</p>
+    </div>
+
+    <div class="wave-flash" id="wave-flash">
+        <div class="t" id="wave-flash-title">First Light</div>
+        <div class="s" id="wave-flash-sub">Wave 1</div>
+    </div>
+
+    <div class="debug-modal" id="debug-modal">
+        <div class="debug-panel">
+            <h3>Sunseed — Director Console</h3>
+            <div class="desc">Live counters and feel levers. Tune flight and light while paused.</div>
+            <div class="debug-grid">
+                <div class="debug-stat"><div class="k">State</div><div class="v" id="debug-state">run</div></div>
+                <div class="debug-stat"><div class="k">Rocks</div><div class="v" id="debug-rocks">0</div></div>
+                <div class="debug-stat"><div class="k">Duskwings</div><div class="v" id="debug-wings">0</div></div>
+                <div class="debug-stat"><div class="k">Embers</div><div class="v" id="debug-embers">0</div></div>
+                <div class="debug-stat"><div class="k">Sparks</div><div class="v" id="debug-sparks">0</div></div>
+                <div class="debug-stat"><div class="k">Shards</div><div class="v" id="debug-shards">0</div></div>
+                <div class="debug-stat"><div class="k">FPS</div><div class="v" id="debug-fps">60</div></div>
+                <div class="debug-stat"><div class="k">Chain</div><div class="v" id="debug-chain">0</div></div>
+                <div class="debug-stat"><div class="k">Kindling</div><div class="v" id="debug-kindling">0</div></div>
+            </div>
+
+            <div class="debug-section-title">Feel</div>
+            <div class="debug-tuning">
+                <div class="tune"><label>Screen Shake <b id="shake-label">1.0x</b></label><input type="range" id="shake-slider" min="0" max="2" step="0.05" value="1"></div>
+                <div class="tune"><label>Graze Reach <b id="graze-label">2.6</b></label><input type="range" id="graze-slider" min="1.2" max="4.5" step="0.1" value="2.6"></div>
+                <div class="tune"><label>Ember Scoop <b id="scoop-label">3.4</b></label><input type="range" id="scoop-slider" min="1.5" max="6" step="0.1" value="3.4"></div>
+                <div class="tune"><label>Kindle Rate <b id="kindle-label">1.0x</b></label><input type="range" id="kindle-slider" min="0.2" max="3" step="0.05" value="1"></div>
+            </div>
+
+            <div class="debug-section-title">Movement</div>
+            <div class="debug-tuning">
+                <div class="tune"><label>Thrust <b id="thrust-label">20</b></label><input type="range" id="thrust-slider" min="10" max="38" step="1" value="20"></div>
+                <div class="tune"><label>Coast Drag <b id="drag-label">0.60</b></label><input type="range" id="drag-slider" min="0.3" max="0.92" step="0.01" value="0.6"></div>
+                <div class="tune"><label>Turn Rate <b id="turn-label">3.6</b></label><input type="range" id="turn-slider" min="2" max="6.5" step="0.1" value="3.6"></div>
+                <div class="tune"><label>Max Speed <b id="speed-label">16</b></label><input type="range" id="speed-slider" min="8" max="28" step="1" value="16"></div>
+            </div>
+
+            <div class="debug-section-title">Presentation</div>
+            <div class="debug-tuning">
+                <div class="tune"><label>Bloom <b id="bloom-label">0.40</b></label><input type="range" id="bloom-slider" min="0" max="1" step="0.02" value="0.4"></div>
+                <div class="tune"><label>Grade <b id="grade-label">0.22</b></label><input type="range" id="grade-slider" min="0" max="1" step="0.02" value="0.22"></div>
+                <div class="tune"><label>Core Glow <b id="glow-label">1.0x</b></label><input type="range" id="glow-slider" min="0.3" max="2" step="0.05" value="1"></div>
+            </div>
+
+            <div class="debug-section-title">Actions</div>
+            <div class="debug-actions">
+                <button class="debug-btn" data-action="lumen">Grant Lumen</button>
+                <button class="debug-btn" data-action="kindling">Fill Kindling</button>
+                <button class="debug-btn" data-action="guns">Upgrade Guns</button>
+                <button class="debug-btn" data-action="weld">Weld Hull</button>
+                <button class="debug-btn" data-action="wing">Wingtrail</button>
+                <button class="debug-btn" data-action="wave">Spawn Wave</button>
+                <button class="debug-btn" data-action="clear">Clear Shell</button>
+                <button class="debug-btn" data-action="invuln">Toggle Invuln</button>
+            </div>
+
+            <div class="debug-foot">
+                <button class="control-btn" id="debug-close">Close</button>
+                <button class="control-btn primary" id="debug-resume">Resume</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="fallback">
+        <div>
+            <h2>WebGL unavailable</h2>
+            <p>Sunseed needs a WebGL2-capable browser with hardware acceleration enabled. Try a recent Chrome, Firefox, Safari, or Edge.</p>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.174.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+        // ---- Constants ----
+        // The playfield is a spherical shell wrapped around a dormant star-core.
+        // "Wrap-around" is literal: fly far enough in any direction and you come home.
+        const SHELL_R = 34;
+        const CORE_R = 25;
+        const PLAYER_RADIUS = 1.2;
+        const EMBER_CAP = 520;
+        const SPARK_CAP = 1400;
+        const SHARD_CAP = 320;
+        const RING_CAP = 48;
+        const SHOT_POOL = 90;
+        const STAR_COUNT = 1800;
+        const LUMEN_MAX = 100;
+        const FLARE_COST = 40;
+        const CHAIN_METER_MAX = 16;
+        const FIRE_KEYS = new Set(['KeyF', 'Enter']);
+        const FLARE_KEYS = new Set(['KeyE', 'ShiftLeft', 'ShiftRight']);
+
+        // ---- DOM cache ----
+        const ui = {
+            stage: document.getElementById('stage'),
+            fallback: document.getElementById('fallback'),
+            eruptFlash: document.getElementById('erupt-flash'),
+            hurtFlash: document.getElementById('hurt-flash'),
+            rimArrows: document.getElementById('rim-arrows'),
+            popups: document.getElementById('popups'),
+            crosshair: document.getElementById('crosshair'),
+            chainMult: document.getElementById('chain-mult'),
+            chainFill: document.getElementById('chain-fill'),
+            kindlingWrap: document.getElementById('kindling-wrap'),
+            kindlingRing: document.getElementById('kindling-ring'),
+            kindlingLabel: document.getElementById('kindling-label'),
+            hearts: [document.getElementById('heart-1'), document.getElementById('heart-2'), document.getElementById('heart-3')],
+            lumenVal: document.getElementById('lumen-val'),
+            lumenFill: document.getElementById('lumen-fill'),
+            missionTitle: document.getElementById('mission-title'),
+            missionCopy: document.getElementById('mission-copy'),
+            scoreVal: document.getElementById('score-val'),
+            waveVal: document.getElementById('wave-val'),
+            rocksVal: document.getElementById('rocks-val'),
+            velVal: document.getElementById('vel-val'),
+            bestVal: document.getElementById('best-val'),
+            kindlingVal: document.getElementById('kindling-val'),
+            kindlingFill: document.getElementById('kindling-fill'),
+            embersVal: document.getElementById('embers-val'),
+            starState: document.getElementById('star-state'),
+            newRun: document.getElementById('new-run'),
+            fire: document.getElementById('fire'),
+            flare: document.getElementById('flare'),
+            pause: document.getElementById('pause'),
+            debug: document.getElementById('debug'),
+            mvLeft: document.getElementById('mv-left'),
+            mvRight: document.getElementById('mv-right'),
+            mvThrust: document.getElementById('mv-thrust'),
+            mvBrake: document.getElementById('mv-brake'),
+            mvFlare: document.getElementById('mv-flare'),
+            banner: document.getElementById('banner'),
+            bannerTitle: document.getElementById('banner-title'),
+            bannerCopy: document.getElementById('banner-copy'),
+            waveFlash: document.getElementById('wave-flash'),
+            waveFlashTitle: document.getElementById('wave-flash-title'),
+            waveFlashSub: document.getElementById('wave-flash-sub'),
+            debugModal: document.getElementById('debug-modal'),
+            debugClose: document.getElementById('debug-close'),
+            debugResume: document.getElementById('debug-resume'),
+            debugState: document.getElementById('debug-state'),
+            debugRocks: document.getElementById('debug-rocks'),
+            debugWings: document.getElementById('debug-wings'),
+            debugEmbers: document.getElementById('debug-embers'),
+            debugSparks: document.getElementById('debug-sparks'),
+            debugShards: document.getElementById('debug-shards'),
+            debugFps: document.getElementById('debug-fps'),
+            debugChain: document.getElementById('debug-chain'),
+            debugKindling: document.getElementById('debug-kindling')
+        };
+
+        // ---- Color grade: warm lift driven by the waking core, cool shadows up top ----
+        const colorGradeShader = {
+            uniforms: {
+                tDiffuse: { value: null },
+                grade: { value: 0.22 },
+                kindle: { value: 0 },
+                hurt: { value: 0 }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform float grade;
+                uniform float kindle;
+                uniform float hurt;
+                varying vec2 vUv;
+
+                void main() {
+                    vec2 uv = vUv;
+                    vec2 dir = uv - 0.5;
+                    vec2 offset = dir * (grade * 0.0011 + hurt * 0.004);
+                    vec3 color = vec3(
+                        texture2D(tDiffuse, uv + offset).r,
+                        texture2D(tDiffuse, uv).g,
+                        texture2D(tDiffuse, uv - offset).b
+                    );
+                    float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+                    // cool starfield shadows, ember-gold mids as the star kindles
+                    vec3 shadowTint = vec3(0.92, 0.94, 1.08);
+                    vec3 warmTint = vec3(1.1, 1.0, 0.87);
+                    color *= mix(shadowTint, warmTint, smoothstep(0.12, 0.8, luma) * (0.4 + kindle * 0.6)) * (1.0 - grade * 0.04);
+                    color = (color - 0.5) * (1.0 + grade * 0.08 + kindle * 0.03) + 0.5;
+                    color = mix(color, vec3(dot(color, vec3(0.5, 0.3, 0.2))) * vec3(1.4, 0.5, 0.5), hurt * 0.25);
+                    gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+                }
+            `
+        };
+
+        // ---- Camera shot presets (every label an honest viewpoint) ----
+        const shotModes = {
+            skim: { name: 'Skim', back: 10.5, up: 4.4, lookAhead: 14, lookUp: 1.6, lag: 9 },
+            cockpit: { name: 'Cockpit', eyeForward: 0.6, eyeUp: 0.8, lookAhead: 22, lookUp: 1.1, lag: 22 },
+            halo: { name: 'Halo', height: 30, back: 9, lookAhead: 5, lag: 4.5 },
+            drift: { name: 'Drift', side: 15, up: 6.5, back: 7, lookAhead: 11, lag: 3, sway: 1 }
+        };
+
+        // ---- Central state (single source of truth) ----
+        const state = {
+            elapsed: 0,
+            visualTime: 0,
+            score: 0,
+            displayScore: 0,
+            wave: 1,
+            hull: 3,
+            kills: 0,
+            chain: 0,
+            chainTimer: 0,
+            bestChain: 0,
+            lumen: 0,
+            kindling: 0,
+            kindlingNeed: 48,
+            embersBanked: 0,
+            kindleLevel: 0,
+            gunsLevel: 1,
+            gunTimer: 0,
+            wingTimer: 0,
+            invulnerable: 2.6,
+            forceInvuln: false,
+            shake: 0,
+            camPunch: 0,
+            hurt: 0,
+            fovKick: 0,
+            paused: false,
+            debugOpen: false,
+            controlsActive: true,
+            gameOver: false,
+            missionIndex: 0,
+            bloom: 0.4,
+            grade: 0.22,
+            shot: 'skim',
+            fps: 60,
+            occluded: false,
+            // tuning levers
+            tuneShake: 1,
+            tuneGraze: 2.6,
+            tuneScoop: 3.4,
+            tuneKindle: 1,
+            tuneThrust: 20,
+            tuneDrag: 0.6,
+            tuneTurn: 3.6,
+            tuneMaxSpeed: 16,
+            tuneGlow: 1
+        };
+
+        // The eruption: a geodesic shockwave that sweeps the whole shell when kindling fills
+        const eruption = {
+            active: false,
+            theta: 0,
+            duration: 2.4,
+            timer: 0,
+            origin: new THREE.Vector3(0, 1, 0),
+            band: 0.14,
+            hitSet: new Set(),
+            ringMesh: null,
+            ringMat: null
+        };
+
+        const input = {
+            keys: Object.create(null),
+            thrusting: false,
+            firing: false,
+            touchLeft: false,
+            touchRight: false,
+            touchThrust: false,
+            touchBrake: false
+        };
+
+        const missions = [
+            { title: 'First Light', copy: 'Crack the caul. Let the embers fall to the star.' },
+            { title: 'Ember Rain', copy: 'Chain the kills. Scoop light if you want the flare.' },
+            { title: 'Duskwings', copy: 'Thieves eat the falling embers. Burn them first.' },
+            { title: 'The Caul Thickens', copy: 'Slag rock shrugs your guns. Spend the flare.' },
+            { title: 'Occlusion', copy: 'An Occluder shadows the star. Break its plate.' },
+            { title: 'Sunrise', copy: 'The star remembers its name. Keep kindling.' }
+        ];
+
+        const rockSpecs = {
+            glass: {
+                large: { radius: 3.2, score: 60, hp: 1, embers: 5 },
+                medium: { radius: 2.0, score: 90, hp: 1, embers: 3 },
+                small: { radius: 1.1, score: 130, hp: 1, embers: 2 }
+            },
+            slag: {
+                large: { radius: 3.3, score: 150, hp: 4, embers: 7 },
+                medium: { radius: 2.1, score: 160, hp: 3, embers: 5 },
+                small: { radius: 1.2, score: 170, hp: 2, embers: 3 }
+            },
+            occluder: {
+                large: { radius: 4.6, score: 1000, hp: 14, embers: 16 }
+            }
+        };
+
+        // gunsLevel indexes this ladder: more barrels in a V, tighter cadence, hotter rounds
+        const gunTiers = [
+            null,
+            { cooldown: 0.18, barrels: 1, damage: 1, speed: 52 },
+            { cooldown: 0.165, barrels: 2, damage: 1, speed: 54 },
+            { cooldown: 0.15, barrels: 3, damage: 1, speed: 56 },
+            { cooldown: 0.135, barrels: 4, damage: 1.5, speed: 59 },
+            { cooldown: 0.12, barrels: 5, damage: 2, speed: 62 }
+        ];
+
+        const pickupSpecs = {
+            weld: { color: 0x9dffc4, label: 'Weld' },
+            guns: { color: 0xffd98a, label: 'Guns' },
+            lumen: { color: 0xffab5e, label: 'Lumen' },
+            wing: { color: 0x8fd8ff, label: 'Wingtrail' }
+        };
+
+        const flareStrike = {
+            cost: FLARE_COST,
+            telegraph: 0.5,
+            radius: 6,
+            pushRadius: 11,
+            damage: 6,
+            pending: []
+        };
+
+        function gunSpec() { return gunTiers[Math.max(1, Math.min(state.gunsLevel, gunTiers.length - 1))]; }
+
+        // ---- Three.js globals ----
+        let scene, camera, renderer, composer, bloomPass, gradePass, clock;
+        let player, effectRoot, starField, dustField, thrustLight;
+        let core, corona, coreLight, atmosphere;
+        let sparks, emberField;
+        const rocks = [];
+        const duskwings = [];
+        const shots = [];
+        const pickups = [];
+        const shards = [];
+        const rings = [];
+        const geysers = [];
+        const shotMeshPool = [];
+        const pendingImplode = [];
+        const rimArrows = [];
+
+        const geometries = {};
+        const geoPool = {};
+        const materials = {};
+        const tempVec = new THREE.Vector3();
+        const tempVecB = new THREE.Vector3();
+        const tempVecC = new THREE.Vector3();
+        const tempVecD = new THREE.Vector3();
+        const tempNormal = new THREE.Vector3();
+        const tempMat = new THREE.Matrix4();
+        const tempQuat = new THREE.Quaternion();
+        const tempColor = new THREE.Color();
+        const Y_AXIS = new THREE.Vector3(0, 1, 0);
+        const Z_AXIS = new THREE.Vector3(0, 0, 1);
+        const WHITE = new THREE.Color(0xffffff);
+
+        // ---- Math helpers ----
+        function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+        function lerp(a, b, t) { return a + (b - a) * t; }
+        function randomRange(min, max) { return min + Math.random() * (max - min); }
+        function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+        // ---- Spherical-shell frame helpers ----
+        // Every mobile thing carries: pos (on the shell), vel (tangent), and for steered
+        // things a heading (tangent unit vector). Each step: advance, re-project to the
+        // shell, then parallel-transport vel/heading back into the new tangent plane.
+        function projectToShell(p, altitude = 0) {
+            p.normalize().multiplyScalar(SHELL_R + altitude);
+        }
+        function tangentize(v, pos) {
+            tempNormal.copy(pos).normalize();
+            v.addScaledVector(tempNormal, -v.dot(tempNormal));
+        }
+        function surfaceNormal(pos, out) {
+            return out.copy(pos).normalize();
+        }
+        // geodesic separation angle between two shell points
+        function arcAngle(a, b) {
+            return Math.acos(clamp(a.dot(b) / (a.length() * b.length()), -1, 1));
+        }
+        function chordDistance(a, b) {
+            return tempVecD.copy(b).sub(a).length();
+        }
+        // random point on the shell at least minArc radians away from `from`
+        function randomShellPoint(from, minArc) {
+            const p = new THREE.Vector3();
+            for (let tries = 0; tries < 40; tries++) {
+                p.set(randomRange(-1, 1), randomRange(-1, 1), randomRange(-1, 1));
+                if (p.lengthSq() < 0.001) continue;
+                p.normalize().multiplyScalar(SHELL_R);
+                if (!from || arcAngle(p, from) > minArc) return p;
+            }
+            return p.copy(from || new THREE.Vector3(0, 0, 1)).negate().normalize().multiplyScalar(SHELL_R);
+        }
+        // random tangent direction at a shell point
+        function randomTangent(pos, out) {
+            tempNormal.copy(pos).normalize();
+            do {
+                out.set(randomRange(-1, 1), randomRange(-1, 1), randomRange(-1, 1));
+                out.addScaledVector(tempNormal, -out.dot(tempNormal));
+            } while (out.lengthSq() < 0.01);
+            return out.normalize();
+        }
+        // advance a shell-bound entity: integrate, reproject, keep vel tangent
+        function advanceOnShell(entity, dt, altitude = 0) {
+            entity.pos.addScaledVector(entity.vel, dt);
+            projectToShell(entity.pos, altitude);
+            tangentize(entity.vel, entity.pos);
+        }
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x090512, 0.004);
+
+            camera = new THREE.PerspectiveCamera(64, window.innerWidth / window.innerHeight, 0.1, 900);
+            camera.position.set(0, SHELL_R + 30, 40);
+            camera.lookAt(0, SHELL_R, 0);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 0.95;
+            ui.stage.appendChild(renderer.domElement);
+
+            composer = new EffectComposer(renderer);
+            composer.addPass(new RenderPass(scene, camera));
+            bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.45, 0.2);
+            composer.addPass(bloomPass);
+            gradePass = new ShaderPass(colorGradeShader);
+            composer.addPass(gradePass);
+            composer.addPass(new OutputPass());
+
+            clock = new THREE.Clock();
+            effectRoot = new THREE.Group();
+            scene.add(effectRoot);
+
+            buildGeometries();
+            buildMaterials();
+            buildLights();
+            buildCore();
+            buildAtmosphere();
+            buildLeyRings();
+            buildStarfield();
+            buildDust();
+            buildEmberField();
+            buildSparks();
+            buildRimArrows();
+            buildRockPool();
+            buildShardPool();
+            buildRingPool();
+            buildShotPool();
+            buildEruptionRing();
+            buildPopupPool();
+            player = createPlayer();
+            resetRun();
+            setShot(state.shot);
+            bindEvents();
+            updatePostProcessing();
+            window.__sunseedReady = true;
+        }
+
+        function buildGeometries() {
+            // Skiff hull: slender dart, nose +Z, with a keel fin because "down" is real here
+            const body = new THREE.ConeGeometry(0.55, 2.7, 6);
+            body.rotateX(Math.PI / 2);
+            geometries.shipBody = body;
+
+            // scoop prongs: the forward V that drinks embers
+            const prong = new THREE.BufferGeometry();
+            prong.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+                0, 0, 0.4, -0.16, 0.05, 2.0, -0.34, 0, 0.3,
+                0, 0, 0.4, 0.34, 0, 0.3, 0.16, 0.05, 2.0
+            ]), 3));
+            prong.computeVertexNormals();
+            geometries.shipProng = prong;
+
+            const wing = new THREE.BufferGeometry();
+            wing.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+                0, 0, 0.8, -1.6, 0.04, -1.0, 0, 0.16, -0.5,
+                0, 0, 0.8, 0, 0.16, -0.5, 1.6, 0.04, -1.0
+            ]), 3));
+            wing.computeVertexNormals();
+            geometries.shipWing = wing;
+
+            const keel = new THREE.BufferGeometry();
+            keel.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+                0, -0.05, 0.5, 0, -0.85, -1.0, 0, -0.05, -1.3
+            ]), 3));
+            keel.computeVertexNormals();
+            geometries.shipKeel = keel;
+
+            geometries.cockpit = new THREE.SphereGeometry(0.3, 14, 12);
+            geometries.engineGlow = new THREE.SphereGeometry(0.32, 12, 10);
+            geometries.flame = new THREE.ConeGeometry(0.24, 1.5, 10);
+            geometries.flame.rotateX(-Math.PI / 2);
+            geometries.scoopAura = new THREE.TorusGeometry(1, 0.05, 8, 40);
+
+            geometries.ring = new THREE.TorusGeometry(1, 0.06, 8, 48);
+            geometries.eruptRing = new THREE.TorusGeometry(1, 0.02, 10, 200);
+
+            // faceted shard (single triangle)
+            const shard = new THREE.BufferGeometry();
+            shard.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+                0, 0.5, 0, -0.45, -0.3, 0.1, 0.45, -0.35, -0.1
+            ]), 3));
+            shard.computeVertexNormals();
+            geometries.shard = shard;
+
+            geometries.shot = new THREE.CapsuleGeometry(0.15, 0.7, 4, 8);
+            geometries.shot.rotateX(Math.PI / 2);
+            geometries.pickup = new THREE.OctahedronGeometry(0.62, 0);
+            geometries.reticule = new THREE.RingGeometry(0.85, 1.0, 5);
+
+            // duskwing: a light-thief chevron, wings swept back from a beak
+            const wingspan = new THREE.BufferGeometry();
+            wingspan.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+                0, 0, 1.3, -1.7, 0.22, -0.9, 0, 0.1, -0.3,
+                0, 0, 1.3, 0, 0.1, -0.3, 1.7, 0.22, -0.9,
+                0, -0.14, 1.3, 0, 0.1, -0.3, -1.7, 0.22, -0.9,
+                0, -0.14, 1.3, 1.7, 0.22, -0.9, 0, 0.1, -0.3
+            ]), 3));
+            wingspan.computeVertexNormals();
+            geometries.duskwing = wingspan;
+
+            geometries.geyserColumn = new THREE.CylinderGeometry(0.55, 1.4, 1, 12, 1, true);
+            geometries.geyserCore = new THREE.CylinderGeometry(0.22, 0.5, 1, 10, 1, true);
+        }
+
+        function buildMaterials() {
+            materials.shipBody = new THREE.MeshStandardMaterial({ color: 0xf4e6cf, metalness: 0.55, roughness: 0.32, emissive: 0x40230e, emissiveIntensity: 0.5 });
+            materials.shipWing = new THREE.MeshStandardMaterial({ color: 0xd8a86f, metalness: 0.5, roughness: 0.42, emissive: 0x3c1e0c, emissiveIntensity: 0.6, side: THREE.DoubleSide });
+            materials.shipKeel = new THREE.MeshStandardMaterial({ color: 0xb98454, metalness: 0.5, roughness: 0.42, emissive: 0x33180a, emissiveIntensity: 0.6, side: THREE.DoubleSide });
+            materials.cockpit = new THREE.MeshStandardMaterial({ color: 0x8fd8ff, metalness: 0.2, roughness: 0.1, emissive: 0x2f7ea8, emissiveIntensity: 1.3 });
+            materials.engineGlow = additive(0xffc07a, 0.85);
+            materials.flame = additive(0xffe0b0, 0.5);
+            materials.scoopAura = additive(0xffd98a, 0.12);
+            materials.shot = additive(0xffe9bd, 0.95);
+            materials.reticule = additive(0xffd98a, 0.4);
+        }
+
+        function additive(color, opacity) {
+            return new THREE.MeshBasicMaterial({
+                color,
+                transparent: true,
+                opacity,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+        }
+
+        function buildLights() {
+            scene.add(new THREE.AmbientLight(0x8a7ab0, 0.4));
+            // cold starlight from above, so rock tops read cool against warm underlit faces
+            const starlight = new THREE.DirectionalLight(0xbfd4ff, 0.9);
+            starlight.position.set(30, 70, -20);
+            scene.add(starlight);
+            // the buried star lights everything from below
+            coreLight = new THREE.PointLight(0xff9a4e, 3.2, 140, 1.6);
+            coreLight.position.set(0, 0, 0);
+            scene.add(coreLight);
+            thrustLight = new THREE.PointLight(0xffc07a, 2.0, 12);
+            scene.add(thrustLight);
+        }
+
+        function buildCore() {
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    kindle: { value: 0 },
+                    flash: { value: 0 },
+                    glow: { value: 1 }
+                },
+                vertexShader: `
+                    varying vec3 vNormal;
+                    varying vec3 vPos;
+                    void main() {
+                        vNormal = normalize(normalMatrix * normal);
+                        vPos = position;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform float kindle;
+                    uniform float flash;
+                    uniform float glow;
+                    varying vec3 vNormal;
+                    varying vec3 vPos;
+
+                    // cheap layered value noise from sines: plasma cells crawling on the surface
+                    float bands(vec3 p, float t) {
+                        float a = sin(p.x * 0.55 + t * 0.5) * sin(p.y * 0.62 - t * 0.42) * sin(p.z * 0.58 + t * 0.36);
+                        float b = sin(p.x * 1.7 - t * 0.7) * sin(p.y * 1.5 + t * 0.6) * sin(p.z * 1.9 - t * 0.5);
+                        return a * 0.65 + b * 0.35;
+                    }
+
+                    void main() {
+                        float n = bands(vPos, time) * 0.5 + 0.5;
+                        float ridge = smoothstep(0.36, 0.66, n);
+                        float heat = clamp(0.22 + kindle * 0.85 + flash, 0.0, 2.0);
+                        vec3 crust = vec3(0.16, 0.04, 0.03);
+                        vec3 emberLow = vec3(0.55, 0.14, 0.04);
+                        vec3 emberHot = vec3(1.0, 0.46, 0.13);
+                        vec3 goldHot = vec3(1.0, 0.82, 0.45);
+                        vec3 color = mix(crust, emberLow, ridge);
+                        color = mix(color, emberHot, ridge * heat * 0.75);
+                        color = mix(color, goldHot, ridge * max(0.0, heat - 0.7));
+                        // limb brightening: the star's edge burns hotter than its face
+                        float rim = pow(1.0 - abs(dot(normalize(vNormal), vec3(0.0, 0.0, 1.0))), 2.0);
+                        color += goldHot * rim * (0.12 + kindle * 0.3 + flash * 0.5);
+                        gl_FragColor = vec4(color * glow * (0.75 + heat * 0.55), 1.0);
+                    }
+                `
+            });
+            core = new THREE.Mesh(new THREE.SphereGeometry(CORE_R, 56, 40), material);
+            scene.add(core);
+
+            const coronaMat = new THREE.ShaderMaterial({
+                uniforms: {
+                    kindle: { value: 0 },
+                    flash: { value: 0 },
+                    glow: { value: 1 }
+                },
+                vertexShader: `
+                    varying vec3 vNormal;
+                    varying vec3 vView;
+                    void main() {
+                        vNormal = normalize(normalMatrix * normal);
+                        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+                        vView = normalize(-mv.xyz);
+                        gl_Position = projectionMatrix * mv;
+                    }
+                `,
+                fragmentShader: `
+                    uniform float kindle;
+                    uniform float flash;
+                    uniform float glow;
+                    varying vec3 vNormal;
+                    varying vec3 vView;
+                    void main() {
+                        float fres = pow(1.0 - abs(dot(vNormal, vView)), 2.6);
+                        vec3 color = mix(vec3(1.0, 0.55, 0.2), vec3(1.0, 0.85, 0.55), kindle + flash);
+                        gl_FragColor = vec4(color * glow, fres * (0.12 + kindle * 0.3 + flash * 0.55));
+                    }
+                `,
+                transparent: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            });
+            corona = new THREE.Mesh(new THREE.SphereGeometry(CORE_R * 1.07, 48, 32), coronaMat);
+            scene.add(corona);
+        }
+
+        function buildAtmosphere() {
+            // faint warm haze pinned to the shell radius: sells the horizon curve
+            const material = new THREE.ShaderMaterial({
+                uniforms: { kindle: { value: 0 } },
+                vertexShader: `
+                    varying vec3 vNormal;
+                    varying vec3 vView;
+                    void main() {
+                        vNormal = normalize(normalMatrix * normal);
+                        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+                        vView = normalize(-mv.xyz);
+                        gl_Position = projectionMatrix * mv;
+                    }
+                `,
+                fragmentShader: `
+                    uniform float kindle;
+                    varying vec3 vNormal;
+                    varying vec3 vView;
+                    void main() {
+                        float fres = pow(1.0 - abs(dot(vNormal, vView)), 3.4);
+                        vec3 color = mix(vec3(0.85, 0.5, 0.3), vec3(1.0, 0.75, 0.45), kindle);
+                        gl_FragColor = vec4(color, fres * (0.05 + kindle * 0.07));
+                    }
+                `,
+                transparent: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+                side: THREE.FrontSide
+            });
+            atmosphere = new THREE.Mesh(new THREE.SphereGeometry(SHELL_R + 1.6, 48, 32), material);
+            scene.add(atmosphere);
+        }
+
+        function buildLeyRings() {
+            // three faint great circles: orientation landmarks on an otherwise seamless shell
+            const mat = additive(0xffab5e, 0.05);
+            const tilts = [
+                [Math.PI / 2, 0, 0],
+                [Math.PI / 2, 0, Math.PI / 3],
+                [Math.PI / 5, Math.PI / 4, 0]
+            ];
+            for (const [rx, ry, rz] of tilts) {
+                const ring = new THREE.Mesh(new THREE.TorusGeometry(SHELL_R + 0.15, 0.05, 6, 160), mat);
+                ring.rotation.set(rx, ry, rz);
+                scene.add(ring);
+            }
+        }
+
+        // Hygiene-safe shader points: capped gl_PointSize + circular discard, never square sprites.
+        function makePointMaterial(bloomBoost) {
+            return new THREE.ShaderMaterial({
+                transparent: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
+                vertexColors: true,
+                uniforms: {
+                    uPixelRatio: { value: Math.min(window.devicePixelRatio || 1, 2) },
+                    uBloom: { value: bloomBoost || 0 }
+                },
+                vertexShader: `
+                    attribute float aSize;
+                    attribute float aAlpha;
+                    varying vec3 vColor;
+                    varying float vAlpha;
+                    uniform float uPixelRatio;
+                    uniform float uBloom;
+                    void main() {
+                        vColor = color;
+                        vAlpha = aAlpha;
+                        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+                        gl_Position = projectionMatrix * mv;
+                        float atten = 220.0 / max(1.0, -mv.z);
+                        gl_PointSize = clamp(aSize * uPixelRatio * atten * (1.0 + uBloom * 0.3), 2.0, 28.0);
+                    }
+                `,
+                fragmentShader: `
+                    varying vec3 vColor;
+                    varying float vAlpha;
+                    void main() {
+                        vec2 uv = gl_PointCoord * 2.0 - 1.0;
+                        float d = dot(uv, uv);
+                        if (d > 1.0) discard;
+                        float coreDot = smoothstep(0.4, 0.0, d);
+                        float halo = smoothstep(1.0, 0.1, d) * 0.5;
+                        gl_FragColor = vec4(vColor * (1.0 + coreDot * 0.8), vAlpha * (coreDot + halo));
+                    }
+                `
+            });
+        }
+
+        function buildStarfield() {
+            const count = window.innerWidth < 720 ? 1100 : STAR_COUNT;
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            const sizes = new Float32Array(count);
+            const color = new THREE.Color();
+            for (let i = 0; i < count; i++) {
+                const r = randomRange(130, 280);
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(randomRange(-1, 1));
+                positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+                positions[i * 3 + 1] = r * Math.cos(phi);
+                positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+                color.setHSL(randomRange(0.55, 0.68), randomRange(0.2, 0.55), randomRange(0.45, 0.8));
+                colors[i * 3] = color.r;
+                colors[i * 3 + 1] = color.g;
+                colors[i * 3 + 2] = color.b;
+                sizes[i] = randomRange(1.4, 4.2);
+            }
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+            geometry.setAttribute('aAlpha', new THREE.BufferAttribute(new Float32Array(count).fill(0.6), 1));
+            geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 320);
+            starField = new THREE.Points(geometry, makePointMaterial(0.4));
+            starField.frustumCulled = false;
+            starField.renderOrder = -1;
+            scene.add(starField);
+        }
+
+        function buildDust() {
+            // caul-dust: slow motes drifting in the shell band, giving the sky depth
+            const count = window.innerWidth < 720 ? 220 : 420;
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            const sizes = new Float32Array(count);
+            const color = new THREE.Color();
+            for (let i = 0; i < count; i++) {
+                const r = SHELL_R + randomRange(-2, 4);
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(randomRange(-1, 1));
+                positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+                positions[i * 3 + 1] = r * Math.cos(phi);
+                positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+                color.setHSL(randomRange(0.06, 0.11), randomRange(0.5, 0.85), randomRange(0.4, 0.65));
+                colors[i * 3] = color.r;
+                colors[i * 3 + 1] = color.g;
+                colors[i * 3 + 2] = color.b;
+                sizes[i] = randomRange(1.2, 2.8);
+            }
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+            geometry.setAttribute('aAlpha', new THREE.BufferAttribute(new Float32Array(count).fill(0.5), 1));
+            geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), SHELL_R + 8);
+            dustField = new THREE.Points(geometry, makePointMaterial(0.2));
+            dustField.frustumCulled = false;
+            scene.add(dustField);
+        }
+
+        function buildEmberField() {
+            // the embers: warm motes released by kills, falling to the core (or into scoops and beaks)
+            const positions = new Float32Array(EMBER_CAP * 3);
+            const colors = new Float32Array(EMBER_CAP * 3);
+            const sizes = new Float32Array(EMBER_CAP);
+            const alphas = new Float32Array(EMBER_CAP);
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+            geometry.setAttribute('aAlpha', new THREE.BufferAttribute(alphas, 1));
+            geometry.setDrawRange(0, 0);
+            geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), SHELL_R + 10);
+            const points = new THREE.Points(geometry, makePointMaterial(0.7));
+            points.frustumCulled = false;
+            scene.add(points);
+            const pool = new Array(EMBER_CAP);
+            for (let i = 0; i < EMBER_CAP; i++) {
+                pool[i] = { pos: new THREE.Vector3(), vel: new THREE.Vector3(), swirl: new THREE.Vector3(), age: 0, life: 0, size: 4, active: false };
+            }
+            emberField = { geometry, positions, colors, sizes, alphas, pool, head: 0, activeCount: 0, material: points.material };
+        }
+
+        function buildSparks() {
+            const positions = new Float32Array(SPARK_CAP * 3);
+            const colors = new Float32Array(SPARK_CAP * 3);
+            const sizes = new Float32Array(SPARK_CAP);
+            const alphas = new Float32Array(SPARK_CAP);
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+            geometry.setAttribute('aAlpha', new THREE.BufferAttribute(alphas, 1));
+            geometry.setDrawRange(0, 0);
+            geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 400);
+            const material = makePointMaterial(0.5);
+            const points = new THREE.Points(geometry, material);
+            points.frustumCulled = false;
+            scene.add(points);
+            const pool = new Array(SPARK_CAP);
+            for (let i = 0; i < SPARK_CAP; i++) {
+                pool[i] = { pos: new THREE.Vector3(), vel: new THREE.Vector3(), color: new THREE.Color(), life: 0, maxLife: 1, size: 3, drag: 0.8, active: false };
+            }
+            sparks = { geometry, material, positions, colors, sizes, alphas, pool, head: 0, activeCount: 0 };
+        }
+
+        function buildRimArrows() {
+            for (let i = 0; i < 10; i++) {
+                const el = document.createElement('div');
+                el.className = 'rim-arrow';
+                ui.rimArrows.appendChild(el);
+                rimArrows.push(el);
+            }
+        }
+
+        function createPlayer() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(geometries.shipBody, materials.shipBody);
+            const prong = new THREE.Mesh(geometries.shipProng, materials.shipWing);
+            const wing = new THREE.Mesh(geometries.shipWing, materials.shipWing);
+            const keel = new THREE.Mesh(geometries.shipKeel, materials.shipKeel);
+            const cockpit = new THREE.Mesh(geometries.cockpit, materials.cockpit);
+            cockpit.position.set(0, 0.22, 0.4);
+            cockpit.scale.set(0.8, 0.6, 1.1);
+            group.add(body, prong, wing, keel, cockpit);
+
+            const glow = new THREE.Mesh(geometries.engineGlow, materials.engineGlow.clone());
+            glow.position.set(0, 0.05, -1.5);
+            glow.scale.set(0.8, 0.55, 1);
+            group.add(glow);
+            const flame = new THREE.Mesh(geometries.flame, materials.flame.clone());
+            flame.position.set(0, 0.05, -2.2);
+            group.add(flame);
+            group.userData.glow = glow;
+            group.userData.flame = flame;
+
+            // the ember scoop: a soft gold halo that widens with the scoop tuning lever
+            const scoopAura = new THREE.Mesh(geometries.scoopAura, materials.scoopAura.clone());
+            scoopAura.rotation.x = Math.PI / 2;
+            group.add(scoopAura);
+
+            scene.add(group);
+
+            const reticule = new THREE.Mesh(geometries.reticule, materials.reticule.clone());
+            scene.add(reticule);
+
+            const startPos = new THREE.Vector3(0, 0, 1).multiplyScalar(SHELL_R);
+            return {
+                group,
+                scoopAura,
+                reticule,
+                pos: startPos,
+                vel: new THREE.Vector3(),
+                heading: new THREE.Vector3(0, 1, 0),
+                bank: 0,
+                radius: PLAYER_RADIUS
+            };
+        }
+
+        // ---- Run lifecycle ----
+        function resetRun() {
+            clearRocks();
+            clearWings();
+            resetShots();
+            clearPickups();
+            resetShardPool();
+            resetRingPool();
+            clearGeysers();
+            pendingImplode.length = 0;
+            flareStrike.pending.length = 0;
+            endEruption(true);
+            sparks.head = 0;
+            sparks.activeCount = 0;
+            for (let i = 0; i < SPARK_CAP; i++) sparks.pool[i].active = false;
+            emberField.head = 0;
+            emberField.activeCount = 0;
+            for (let i = 0; i < EMBER_CAP; i++) emberField.pool[i].active = false;
+
+            Object.assign(state, {
+                elapsed: 0,
+                score: 0,
+                displayScore: 0,
+                wave: 1,
+                hull: 3,
+                kills: 0,
+                chain: 0,
+                chainTimer: 0,
+                bestChain: 0,
+                lumen: 0,
+                kindling: 0,
+                kindlingNeed: 48,
+                embersBanked: 0,
+                kindleLevel: 0,
+                gunsLevel: 1,
+                gunTimer: 0,
+                wingTimer: 0,
+                invulnerable: 2.6,
+                forceInvuln: false,
+                shake: 0,
+                camPunch: 0,
+                hurt: 0,
+                fovKick: 0,
+                paused: false,
+                debugOpen: false,
+                controlsActive: true,
+                gameOver: false,
+                missionIndex: 0,
+                occluded: false
+            });
+
+            player.pos.set(0, 0, 1).multiplyScalar(SHELL_R);
+            player.vel.set(0, 0, 0);
+            player.heading.set(0, 1, 0);
+            player.bank = 0;
+            input.firing = false;
+
+            ui.debugModal.classList.remove('show');
+            hideBanner();
+            snapCameraToShot();
+            spawnWave(1);
+            flashWave();
+            refreshUi();
+        }
+
+        function spawnWave(wave) {
+            state.missionIndex = Math.min(missions.length - 1, wave - 1);
+            const speedScale = 1 + (wave - 1) * 0.07;
+            const isOcclusion = wave % 5 === 0;
+
+            if (isOcclusion) {
+                spawnRock('large', randomShellPoint(player.pos, 1.4), null, speedScale * 0.6, 'occluder');
+                const support = 4 + Math.floor(wave / 5);
+                for (let i = 0; i < support; i++) {
+                    spawnRock('large', randomShellPoint(player.pos, 1.2), null, speedScale, 'glass');
+                }
+            } else {
+                const count = Math.min(18, 4 + wave * 2);
+                for (let i = 0; i < count; i++) {
+                    let type = 'glass';
+                    if (wave >= 4 && Math.random() < 0.2) type = 'slag';
+                    spawnRock('large', randomShellPoint(player.pos, 1.2), null, speedScale, type);
+                }
+            }
+
+            if (wave >= 3) {
+                const wingCount = Math.min(4, Math.floor((wave - 1) / 2));
+                for (let i = 0; i < wingCount; i++) spawnDuskwing(speedScale);
+            }
+        }
+
+        function advanceWave() {
+            state.wave += 1;
+            state.invulnerable = Math.max(state.invulnerable, 1.0);
+            spawnWave(state.wave);
+            flashWave();
+        }
+
+        // ---- Rocks (the caul) ----
+        function buildRockPool() {
+            const defs = [
+                ['glass', 'large'], ['glass', 'medium'], ['glass', 'small'],
+                ['slag', 'large'], ['slag', 'medium'], ['slag', 'small'],
+                ['occluder', 'large']
+            ];
+            for (const [type, size] of defs) {
+                const spec = rockSpecs[type][size];
+                const variants = [];
+                for (let v = 0; v < 4; v++) {
+                    const geo = createRockGeometry(spec.radius, type);
+                    variants.push({ geo, edges: new THREE.EdgesGeometry(geo) });
+                }
+                let edgeColor = 0xffab5e;
+                if (type === 'slag') edgeColor = 0xffd98a;
+                if (type === 'occluder') edgeColor = 0xff5a4a;
+                const lineMat = new THREE.LineBasicMaterial({
+                    color: edgeColor,
+                    transparent: true,
+                    opacity: type === 'occluder' ? 0.55 : 0.35,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                geoPool[type + ':' + size] = { variants, lineMat };
+            }
+        }
+
+        function createRockGeometry(radius, type) {
+            const detail = type === 'occluder' ? 1 : 1;
+            const geometry = new THREE.IcosahedronGeometry(radius, detail);
+            const pos = geometry.attributes.position;
+            const v = new THREE.Vector3();
+            for (let i = 0; i < pos.count; i++) {
+                v.fromBufferAttribute(pos, i);
+                const n = 0.76 + Math.random() * 0.46;
+                v.multiplyScalar(n);
+                if (type === 'occluder') v.y *= 0.5; // a flat basalt plate, built to shadow
+                pos.setXYZ(i, v.x, v.y, v.z);
+            }
+            geometry.computeVertexNormals();
+            return geometry;
+        }
+
+        function spawnRock(size, position, inheritedVel, speedScale = 1, type = 'glass') {
+            const spec = rockSpecs[type][size] || rockSpecs.glass[size];
+            const pool = geoPool[type + ':' + size] || geoPool['glass:' + size];
+            const variant = pool.variants[(Math.random() * pool.variants.length) | 0];
+
+            let baseColor, emissive;
+            if (type === 'slag') { baseColor = 0x6b5136; emissive = 0x4a2408; }
+            else if (type === 'occluder') { baseColor = 0x241820; emissive = 0x54120c; }
+            else { baseColor = size === 'large' ? 0x7d6a8f : size === 'medium' ? 0x8a6f80 : 0x9c7a6d; emissive = 0x381c10; }
+
+            const material = new THREE.MeshStandardMaterial({
+                color: baseColor,
+                metalness: 0.35,
+                roughness: 0.55,
+                emissive,
+                emissiveIntensity: type === 'occluder' ? 0.8 : 0.55,
+                flatShading: true
+            });
+            // geo + edges geo + line material come from the shared pool (never disposed per-rock)
+            const mesh = new THREE.Mesh(variant.geo, material);
+            const edges = new THREE.LineSegments(variant.edges, pool.lineMat);
+            mesh.add(edges);
+            const group = new THREE.Group();
+            group.add(mesh);
+            group.position.copy(position);
+            scene.add(group);
+
+            const speed = randomRange(2.2, 4.6) / Math.sqrt(spec.radius) * speedScale * (type === 'occluder' ? 0.45 : 1);
+            const vel = new THREE.Vector3();
+            randomTangent(position, vel).multiplyScalar(speed);
+            if (inheritedVel) {
+                vel.addScaledVector(inheritedVel, 0.6);
+                tangentize(vel, position);
+            }
+
+            rocks.push({
+                type,
+                size,
+                group,
+                mesh,
+                material,
+                pooled: true,
+                pos: group.position,
+                vel,
+                spin: new THREE.Vector3(randomRange(-1, 1), randomRange(-1, 1), randomRange(-1, 1)).multiplyScalar(type === 'occluder' ? 0.2 : 0.6),
+                radius: spec.radius,
+                score: spec.score,
+                hp: spec.hp,
+                maxHp: spec.hp,
+                embers: spec.embers,
+                flash: 0,
+                grazeCd: 0,
+                dying: false
+            });
+        }
+
+        function updateRocks(dt) {
+            let occluded = false;
+            for (const r of rocks) {
+                if (r.type === 'occluder' && !r.dying) occluded = true;
+                if (!r.dying) advanceOnShell(r, dt);
+                r.grazeCd = Math.max(0, r.grazeCd - dt);
+                r.mesh.rotation.x += r.spin.x * dt;
+                r.mesh.rotation.y += r.spin.y * dt;
+                r.mesh.rotation.z += r.spin.z * dt;
+
+                if (r.flash > 0) {
+                    r.flash = Math.max(0, r.flash - dt);
+                    const f = r.flash / 0.06;
+                    r.material.emissiveIntensity = 0.55 + f * 3.4;
+                } else if (!r.dying) {
+                    r.material.emissiveIntensity = r.type === 'occluder' ? 0.8 : 0.55;
+                }
+            }
+            state.occluded = occluded;
+        }
+
+        // ---- Duskwings (light-thieves) ----
+        function spawnDuskwing(speedScale) {
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x3d3060,
+                metalness: 0.45,
+                roughness: 0.35,
+                emissive: 0x4630a8,
+                emissiveIntensity: 0.9,
+                flatShading: true,
+                side: THREE.DoubleSide
+            });
+            const mesh = new THREE.Mesh(geometries.duskwing, material);
+            const group = new THREE.Group();
+            group.add(mesh);
+            const pos = randomShellPoint(player.pos, 1.4);
+            group.position.copy(pos);
+            scene.add(group);
+            const vel = new THREE.Vector3();
+            randomTangent(pos, vel).multiplyScalar(3);
+            duskwings.push({
+                group,
+                mesh,
+                material,
+                pos: group.position,
+                vel,
+                heading: vel.clone().normalize(),
+                radius: 1.2,
+                hp: 2,
+                score: 240,
+                eaten: 0,
+                flash: 0,
+                speed: 7.5 * speedScale,
+                flap: Math.random() * Math.PI * 2
+            });
+        }
+
+        function updateDuskwings(dt) {
+            for (const w of duskwings) {
+                // hunt the nearest falling ember; otherwise shadow the player from afar
+                let target = null;
+                let bestDist = Infinity;
+                const pool = emberField.pool;
+                for (let i = 0; i < EMBER_CAP; i++) {
+                    const e = pool[i];
+                    if (!e.active) continue;
+                    const d = chordDistance(w.pos, e.pos);
+                    if (d < bestDist) { bestDist = d; target = e; }
+                }
+                tempVec.copy(target ? target.pos : player.pos).sub(w.pos);
+                tangentize(tempVec, w.pos);
+                if (tempVec.lengthSq() > 0.01) {
+                    tempVec.normalize().multiplyScalar(w.speed * (target ? 1.15 : 0.7));
+                    w.vel.lerp(tempVec, 1 - Math.exp(-dt * 2.2));
+                }
+                advanceOnShell(w, dt);
+                if (w.vel.lengthSq() > 0.04) {
+                    w.heading.copy(w.vel).normalize();
+                }
+
+                // eat any ember in beak range: stolen light never reaches the star
+                if (target && bestDist < 2.4) {
+                    target.active = false;
+                    w.eaten = Math.min(14, w.eaten + 1);
+                    w.mesh.scale.setScalar(1 + w.eaten * 0.045);
+                    w.speed += 0.12;
+                    spawnSparks(w.pos, tempColor.set(0x8a6cff), 3, 0.4, 0.5, { speed: 4, life: 0.3 });
+                }
+
+                orientOnShell(w.group, w.pos, w.heading, 0);
+                w.flap += dt * (6 + w.speed * 0.4);
+                w.mesh.rotation.z = Math.sin(w.flap) * 0.42;
+
+                if (w.flash > 0) {
+                    w.flash = Math.max(0, w.flash - dt);
+                    w.material.emissiveIntensity = 0.9 + (w.flash / 0.06) * 3.4;
+                } else {
+                    w.material.emissiveIntensity = 0.9;
+                }
+            }
+        }
+
+        function hitDuskwing(index, pos, damage) {
+            const w = duskwings[index];
+            if (!w) return;
+            w.hp -= damage;
+            w.flash = 0.06;
+            spawnSparks(pos, tempColor.set(0xb69cff), 4, 0.2, 0.5, { speed: 5, life: 0.3 });
+            if (w.hp <= 0) killDuskwing(index);
+        }
+
+        function killDuskwing(index) {
+            const w = duskwings[index];
+            if (!w) return;
+            const pos = w.pos.clone();
+            spawnShardBurst(pos, tempColor.set(0x8a6cff), 1.5, false);
+            spawnSparks(pos, tempColor.set(0xb69cff), 14, 0.5, 0.9, { speed: 9, life: 0.5 });
+            spawnRing(pos, tempColor.set(0x8a6cff), 2.6, 0.5);
+            // the thief bursts: every stolen ember comes back, plus the light of the kill
+            spawnEmbers(pos, 4 + w.eaten);
+            registerKill(w.score + w.eaten * 15, pos);
+            scene.remove(w.group);
+            w.material.dispose();
+            duskwings.splice(index, 1);
+        }
+
+        function clearWings() {
+            while (duskwings.length) {
+                const w = duskwings.pop();
+                scene.remove(w.group);
+                w.material.dispose();
+            }
+        }
+
+        // ---- Shooting ----
+        function buildShotPool() {
+            for (let i = 0; i < SHOT_POOL; i++) {
+                const m = new THREE.Mesh(geometries.shot, materials.shot);
+                m.visible = false;
+                scene.add(m);
+                shotMeshPool.push(m);
+            }
+        }
+
+        function acquireShotMesh() {
+            for (let i = 0; i < shotMeshPool.length; i++) {
+                if (!shotMeshPool[i].visible) return shotMeshPool[i];
+            }
+            const m = new THREE.Mesh(geometries.shot, materials.shot);
+            scene.add(m);
+            shotMeshPool.push(m);
+            return m;
+        }
+
+        function onFireDown() {
+            if (state.gameOver || state.paused || state.debugOpen) return;
+            if (input.firing) return;
+            input.firing = true;
+            fireGuns();
+        }
+
+        function onFireUp() {
+            input.firing = false;
+        }
+
+        function fireGuns() {
+            if (state.gameOver || state.gunTimer > 0) return;
+            const spec = gunSpec();
+            state.gunTimer = spec.cooldown;
+
+            surfaceNormal(player.pos, tempNormal);
+            const barrels = spec.barrels;
+            const halfAngle = 0.115;
+            for (let i = 0; i < barrels; i++) {
+                const frac = barrels > 1 ? (i - (barrels - 1) / 2) / ((barrels - 1) / 2) : 0;
+                // fan the barrel direction around the local surface normal
+                tempVecB.copy(player.heading).applyAxisAngle(tempNormal, frac * halfAngle);
+                tempVec.copy(player.pos).addScaledVector(tempVecB, 1.8).addScaledVector(tempNormal, 0.1);
+                projectToShell(tempVec);
+                spawnShot(tempVec, tempVecB, spec);
+            }
+            spawnSparks(tempVec, tempColor.set(0xffe9bd), 3, 0.2, 0.5, { speed: 6, life: 0.22 });
+        }
+
+        function spawnShot(position, dir, spec) {
+            const mesh = acquireShotMesh();
+            mesh.visible = true;
+            mesh.position.copy(position);
+            const velocity = dir.clone().normalize().multiplyScalar(spec.speed).addScaledVector(player.vel, 0.35);
+            tangentize(velocity, position);
+            tempVecC.copy(velocity).normalize();
+            mesh.quaternion.setFromUnitVectors(Z_AXIS, tempVecC);
+            shots.push({ mesh, pos: mesh.position, vel: velocity, damage: spec.damage, radius: 0.4, life: 1.05 });
+        }
+
+        function updateShots(dt) {
+            for (let i = shots.length - 1; i >= 0; i--) {
+                const s = shots[i];
+                s.life -= dt;
+                if (s.life <= 0) { s.mesh.visible = false; shots.splice(i, 1); continue; }
+                advanceOnShell(s, dt, 0.15);
+                if (s.vel.lengthSq() > 0.01) {
+                    tempVecC.copy(s.vel).normalize();
+                    s.mesh.quaternion.setFromUnitVectors(Z_AXIS, tempVecC);
+                }
+            }
+        }
+
+        function resetShots() {
+            shots.length = 0;
+            for (let i = 0; i < shotMeshPool.length; i++) shotMeshPool[i].visible = false;
+        }
+
+        // ---- Flare strike: the star answers at your reticle ----
+        function requestFlare() {
+            if (state.gameOver || state.paused || state.debugOpen) return;
+            if (state.lumen < flareStrike.cost) {
+                spawnPopup(player.pos.clone(), 'NEED ' + flareStrike.cost + ' LUMEN', false, 'cool');
+                return;
+            }
+            state.lumen -= flareStrike.cost;
+            const point = reticulePoint(new THREE.Vector3());
+            const telegraphRing = spawnRing(point, tempColor.set(0xffd98a), flareStrike.radius, 0.5, flareStrike.telegraph + 0.1);
+            flareStrike.pending.push({ point, timer: flareStrike.telegraph, ring: telegraphRing });
+            spawnSparks(point, tempColor.set(0xffd98a), 8, 1.2, 0.6, { speed: 4, life: 0.4 });
+        }
+
+        function updateFlare(dt) {
+            for (let i = flareStrike.pending.length - 1; i >= 0; i--) {
+                const p = flareStrike.pending[i];
+                p.timer -= dt;
+                if (p.timer <= 0) {
+                    flareStrike.pending.splice(i, 1);
+                    detonateFlare(p.point);
+                }
+            }
+        }
+
+        function detonateFlare(point) {
+            surfaceNormal(point, tempNormal);
+            spawnGeyser(point);
+            spawnRing(point, tempColor.set(0xffe9bd), flareStrike.radius * 1.6, 0.8);
+            spawnRing(point, tempColor.set(0xffab5e), flareStrike.radius * 2.4, 0.4);
+            spawnSparks(point, tempColor.set(0xffe0b0), 30, 1.6, 1.1, { speed: 13, life: 0.6 });
+            state.shake = Math.max(state.shake, 1.2);
+            state.camPunch = Math.max(state.camPunch, 0.8);
+            pulseCoreFlash(0.7);
+            flashErupt(0.45);
+
+            for (let i = rocks.length - 1; i >= 0; i--) {
+                const r = rocks[i];
+                if (r.dying) continue;
+                const d = chordDistance(point, r.pos);
+                if (d < flareStrike.radius + r.radius) {
+                    hitRock(i, r.pos.clone(), flareStrike.damage, true);
+                } else if (d < flareStrike.pushRadius + r.radius) {
+                    tempVec.copy(r.pos).sub(point);
+                    tangentize(tempVec, r.pos);
+                    if (tempVec.lengthSq() > 0.01) r.vel.addScaledVector(tempVec.normalize(), 7);
+                }
+            }
+            for (let i = duskwings.length - 1; i >= 0; i--) {
+                const w = duskwings[i];
+                if (chordDistance(point, w.pos) < flareStrike.radius + w.radius) {
+                    hitDuskwing(i, w.pos.clone(), flareStrike.damage);
+                }
+            }
+        }
+
+        function spawnGeyser(point) {
+            surfaceNormal(point, tempNormal);
+            const group = new THREE.Group();
+            const outer = new THREE.Mesh(geometries.geyserColumn, additive(0xffab5e, 0.4));
+            const inner = new THREE.Mesh(geometries.geyserCore, additive(0xfff0d2, 0.9));
+            outer.material.side = THREE.DoubleSide;
+            inner.material.side = THREE.DoubleSide;
+            group.add(outer, inner);
+            group.position.copy(tempNormal).multiplyScalar(CORE_R + 1);
+            group.quaternion.setFromUnitVectors(Y_AXIS, tempNormal);
+            effectRoot.add(group);
+            const light = new THREE.PointLight(0xffc07a, 5, 26);
+            light.position.copy(point).addScaledVector(tempNormal, 1.5);
+            effectRoot.add(light);
+            geysers.push({ group, light, outerMat: outer.material, innerMat: inner.material, normal: tempNormal.clone(), life: 0.55, maxLife: 0.55 });
+        }
+
+        function updateGeysers(dt) {
+            for (let i = geysers.length - 1; i >= 0; i--) {
+                const g = geysers[i];
+                g.life -= dt;
+                if (g.life <= 0) {
+                    effectRoot.remove(g.group);
+                    effectRoot.remove(g.light);
+                    g.outerMat.dispose();
+                    g.innerMat.dispose();
+                    geysers.splice(i, 1);
+                    continue;
+                }
+                const t = 1 - g.life / g.maxLife;
+                const rise = easeOutCubic(Math.min(1, t * 2.4));
+                const height = (SHELL_R - CORE_R + 6) * rise;
+                g.group.scale.set(1 + t * 0.6, Math.max(0.01, height), 1 + t * 0.6);
+                g.group.position.copy(g.normal).multiplyScalar(CORE_R + height / 2);
+                const fade = clamp(g.life / (g.maxLife * 0.55), 0, 1);
+                g.outerMat.opacity = 0.4 * fade;
+                g.innerMat.opacity = 0.9 * fade;
+                g.light.intensity = 5 * fade;
+            }
+        }
+
+        function clearGeysers() {
+            while (geysers.length) {
+                const g = geysers.pop();
+                effectRoot.remove(g.group);
+                effectRoot.remove(g.light);
+                g.outerMat.dispose();
+                g.innerMat.dispose();
+            }
+        }
+
+        // ---- Eruption: the fed star sweeps the shell clean ----
+        function buildEruptionRing() {
+            const mat = additive(0xffe0b0, 0);
+            const mesh = new THREE.Mesh(geometries.eruptRing, mat);
+            mesh.visible = false;
+            effectRoot.add(mesh);
+            eruption.ringMesh = mesh;
+            eruption.ringMat = mat;
+        }
+
+        function startEruption() {
+            eruption.active = true;
+            eruption.timer = 0;
+            eruption.theta = 0;
+            eruption.hitSet.clear();
+            surfaceNormal(player.pos, tempNormal);
+            eruption.origin.copy(tempNormal);
+            eruption.ringMesh.visible = true;
+            eruption.ringMesh.quaternion.setFromUnitVectors(Z_AXIS, eruption.origin);
+            state.kindling = 0;
+            state.kindlingNeed = 40 + state.wave * 8;
+            state.hull = Math.min(3, state.hull + 1);
+            state.wingTimer = Math.max(state.wingTimer, 4);
+            state.shake = Math.max(state.shake, 1.6);
+            state.camPunch = Math.max(state.camPunch, 1.0);
+            pulseCoreFlash(1.2);
+            flashErupt(1);
+            spawnPopup(player.pos.clone(), 'ERUPTION', true);
+            spawnSparks(player.pos, tempColor.set(0xfff0d2), 40, 2.5, 1.2, { speed: 14, life: 0.7 });
+            refreshUi();
+        }
+
+        function updateEruption(dt) {
+            if (!eruption.active) return;
+            eruption.timer += dt;
+            const t = clamp(eruption.timer / eruption.duration, 0, 1);
+            eruption.theta = t * Math.PI;
+            const s = Math.max(0.02, (SHELL_R + 0.4) * Math.sin(eruption.theta));
+            eruption.ringMesh.scale.setScalar(s);
+            eruption.ringMesh.position.copy(eruption.origin).multiplyScalar((SHELL_R + 0.4) * Math.cos(eruption.theta));
+            eruption.ringMat.opacity = 0.85 * (1 - t * 0.55);
+
+            // the wavefront cracks what it passes over
+            for (let i = rocks.length - 1; i >= 0; i--) {
+                const r = rocks[i];
+                if (r.dying || eruption.hitSet.has(r)) continue;
+                tempVec.copy(r.pos).normalize();
+                const ang = Math.acos(clamp(tempVec.dot(eruption.origin), -1, 1));
+                if (Math.abs(ang - eruption.theta) < eruption.band) {
+                    eruption.hitSet.add(r);
+                    if (r.type === 'occluder') {
+                        // the plate shrugs the wave; it only slides
+                        tempVecB.copy(r.pos).sub(eruption.origin.clone().multiplyScalar(SHELL_R));
+                        tangentize(tempVecB, r.pos);
+                        if (tempVecB.lengthSq() > 0.01) r.vel.addScaledVector(tempVecB.normalize(), 5);
+                        spawnSparks(r.pos, tempColor.set(0xff5a4a), 6, r.radius * 0.5, 0.6, { speed: 6, life: 0.4 });
+                    } else {
+                        hitRock(i, r.pos.clone(), 2, false, true);
+                    }
+                }
+            }
+            for (let i = duskwings.length - 1; i >= 0; i--) {
+                const w = duskwings[i];
+                if (eruption.hitSet.has(w)) continue;
+                tempVec.copy(w.pos).normalize();
+                const ang = Math.acos(clamp(tempVec.dot(eruption.origin), -1, 1));
+                if (Math.abs(ang - eruption.theta) < eruption.band) {
+                    eruption.hitSet.add(w);
+                    hitDuskwing(i, w.pos.clone(), 2);
+                }
+            }
+
+            if (t >= 1) endEruption(false);
+        }
+
+        function endEruption(silent) {
+            eruption.active = false;
+            eruption.hitSet.clear();
+            if (eruption.ringMesh) {
+                eruption.ringMesh.visible = false;
+                eruption.ringMat.opacity = 0;
+            }
+            if (!silent) refreshUi();
+        }
+
+        // ---- Embers: the falling light ----
+        function spawnEmbers(position, count) {
+            const pool = emberField.pool;
+            for (let i = 0; i < count; i++) {
+                const e = pool[emberField.head];
+                emberField.head = (emberField.head + 1) % EMBER_CAP;
+                e.active = true;
+                e.age = 0;
+                e.life = randomRange(7, 9);
+                e.size = randomRange(3.2, 5.2);
+                e.pos.copy(position).addScaledVector(tempVecC.set(randomRange(-1, 1), randomRange(-1, 1), randomRange(-1, 1)), 0.7);
+                randomTangent(e.pos, e.swirl).multiplyScalar(randomRange(1.5, 4));
+                e.vel.copy(e.swirl);
+            }
+        }
+
+        function updateEmbers(dt) {
+            const pool = emberField.pool;
+            const positions = emberField.positions;
+            const colors = emberField.colors;
+            const sizes = emberField.sizes;
+            const alphas = emberField.alphas;
+            const kindleGain = state.occluded ? 0.45 : 1;
+            let n = 0;
+            for (let i = 0; i < EMBER_CAP; i++) {
+                const e = pool[i];
+                if (!e.active) continue;
+                e.age += dt;
+                e.life -= dt;
+                if (e.life <= 0) { e.active = false; continue; }
+
+                // linger near the shell first (catchable), then commit to the fall
+                const commit = clamp((e.age - 1.1) / 1.4, 0, 1);
+                surfaceNormal(e.pos, tempNormal);
+                e.vel.addScaledVector(tempNormal, -dt * (2.5 + commit * 12));
+                e.vel.addScaledVector(e.swirl, dt * (1 - commit) * 0.8);
+                e.vel.multiplyScalar(Math.pow(0.62, dt));
+                e.pos.addScaledVector(e.vel, dt);
+
+                const rad = e.pos.length();
+                if (rad <= CORE_R + 0.9) {
+                    // banked: the star drinks it
+                    e.active = false;
+                    state.kindling += 1 * state.tuneKindle * kindleGain;
+                    state.embersBanked += 1;
+                    pulseCoreFlash(0.05);
+                    continue;
+                }
+
+                // scooped: the skiff drinks it instead (only if the battery has room)
+                if (state.lumen < LUMEN_MAX - 0.5 && chordDistance(e.pos, player.pos) < state.tuneScoop) {
+                    e.active = false;
+                    state.lumen = Math.min(LUMEN_MAX, state.lumen + 3);
+                    spawnSparks(player.pos, tempColor.set(0xffd98a), 2, 0.3, 0.4, { speed: 3, life: 0.25 });
+                    continue;
+                }
+
+                const heat = clamp(1 - (rad - CORE_R) / (SHELL_R - CORE_R), 0, 1);
+                positions[n * 3] = e.pos.x;
+                positions[n * 3 + 1] = e.pos.y;
+                positions[n * 3 + 2] = e.pos.z;
+                colors[n * 3] = 1;
+                colors[n * 3 + 1] = 0.55 + heat * 0.3;
+                colors[n * 3 + 2] = 0.25 + heat * 0.35;
+                sizes[n] = e.size * (1 + heat * 0.4);
+                alphas[n] = clamp(e.life / 1.2, 0, 1) * 0.95;
+                n++;
+            }
+            emberField.activeCount = n;
+            emberField.geometry.setDrawRange(0, n);
+            emberField.geometry.attributes.position.needsUpdate = true;
+            emberField.geometry.attributes.color.needsUpdate = true;
+            emberField.geometry.attributes.aSize.needsUpdate = true;
+            emberField.geometry.attributes.aAlpha.needsUpdate = true;
+
+            if (!eruption.active && state.kindling >= state.kindlingNeed && !state.gameOver) {
+                startEruption();
+            }
+        }
+
+        // ---- Damage / kills ----
+        function findProjectileHit(position, radius) {
+            for (let i = rocks.length - 1; i >= 0; i--) {
+                const r = rocks[i];
+                if (r.dying) continue;
+                if (chordDistance(r.pos, position) < r.radius + radius) {
+                    return { list: rocks, index: i };
+                }
+            }
+            for (let i = duskwings.length - 1; i >= 0; i--) {
+                const w = duskwings[i];
+                if (chordDistance(w.pos, position) < w.radius + radius) {
+                    return { list: duskwings, index: i };
+                }
+            }
+            return null;
+        }
+
+        // damage a rock; lethal hits implode (collapse inward) before shattering
+        function hitRock(index, impactPos, damage, viaFlare = false, viaEruption = false) {
+            const r = rocks[index];
+            if (!r || r.dying) return false;
+            r.hp -= damage;
+            if (r.hp > 0) {
+                r.flash = 0.06;
+                spawnSparks(impactPos, tempColor.set(r.type === 'slag' ? 0xffd98a : 0xffc9a0), 4, 0.2, 0.5, { speed: 5, life: 0.3 });
+                state.shake = Math.max(state.shake, 0.16);
+                return false;
+            }
+            r.dying = true;
+            r.flash = 0.06;
+            pendingImplode.push({ rock: r, timer: 0.09, viaFlare, viaEruption });
+            return true;
+        }
+
+        function resolveImplosions(dt) {
+            for (let i = pendingImplode.length - 1; i >= 0; i--) {
+                const p = pendingImplode[i];
+                p.timer -= dt;
+                // the collapse: rock crushes inward before it bursts
+                const t = clamp(1 - p.timer / 0.09, 0, 1);
+                p.rock.mesh.scale.setScalar(1 - t * 0.3);
+                p.rock.material.emissiveIntensity = 0.55 + t * 4;
+                if (p.timer <= 0) {
+                    const idx = rocks.indexOf(p.rock);
+                    if (idx !== -1) destroyRock(idx, p.viaFlare, p.viaEruption);
+                    pendingImplode.splice(i, 1);
+                }
+            }
+        }
+
+        function destroyRock(index, viaFlare, viaEruption) {
+            const r = rocks[index];
+            if (!r) return;
+            const position = r.pos.clone();
+            const velocity = r.vel.clone();
+
+            let color;
+            if (r.type === 'slag') color = tempColor.set(0xffd98a).clone();
+            else if (r.type === 'occluder') color = tempColor.set(0xff5a4a).clone();
+            else color = tempColor.set(r.size === 'large' ? 0xd9b8ff : r.size === 'medium' ? 0xffb98a : 0xffc9a0).clone();
+
+            spawnSparks(position, color, viaFlare ? 14 : 9, r.radius * 0.34, viaFlare ? 1.0 : 0.7, { speed: 11, life: 0.5 });
+            spawnSparks(position, tempColor.set(0xffffff), 5, r.radius * 0.2, 0.7, { speed: 7, life: 0.32 });
+            spawnShardBurst(position, color, r.radius, viaFlare);
+            spawnRing(position, color, r.radius * 1.15, viaFlare ? 0.7 : 0.42);
+
+            state.shake = Math.max(state.shake, viaFlare ? 0.7 : viaEruption ? 0.3 : 0.34);
+            state.camPunch = Math.max(state.camPunch, viaEruption ? 0.12 : 0.26);
+
+            const emberCount = viaEruption ? Math.ceil(r.embers * 0.5) : r.embers + (state.chain >= 5 ? 1 : 0);
+            spawnEmbers(position, emberCount);
+            registerKill(r.score, position, viaFlare);
+
+            if (r.type === 'occluder') {
+                state.shake = Math.max(state.shake, 1.5);
+                state.camPunch = Math.max(state.camPunch, 1.0);
+                spawnSparks(position, tempColor.set(0xffffff), 24, r.radius * 0.5, 1.2, { speed: 15, life: 0.7 });
+                spawnRing(position, tempColor.set(0xff5a4a), r.radius * 2.2, 0.6);
+                for (let i = 0; i < 3; i++) spawnRock('medium', jitterOnShell(position, 2), velocity, 1.1, 'slag');
+                spawnPopup(position.clone(), 'OCCLUDER DOWN +' + r.score, true);
+            } else if (r.size === 'large') {
+                const childType = r.type;
+                for (let i = 0; i < 2; i++) spawnRock('medium', jitterOnShell(position, 1.4), velocity, 1.08, childType);
+            } else if (r.size === 'medium') {
+                const children = r.type === 'slag' ? 2 : 3;
+                for (let i = 0; i < children; i++) spawnRock('small', jitterOnShell(position, 1.0), velocity, 1.16, r.type);
+            }
+
+            if (!viaEruption && Math.random() < pickupChance()) spawnPickup(position);
+
+            scene.remove(r.group);
+            r.material.dispose();
+            rocks.splice(index, 1);
+        }
+
+        function jitterOnShell(position, spread) {
+            const p = position.clone().add(tempVecC.set(randomRange(-1, 1), randomRange(-1, 1), randomRange(-1, 1)).multiplyScalar(spread));
+            projectToShell(p);
+            return p;
+        }
+
+        function registerKill(baseScore, position, viaFlare = false) {
+            state.chain = state.chainTimer > 0 ? Math.min(99, state.chain + 1) : 1;
+            state.chainTimer = 2.0;
+            state.bestChain = Math.max(state.bestChain, state.chain);
+            const mult = 1 + Math.max(0, state.chain - 1) * 0.12;
+            const gained = Math.round((baseScore + state.wave * 6) * mult * (viaFlare ? 1.2 : 1));
+            state.score += gained;
+            state.kills += 1;
+            spawnPopup(position.clone(), '+' + gained, state.chain >= 6);
+            if (state.chain > 1 && state.chain % 5 === 0) {
+                spawnRing(position, tempColor.set(0xfff0d2), 3.2, 0.5);
+                spawnPopup(jitterOnShell(position, 2), 'CHAIN x' + state.chain, true);
+            }
+        }
+
+        function clearRocks() {
+            while (rocks.length) {
+                const r = rocks.pop();
+                scene.remove(r.group);
+                r.material.dispose();
+            }
+            pendingImplode.length = 0;
+        }
+
+        // ---- Player flight ----
+        function orientOnShell(group, pos, heading, bank) {
+            surfaceNormal(pos, tempNormal);
+            tempVecC.copy(tempNormal).cross(heading).normalize(); // right = n x forward
+            tempMat.makeBasis(tempVecC, tempNormal, heading);
+            group.quaternion.setFromRotationMatrix(tempMat);
+            if (bank) {
+                tempQuat.setFromAxisAngle(Z_AXIS, bank);
+                group.quaternion.multiply(tempQuat);
+            }
+            group.position.copy(pos);
+        }
+
+        function updatePlayer(dt) {
+            const keyLeft = input.keys.KeyA || input.keys.ArrowLeft || input.touchLeft;
+            const keyRight = input.keys.KeyD || input.keys.ArrowRight || input.touchRight;
+            const keyUp = input.keys.KeyW || input.keys.ArrowUp || input.touchThrust;
+            const keyDown = input.keys.KeyS || input.keys.ArrowDown || input.touchBrake;
+
+            const boost = state.wingTimer > 0 ? 1.32 : 1;
+            const rotate = (keyLeft ? 1 : 0) - (keyRight ? 1 : 0);
+            const speed = player.vel.length();
+
+            surfaceNormal(player.pos, tempNormal);
+            const turnRate = (state.tuneTurn + speed * 0.012) * (state.wingTimer > 0 ? 1.15 : 1);
+            player.heading.applyAxisAngle(tempNormal, rotate * dt * turnRate);
+            tangentize(player.heading, player.pos);
+            player.heading.normalize();
+
+            input.thrusting = Boolean(keyUp);
+            if (input.thrusting) {
+                player.vel.addScaledVector(player.heading, dt * state.tuneThrust * boost);
+                spawnEngineTrail();
+            }
+            if (keyDown) player.vel.multiplyScalar(Math.pow(0.035, dt));
+            player.vel.multiplyScalar(Math.pow(input.thrusting ? Math.min(0.92, state.tuneDrag + 0.12) : state.tuneDrag, dt));
+            player.vel.clampLength(0, state.tuneMaxSpeed * boost);
+
+            advanceOnShell(player, dt);
+            tangentize(player.heading, player.pos);
+            player.heading.normalize();
+
+            const bankTarget = -rotate * 0.42;
+            player.bank = lerp(player.bank, bankTarget, 1 - Math.exp(-dt * 8));
+            orientOnShell(player.group, player.pos, player.heading, player.bank);
+            player.group.visible = state.shot !== 'cockpit' && !(state.invulnerable > 0 && !state.gameOver && Math.floor(state.visualTime * 14) % 3 === 0);
+
+            updateEngineAnimation();
+
+            // scoop halo breathes with the tuning lever, glows when a flare is banked
+            const ready = state.lumen >= flareStrike.cost;
+            player.scoopAura.scale.setScalar(state.tuneScoop * (1 + Math.sin(state.visualTime * 5) * 0.05));
+            player.scoopAura.material.opacity = (ready ? 0.2 : 0.1) + (state.wingTimer > 0 ? 0.06 : 0);
+            player.scoopAura.material.color.set(ready ? 0xffe9bd : 0xffd98a);
+
+            // detached reticule: shows gun line + the flare's landing zone
+            reticulePoint(tempVecB);
+            surfaceNormal(tempVecB, tempVecC);
+            player.reticule.visible = state.shot !== 'cockpit';
+            player.reticule.position.copy(tempVecB).addScaledVector(tempVecC, 0.25);
+            player.reticule.quaternion.setFromUnitVectors(Z_AXIS, tempVecC);
+            player.reticule.rotateZ(state.visualTime * 0.7);
+            player.reticule.material.opacity = ready ? 0.55 + Math.sin(state.visualTime * 6) * 0.15 : 0.3;
+            player.reticule.material.color.set(ready ? 0xffd98a : 0xd8c9b0);
+
+            thrustLight.position.copy(player.pos).addScaledVector(player.heading, -2).addScaledVector(tempNormal, 0.6);
+            thrustLight.intensity = input.thrusting ? 3.8 : 1.1;
+        }
+
+        function reticulePoint(out) {
+            const speed = player.vel.length();
+            const dist = 8.5 + Math.min(5, speed * 0.32);
+            out.copy(player.pos).addScaledVector(player.heading, dist);
+            projectToShell(out);
+            return out;
+        }
+
+        function updateEngineAnimation() {
+            const thrust = input.thrusting ? 1 : 0;
+            const idle = 0.34 + Math.sin(state.visualTime * 10) * 0.05;
+            const burn = thrust ? 1 + Math.sin(state.visualTime * 44) * 0.18 : idle;
+            const glow = player.group.userData.glow;
+            const flame = player.group.userData.flame;
+            glow.scale.set(0.8 + burn * 0.2, 0.55 + burn * 0.08, 1 + burn * 0.4);
+            glow.material.opacity = thrust ? 0.72 + burn * 0.16 : 0.3 + idle * 0.16;
+            glow.material.color.set(state.wingTimer > 0 ? 0xa8e4ff : 0xffc07a);
+            flame.scale.set(0.7 + burn * 0.2, 0.7 + burn * 0.2, 0.5 + burn * (thrust ? 1.2 : 0.2));
+            flame.material.opacity = thrust ? 0.34 + burn * 0.2 : 0.06 + idle * 0.05;
+            flame.material.color.set(state.wingTimer > 0 ? 0xd6f2ff : 0xffe0b0);
+        }
+
+        function spawnEngineTrail() {
+            if (Math.random() > (state.wingTimer > 0 ? 0.8 : 0.5)) return;
+            tempVec.copy(player.pos).addScaledVector(player.heading, -1.8);
+            spawnSparks(tempVec, tempColor.set(state.wingTimer > 0 ? 0x9adcff : 0xffb46e), 1, 0.15, 0.32, { speed: 2.5, life: 0.34 });
+        }
+
+        // ---- Pickups ----
+        function pickupChance() { return 0.16 + state.wave * 0.004; }
+
+        function spawnPickup(position) {
+            const roll = Math.random();
+            let type = 'wing';
+            if (roll < 0.3) type = 'guns';
+            else if (roll < 0.55) type = 'weld';
+            else if (roll < 0.8) type = 'lumen';
+            const spec = pickupSpecs[type];
+            const group = new THREE.Group();
+            const coreMesh = new THREE.Mesh(geometries.pickup, new THREE.MeshStandardMaterial({
+                color: spec.color, metalness: 0.4, roughness: 0.2, emissive: spec.color, emissiveIntensity: 0.8
+            }));
+            const halo = new THREE.Mesh(geometries.ring, additive(spec.color, 0.5));
+            halo.scale.setScalar(1.1);
+            group.add(coreMesh, halo);
+            const p = position.clone();
+            projectToShell(p, 0.4);
+            group.position.copy(p);
+            surfaceNormal(p, tempNormal);
+            halo.quaternion.setFromUnitVectors(Z_AXIS, tempNormal);
+            scene.add(group);
+            pickups.push({ type, group, coreMesh, halo, pos: group.position, vel: new THREE.Vector3(), life: 13, radius: 1.1, spin: randomRange(1, 2.5) });
+        }
+
+        function updatePickups(dt) {
+            const gravityRadius = 8.5;
+            for (let i = pickups.length - 1; i >= 0; i--) {
+                const p = pickups[i];
+                p.life -= dt;
+                p.coreMesh.rotation.y += p.spin * dt;
+                p.halo.scale.setScalar(1.1 + Math.sin(state.visualTime * 4 + i) * 0.12);
+                // the skiff's scoop drags pickups in across the shell
+                const dist = chordDistance(p.pos, player.pos);
+                if (dist < gravityRadius) {
+                    tempVec.copy(player.pos).sub(p.pos);
+                    tangentize(tempVec, p.pos);
+                    const pull = 1 - dist / gravityRadius;
+                    if (tempVec.lengthSq() > 0.01) p.vel.addScaledVector(tempVec.normalize(), pull * pull * 40 * dt);
+                }
+                p.vel.multiplyScalar(Math.pow(0.3, dt));
+                advanceOnShell(p, dt, 0.4);
+                if (dist < player.radius + p.radius + 0.6) {
+                    applyPickup(p.type, p.pos.clone());
+                    removePickup(i);
+                    continue;
+                }
+                if (p.life <= 0) { removePickup(i); continue; }
+                if (p.life < 3) p.coreMesh.material.emissiveIntensity = Math.sin(state.visualTime * 12) * 0.4 + 0.6;
+            }
+        }
+
+        function applyPickup(type, position) {
+            const spec = pickupSpecs[type] || pickupSpecs.lumen;
+            if (type === 'weld') {
+                state.hull = Math.min(3, state.hull + 1);
+            } else if (type === 'guns') {
+                state.gunsLevel = Math.min(gunTiers.length - 1, state.gunsLevel + 1);
+            } else if (type === 'lumen') {
+                state.lumen = Math.min(LUMEN_MAX, state.lumen + 35);
+            } else if (type === 'wing') {
+                state.wingTimer = 7;
+            }
+            spawnSparks(position, tempColor.set(spec.color), 14, 0.5, 0.7, { speed: 8, life: 0.5 });
+            spawnPopup(position, spec.label.toUpperCase(), false, type === 'wing' ? 'cool' : '');
+            refreshUi();
+        }
+
+        function removePickup(index) {
+            const p = pickups[index];
+            if (!p) return;
+            scene.remove(p.group);
+            p.group.traverse((c) => { if (c.material) c.material.dispose(); });
+            pickups.splice(index, 1);
+        }
+
+        function clearPickups() {
+            while (pickups.length) {
+                const p = pickups.pop();
+                scene.remove(p.group);
+                p.group.traverse((c) => { if (c.material) c.material.dispose(); });
+            }
+        }
+
+        // ---- Collisions + the graze ----
+        function checkCollisions() {
+            for (let i = shots.length - 1; i >= 0; i--) {
+                const s = shots[i];
+                const hit = findProjectileHit(s.pos, s.radius);
+                if (hit) {
+                    if (hit.list === duskwings) {
+                        hitDuskwing(hit.index, s.pos.clone(), s.damage);
+                    } else {
+                        hitRock(hit.index, s.pos.clone(), s.damage);
+                    }
+                    s.mesh.visible = false;
+                    shots.splice(i, 1);
+                }
+            }
+
+            const canBeHit = state.invulnerable <= 0 && !state.forceInvuln;
+            for (let i = rocks.length - 1; i >= 0; i--) {
+                const r = rocks[i];
+                if (r.dying) continue;
+                const dist = chordDistance(r.pos, player.pos);
+                if (canBeHit && dist < r.radius + player.radius) {
+                    handlePlayerImpact(r.pos.clone());
+                    break;
+                }
+                // the graze: skimming a rock fast and close pays in lumen
+                if (r.grazeCd <= 0 && dist < r.radius + player.radius + state.tuneGraze) {
+                    tempVec.copy(player.vel).sub(r.vel);
+                    if (tempVec.length() > 7) {
+                        r.grazeCd = 0.9;
+                        state.lumen = Math.min(LUMEN_MAX, state.lumen + 6);
+                        tempVecB.copy(player.pos).lerp(r.pos, 0.5);
+                        spawnRing(tempVecB, tempColor.set(0x8fd8ff), 1.6, 0.4);
+                        spawnSparks(tempVecB, tempColor.set(0x9adcff), 5, 0.3, 0.5, { speed: 6, life: 0.3 });
+                        if (Math.random() < 0.4) spawnPopup(tempVecB.clone(), 'GRAZE +6', false, 'cool');
+                    }
+                }
+            }
+            if (canBeHit) {
+                for (let i = duskwings.length - 1; i >= 0; i--) {
+                    const w = duskwings[i];
+                    if (chordDistance(w.pos, player.pos) < w.radius + player.radius) {
+                        killDuskwing(i);
+                        handlePlayerImpact(player.pos.clone());
+                        break;
+                    }
+                }
+            }
+        }
+
+        function handlePlayerImpact(position) {
+            state.hull -= 1;
+            state.chain = 0;
+            state.invulnerable = 2.5;
+            state.shake = Math.max(state.shake, 1.6);
+            state.camPunch = Math.max(state.camPunch, 1.0);
+            state.hurt = 1;
+            flashHurt();
+            spawnSparks(player.pos, tempColor.set(0xff6272), 34, 1.8, 1.0, { speed: 12, life: 0.55 });
+            spawnRing(player.pos, tempColor.set(0xff6272), 4.0, 0.7);
+            // knock the skiff away from the impact
+            tempVec.copy(player.pos).sub(position);
+            tangentize(tempVec, player.pos);
+            if (tempVec.lengthSq() > 0.01) player.vel.addScaledVector(tempVec.normalize(), 9);
+            refreshUi();
+
+            if (state.hull <= 0) {
+                state.gameOver = true;
+                spawnShardBurst(player.pos, tempColor.set(0xffab5e), 2.2, true);
+                setPaused(true, 'Skiff Down', 'Score ' + state.score.toLocaleString() + ' · Best chain x' + state.bestChain + ' · ' + state.embersBanked + ' embers banked. New Run to fly again.');
+            }
+        }
+
+        // ---- Sparks (shader points, circular discard, size-capped) ----
+        function spawnSparks(position, color, count, spread, power, opts = {}) {
+            const pool = sparks.pool;
+            const speed = opts.speed || 8;
+            const life = opts.life || 0.5;
+            const drag = opts.drag || 0.8;
+            for (let i = 0; i < count; i++) {
+                const s = pool[sparks.head];
+                sparks.head = (sparks.head + 1) % SPARK_CAP;
+                s.active = true;
+                s.pos.set(
+                    position.x + randomRange(-1, 1) * spread,
+                    position.y + randomRange(-1, 1) * spread,
+                    position.z + randomRange(-1, 1) * spread
+                );
+                const sp = randomRange(0.4, 1) * speed * power;
+                s.vel.set(randomRange(-1, 1), randomRange(-1, 1), randomRange(-1, 1));
+                if (s.vel.lengthSq() < 0.01) s.vel.set(0, 1, 0);
+                s.vel.normalize().multiplyScalar(sp);
+                s.color.copy(color).lerp(WHITE, Math.random() * 0.3);
+                s.life = randomRange(life * 0.7, life);
+                s.maxLife = life;
+                s.size = randomRange(2.5, 6) * (power + 0.4);
+                s.drag = drag;
+            }
+        }
+
+        function updateSparks(dt) {
+            const pool = sparks.pool;
+            const positions = sparks.positions;
+            const colors = sparks.colors;
+            const sizes = sparks.sizes;
+            const alphas = sparks.alphas;
+            let n = 0;
+            for (let i = 0; i < SPARK_CAP; i++) {
+                const s = pool[i];
+                if (!s.active) continue;
+                s.life -= dt;
+                if (s.life <= 0) { s.active = false; continue; }
+                s.vel.multiplyScalar(Math.pow(s.drag, dt));
+                s.pos.addScaledVector(s.vel, dt);
+                positions[n * 3] = s.pos.x;
+                positions[n * 3 + 1] = s.pos.y;
+                positions[n * 3 + 2] = s.pos.z;
+                colors[n * 3] = s.color.r;
+                colors[n * 3 + 1] = s.color.g;
+                colors[n * 3 + 2] = s.color.b;
+                sizes[n] = s.size;
+                alphas[n] = clamp(s.life / s.maxLife, 0, 1) * 0.9;
+                n++;
+            }
+            sparks.activeCount = n;
+            sparks.geometry.setDrawRange(0, n);
+            sparks.geometry.attributes.position.needsUpdate = true;
+            sparks.geometry.attributes.color.needsUpdate = true;
+            sparks.geometry.attributes.aSize.needsUpdate = true;
+            sparks.geometry.attributes.aAlpha.needsUpdate = true;
+        }
+
+        // ---- Shards (pooled real-geometry triangles; zero per-kill allocation) ----
+        let shardHead = 0;
+        let shardActiveCount = 0;
+        const ICE = new THREE.Color(0xfff0da);
+
+        function buildShardPool() {
+            for (let i = 0; i < SHARD_CAP; i++) {
+                const material = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+                const mesh = new THREE.Mesh(geometries.shard, material);
+                mesh.visible = false;
+                effectRoot.add(mesh);
+                shards.push({ mesh, material, velocity: new THREE.Vector3(), angular: new THREE.Vector3(), life: 0, maxLife: 1, opacity: 1, drag: 0.78, active: false });
+            }
+        }
+
+        function resetShardPool() {
+            shardHead = 0;
+            shardActiveCount = 0;
+            for (let i = 0; i < shards.length; i++) { shards[i].active = false; shards[i].mesh.visible = false; }
+        }
+
+        function spawnShardBurst(position, color, radius, big) {
+            const count = radius > 3 ? 13 : radius > 1.8 ? 9 : 6;
+            const blast = big ? 1.3 : 1;
+            for (let i = 0; i < count; i++) {
+                const s = shards[shardHead];
+                shardHead = (shardHead + 1) % SHARD_CAP;
+                tempVecC.set(randomRange(-1, 1), randomRange(-1, 1), randomRange(-1, 1));
+                if (tempVecC.lengthSq() < 0.01) tempVecC.set(0, 1, 0);
+                tempVecC.normalize();
+                const off = randomRange(0.2, radius * 0.5);
+                s.mesh.position.set(position.x + tempVecC.x * off, position.y + tempVecC.y * off, position.z + tempVecC.z * off);
+                s.mesh.rotation.set(Math.random() * 6.28, Math.random() * 6.28, Math.random() * 6.28);
+                s.mesh.scale.setScalar(randomRange(0.4, 1.0) * radius * 0.5 * blast);
+                s.mesh.visible = true;
+                s.material.color.copy(color).lerp(ICE, randomRange(0.2, 0.55));
+                const op = randomRange(0.5, 0.85);
+                s.opacity = op;
+                s.material.opacity = op;
+                s.velocity.copy(tempVecC).multiplyScalar(randomRange(5, 12) * blast);
+                s.angular.set(randomRange(-9, 9), randomRange(-11, 11), randomRange(-9, 9));
+                s.life = randomRange(0.7, 1.3);
+                s.maxLife = 1.3;
+                s.active = true;
+            }
+        }
+
+        function updateShards(dt) {
+            let n = 0;
+            for (let i = 0; i < shards.length; i++) {
+                const s = shards[i];
+                if (!s.active) continue;
+                s.life -= dt;
+                if (s.life <= 0) { s.active = false; s.mesh.visible = false; continue; }
+                s.velocity.multiplyScalar(Math.pow(s.drag, dt));
+                s.mesh.position.addScaledVector(s.velocity, dt);
+                s.mesh.rotation.x += s.angular.x * dt;
+                s.mesh.rotation.y += s.angular.y * dt;
+                s.mesh.rotation.z += s.angular.z * dt;
+                s.material.opacity = s.opacity * clamp(s.life / 0.6, 0, 1);
+                n++;
+            }
+            shardActiveCount = n;
+        }
+
+        // ---- Shell rings (pooled, oriented to the surface) ----
+        let ringHead = 0;
+
+        function buildRingPool() {
+            for (let i = 0; i < RING_CAP; i++) {
+                const material = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+                const mesh = new THREE.Mesh(geometries.ring, material);
+                mesh.visible = false;
+                effectRoot.add(mesh);
+                rings.push({ mesh, material, life: 0, maxLife: 0.72, start: 0.1, expansion: 1, opacity: 1, active: false });
+            }
+        }
+
+        function resetRingPool() {
+            ringHead = 0;
+            for (let i = 0; i < rings.length; i++) { rings[i].active = false; rings[i].mesh.visible = false; }
+        }
+
+        function spawnRing(position, color, expansion, opacity, life = 0.72) {
+            const r = rings[ringHead];
+            ringHead = (ringHead + 1) % RING_CAP;
+            surfaceNormal(position, tempVecC);
+            r.mesh.position.copy(position).addScaledVector(tempVecC, 0.3);
+            r.mesh.quaternion.setFromUnitVectors(Z_AXIS, tempVecC);
+            r.mesh.scale.setScalar(0.1);
+            r.mesh.visible = true;
+            r.material.color.copy(color);
+            r.material.opacity = opacity;
+            r.life = life;
+            r.maxLife = life;
+            r.start = 0.1;
+            r.expansion = expansion;
+            r.opacity = opacity;
+            r.active = true;
+            return r;
+        }
+
+        function updateRings(dt) {
+            for (let i = 0; i < rings.length; i++) {
+                const r = rings[i];
+                if (!r.active) continue;
+                r.life -= dt;
+                if (r.life <= 0) { r.active = false; r.mesh.visible = false; continue; }
+                const t = 1 - r.life / r.maxLife;
+                r.mesh.scale.setScalar(r.start + r.expansion * easeOutCubic(t));
+                r.material.opacity = r.opacity * (1 - t);
+            }
+        }
+
+        // ---- Popups ----
+        const popupPool = [];
+        let popupCursor = 0;
+
+        function buildPopupPool() {
+            for (let i = 0; i < 32; i++) {
+                const el = document.createElement('div');
+                el.className = 'popup';
+                el.style.opacity = '0';
+                ui.popups.appendChild(el);
+                popupPool.push(el);
+            }
+        }
+
+        function spawnPopup(worldPos, text, hot, extraClass = '') {
+            tempVecB.copy(worldPos);
+            tempVecB.project(camera);
+            if (tempVecB.z > 1) return;
+            const x = (tempVecB.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-tempVecB.y * 0.5 + 0.5) * window.innerHeight;
+            const el = popupPool[popupCursor];
+            popupCursor = (popupCursor + 1) % popupPool.length;
+            el.textContent = text;
+            el.className = 'popup' + (hot ? ' hot' : '') + (extraClass ? ' ' + extraClass : '');
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            el.style.animation = 'none';
+            void el.offsetWidth; // reflow to restart the rise/fade animation on this pooled node
+            el.style.animation = '';
+        }
+
+        // ---- Camera: a feel instrument riding the shell ----
+        const camSmoothUp = new THREE.Vector3(0, 1, 0);
+        const camEye = new THREE.Vector3();
+        const camLook = new THREE.Vector3();
+
+        function applyShake(vec, amount) {
+            if (state.shake <= 0) return;
+            const s = state.shake * state.tuneShake * amount;
+            vec.x += randomRange(-1, 1) * s;
+            vec.y += randomRange(-1, 1) * s * 0.6;
+            vec.z += randomRange(-1, 1) * s;
+        }
+
+        function updateCamera(dt, instant = false) {
+            state.shake = Math.max(0, state.shake - dt * 3.2);
+            state.camPunch = Math.max(0, state.camPunch - dt * 3.4);
+            const shot = shotModes[state.shot] || shotModes.skim;
+            surfaceNormal(player.pos, tempNormal);
+            const speed = player.vel.length();
+
+            let upTarget = tempNormal;
+            let lag = shot.lag;
+
+            if (state.shot === 'cockpit') {
+                camEye.copy(player.pos)
+                    .addScaledVector(player.heading, shot.eyeForward + speed * 0.014)
+                    .addScaledVector(tempNormal, shot.eyeUp + (input.thrusting ? Math.sin(state.visualTime * 18) * 0.04 : Math.sin(state.visualTime * 7) * 0.02));
+                camLook.copy(player.pos)
+                    .addScaledVector(player.heading, shot.lookAhead + speed * 0.3)
+                    .addScaledVector(tempNormal, shot.lookUp);
+                applyShake(camEye, 0.16);
+            } else if (state.shot === 'halo') {
+                camEye.copy(player.pos)
+                    .addScaledVector(tempNormal, shot.height - state.camPunch * 2.4)
+                    .addScaledVector(player.heading, -shot.back);
+                camLook.copy(player.pos).addScaledVector(player.heading, shot.lookAhead);
+                upTarget = player.heading;
+                applyShake(camEye, 0.5);
+            } else if (state.shot === 'drift') {
+                const sway = Math.sin(state.visualTime * 0.14) * 0.8;
+                tempVecC.copy(tempNormal).cross(player.heading).normalize();
+                camEye.copy(player.pos)
+                    .addScaledVector(tempVecC, shot.side * (0.7 + sway * 0.3))
+                    .addScaledVector(tempNormal, shot.up + Math.cos(state.visualTime * 0.1) * 1.4)
+                    .addScaledVector(player.heading, -shot.back);
+                camLook.copy(player.pos).addScaledVector(player.heading, shot.lookAhead * 0.5);
+                applyShake(camEye, 0.4);
+            } else {
+                // skim: low chase over the horizon curve
+                const back = shot.back + speed * 0.1 - state.camPunch * 1.6;
+                const up = shot.up + speed * 0.04 - state.camPunch * 0.35;
+                camEye.copy(player.pos)
+                    .addScaledVector(player.heading, -back)
+                    .addScaledVector(tempNormal, up);
+                camLook.copy(player.pos)
+                    .addScaledVector(player.heading, shot.lookAhead + speed * 0.2)
+                    .addScaledVector(tempNormal, shot.lookUp);
+                applyShake(camEye, 0.34);
+            }
+
+            const k = instant ? 1 : 1 - Math.exp(-dt * lag);
+            camera.position.lerp(camEye, k);
+            camSmoothUp.lerp(upTarget, instant ? 1 : 1 - Math.exp(-dt * 6)).normalize();
+            camera.up.copy(camSmoothUp);
+            camera.lookAt(camLook);
+
+            // speed widens the lens; eruptions and flares punch it
+            const targetFov = 64 + clamp(speed / state.tuneMaxSpeed, 0, 1.4) * 6 + state.camPunch * 3;
+            if (Math.abs(camera.fov - targetFov) > 0.02) {
+                camera.fov = lerp(camera.fov, targetFov, instant ? 1 : 1 - Math.exp(-dt * 5));
+                camera.updateProjectionMatrix();
+            }
+        }
+
+        function snapCameraToShot() {
+            updateCamera(0, true);
+        }
+
+        function setShot(name) {
+            if (!shotModes[name]) return;
+            state.shot = name;
+            document.querySelectorAll('[data-shot]').forEach((b) => b.classList.toggle('active', b.dataset.shot === name));
+            snapCameraToShot();
+        }
+
+        // ---- Core glow + post-processing ----
+        let coreFlash = 0;
+
+        function pulseCoreFlash(amount) {
+            coreFlash = Math.min(1.6, coreFlash + amount);
+        }
+
+        function updateKindle(dt) {
+            const target = clamp(state.kindling / Math.max(1, state.kindlingNeed), 0, 1);
+            state.kindleLevel = lerp(state.kindleLevel, target, 1 - Math.exp(-dt * 3));
+            coreFlash = Math.max(0, coreFlash - dt * 1.8);
+            state.hurt = Math.max(0, state.hurt - dt * 2.4);
+
+            core.material.uniforms.time.value = state.visualTime;
+            core.material.uniforms.kindle.value = state.kindleLevel;
+            core.material.uniforms.flash.value = coreFlash;
+            core.material.uniforms.glow.value = state.tuneGlow;
+            corona.material.uniforms.kindle.value = state.kindleLevel * 0.8;
+            corona.material.uniforms.flash.value = coreFlash * 0.7;
+            corona.material.uniforms.glow.value = state.tuneGlow;
+            atmosphere.material.uniforms.kindle.value = state.kindleLevel;
+            core.rotation.y = state.visualTime * 0.02;
+            coreLight.intensity = (2.4 + state.kindleLevel * 3.2 + coreFlash * 4) * state.tuneGlow;
+            tempColor.setHSL(0.07 + state.kindleLevel * 0.035, 0.9, 0.55 + state.kindleLevel * 0.1);
+            coreLight.color.copy(tempColor);
+            if (starField) starField.rotation.y = state.visualTime * 0.004;
+            if (dustField) dustField.rotation.y = state.visualTime * 0.012;
+        }
+
+        function updatePostProcessing() {
+            bloomPass.strength = 0.42 + state.bloom * 0.3 + state.kindleLevel * 0.16 + coreFlash * 0.1;
+            bloomPass.radius = 0.42 + state.kindleLevel * 0.1;
+            gradePass.uniforms.grade.value = state.grade;
+            gradePass.uniforms.kindle.value = state.kindleLevel;
+            gradePass.uniforms.hurt.value = clamp(state.hurt, 0, 1);
+            document.documentElement.style.setProperty('--kindle', clamp(state.kindleLevel + coreFlash * 0.3, 0, 1).toFixed(3));
+        }
+
+        // ---- Rim threat arrows: offscreen or hidden past the horizon ----
+        const RIM_COLORS = { occluder: '#ff5a4a', slag: '#ffd98a', large: '#d9b8ff', wing: '#a98cff' };
+        let rimUsed = 0;
+
+        function placeRimArrow(pos, color, cx, cy, margin) {
+            if (rimUsed >= rimArrows.length) return;
+            const overHorizon = arcAngle(pos, player.pos) > 1.0;
+            tempVec.copy(pos).project(camera);
+            const behind = tempVec.z > 1;
+            if (!behind && !overHorizon && Math.abs(tempVec.x) <= 1 && Math.abs(tempVec.y) <= 1) return; // visible: no arrow
+            let nx = tempVec.x;
+            let ny = tempVec.y;
+            if (behind) { nx = -nx; ny = -ny; }
+            if (Math.abs(nx) < 1e-4 && Math.abs(ny) < 1e-4) return;
+            const ang = Math.atan2(ny, nx);
+            const ex = Math.cos(ang);
+            const ey = Math.sin(ang);
+            const scale = Math.min((cx - margin) / Math.max(1e-3, Math.abs(ex)), (cy - margin) / Math.max(1e-3, Math.abs(ey)));
+            const el = rimArrows[rimUsed++];
+            el.style.transform = `translate(${cx + ex * scale}px, ${cy - ey * scale}px) rotate(${Math.atan2(-ey, ex) + Math.PI / 2}rad)`;
+            el.style.color = color;
+            el.style.borderBottomColor = color;
+            el.style.opacity = '0.85';
+        }
+
+        function updateRimArrows() {
+            const cx = window.innerWidth / 2;
+            const cy = window.innerHeight / 2;
+            const margin = 40;
+            rimUsed = 0;
+            for (const r of rocks) {
+                if (rimUsed >= rimArrows.length) break;
+                if (r.dying) continue;
+                if (r.type === 'occluder') placeRimArrow(r.pos, RIM_COLORS.occluder, cx, cy, margin);
+                else if (r.type === 'slag') placeRimArrow(r.pos, RIM_COLORS.slag, cx, cy, margin);
+                else if (r.size === 'large') placeRimArrow(r.pos, RIM_COLORS.large, cx, cy, margin);
+            }
+            for (const w of duskwings) {
+                if (rimUsed >= rimArrows.length) break;
+                placeRimArrow(w.pos, RIM_COLORS.wing, cx, cy, margin);
+            }
+            for (let i = rimUsed; i < rimArrows.length; i++) rimArrows[i].style.opacity = '0';
+        }
+
+        // ---- HUD (only touch the DOM on change to avoid per-frame style recalc) ----
+        const uiCache = {};
+
+        function updateUi(dt) {
+            state.displayScore = lerp(state.displayScore, state.score, 1 - Math.exp(-dt * 9));
+            const sr = Math.round(state.displayScore);
+            if (sr !== uiCache.score) { ui.scoreVal.textContent = sr.toLocaleString(); uiCache.score = sr; }
+
+            const chain = Math.max(1, state.chain);
+            if (chain !== uiCache.chain) { ui.chainMult.textContent = 'x' + chain; uiCache.chain = chain; }
+            const chainFrac = state.chain > 0 ? Math.round(clamp(state.chainTimer / 2.0, 0, 1) * 100) : 0;
+            if (chainFrac !== uiCache.chainFrac) { ui.chainFill.style.width = chainFrac + '%'; uiCache.chainFrac = chainFrac; }
+            const chainHeat = Math.round(clamp(state.chain / CHAIN_METER_MAX, 0, 1) * 40);
+            if (chainHeat !== uiCache.chainHeat) {
+                uiCache.chainHeat = chainHeat;
+                const h = chainHeat / 40;
+                tempColor.set(0xffd98a).lerp(tempColorHot, h);
+                ui.chainMult.style.color = '#' + tempColor.getHexString();
+                ui.chainMult.style.textShadow = `0 0 ${Math.round(14 + h * 20)}px rgba(255, ${Math.round(190 - h * 70)}, ${Math.round(120 - h * 60)}, ${(0.5 + h * 0.3).toFixed(2)})`;
+            }
+
+            const lumen = Math.round(state.lumen);
+            if (lumen !== uiCache.lumen) {
+                ui.lumenVal.textContent = lumen;
+                ui.lumenFill.style.width = clamp(lumen / LUMEN_MAX, 0, 1) * 100 + '%';
+                ui.lumenFill.classList.toggle('ready', lumen >= flareStrike.cost);
+                uiCache.lumen = lumen;
+            }
+
+            const kindling = Math.round(state.kindling);
+            if (kindling !== uiCache.kindling) {
+                ui.kindlingVal.textContent = kindling + ' / ' + state.kindlingNeed;
+                ui.kindlingFill.style.width = clamp(kindling / state.kindlingNeed, 0, 1) * 100 + '%';
+                uiCache.kindling = kindling;
+            }
+            const kf = clamp(state.kindling / state.kindlingNeed, 0, 1).toFixed(3);
+            if (kf !== uiCache.kindleFill) { ui.kindlingRing.style.setProperty('--kindle-fill', kf); uiCache.kindleFill = kf; }
+
+            const ringState = eruption.active ? 2 : state.kindling / state.kindlingNeed > 0.62 ? 1 : 0;
+            if (ringState !== uiCache.ringState) {
+                ui.kindlingWrap.classList.toggle('stirring', ringState === 1);
+                ui.kindlingWrap.classList.toggle('erupting', ringState === 2);
+                ui.kindlingLabel.textContent = ringState === 2 ? 'Erupting' : ringState === 1 ? 'Stirring' : 'Kindling';
+                uiCache.ringState = ringState;
+            }
+
+            if (state.embersBanked !== uiCache.banked) { ui.embersVal.textContent = state.embersBanked; uiCache.banked = state.embersBanked; }
+
+            const starState = eruption.active ? 'Erupting' : state.occluded ? 'Occluded' : state.kindleLevel > 0.66 ? 'Blazing' : state.kindleLevel > 0.25 ? 'Stirring' : 'Dormant';
+            if (starState !== uiCache.starState) {
+                ui.starState.textContent = starState;
+                ui.starState.className = state.occluded ? 'occluded' : eruption.active ? 'erupting' : '';
+                uiCache.starState = starState;
+            }
+
+            if (state.hull !== uiCache.hull) {
+                ui.hearts.forEach((h, i) => h.classList.toggle('lit', i < state.hull));
+                uiCache.hull = state.hull;
+            }
+            if (state.wave !== uiCache.wave) { ui.waveVal.textContent = state.wave; uiCache.wave = state.wave; }
+            const rockCount = rocks.length + duskwings.length;
+            if (rockCount !== uiCache.rocks) { ui.rocksVal.textContent = rockCount; uiCache.rocks = rockCount; }
+            const vel = player.vel.length().toFixed(1);
+            if (vel !== uiCache.vel) { ui.velVal.textContent = vel; uiCache.vel = vel; }
+            if (state.bestChain !== uiCache.best) { ui.bestVal.textContent = state.bestChain; uiCache.best = state.bestChain; }
+
+            const hurtOp = state.hurt > 0.01 ? (state.hurt * 0.7).toFixed(2) : '0';
+            if (hurtOp !== uiCache.hurtOp) { ui.hurtFlash.style.opacity = hurtOp; uiCache.hurtOp = hurtOp; }
+
+            const cross = state.shot === 'cockpit' ? '0.9' : '0';
+            if (cross !== uiCache.cross) { ui.crosshair.style.opacity = cross; uiCache.cross = cross; }
+        }
+
+        const tempColorHot = new THREE.Color(0xff7e62);
+
+        function refreshUi() {
+            ui.missionTitle.textContent = missions[state.missionIndex].title;
+            ui.missionCopy.textContent = missions[state.missionIndex].copy;
+            ui.hearts.forEach((h, i) => h.classList.toggle('lit', i < state.hull));
+            uiCache.hull = state.hull;
+        }
+
+        function updateDebugReadout() {
+            ui.debugState.textContent = state.gameOver ? 'over' : state.paused ? 'paused' : 'run';
+            ui.debugRocks.textContent = rocks.length;
+            ui.debugWings.textContent = duskwings.length;
+            ui.debugEmbers.textContent = emberField.activeCount;
+            ui.debugSparks.textContent = sparks.activeCount;
+            ui.debugShards.textContent = shardActiveCount;
+            ui.debugFps.textContent = state.fps;
+            ui.debugChain.textContent = state.chain;
+            ui.debugKindling.textContent = Math.round(state.kindling) + '/' + state.kindlingNeed;
+        }
+
+        // ---- Banners / flashes ----
+        function setPaused(paused, title, copy) {
+            state.paused = paused;
+            ui.pause.textContent = paused && !state.gameOver ? 'Resume' : 'Pause';
+            if (paused) showBanner(title || 'Paused', copy || 'Press Space to resume.');
+            else hideBanner();
+        }
+        function showBanner(title, copy) {
+            ui.bannerTitle.textContent = title;
+            ui.bannerCopy.textContent = copy;
+            ui.banner.classList.add('show');
+        }
+        function hideBanner() { ui.banner.classList.remove('show'); }
+
+        function flashWave() {
+            ui.waveFlashTitle.textContent = missions[state.missionIndex].title;
+            ui.waveFlashSub.textContent = 'Wave ' + state.wave;
+            ui.waveFlash.classList.remove('show');
+            void ui.waveFlash.offsetWidth;
+            ui.waveFlash.classList.add('show');
+            refreshUi();
+        }
+
+        function flashErupt(strength) {
+            const el = ui.eruptFlash;
+            el.style.transition = 'opacity 0.04s linear';
+            el.style.opacity = String(0.7 * strength);
+            setTimeout(() => { el.style.transition = 'opacity 0.5s ease-out'; el.style.opacity = '0'; }, 60);
+        }
+
+        function flashHurt() {
+            const el = ui.hurtFlash;
+            el.style.transition = 'opacity 0.03s linear';
+            el.style.opacity = '0.8';
+            setTimeout(() => { el.style.transition = 'opacity 0.4s ease-out'; el.style.opacity = '0'; }, 50);
+        }
+
+        // ---- Debug ----
+        function toggleDebug() {
+            state.debugOpen = !state.debugOpen;
+            ui.debugModal.classList.toggle('show', state.debugOpen);
+            if (state.debugOpen) updateDebugReadout();
+        }
+        function closeDebug(resume) {
+            state.debugOpen = false;
+            ui.debugModal.classList.remove('show');
+            if (resume && state.paused && !state.gameOver) setPaused(false);
+        }
+        function runDebugAction(action) {
+            if (action === 'lumen') state.lumen = LUMEN_MAX;
+            else if (action === 'kindling') state.kindling = state.kindlingNeed;
+            else if (action === 'guns') applyPickup('guns', player.pos.clone());
+            else if (action === 'weld') applyPickup('weld', player.pos.clone());
+            else if (action === 'wing') applyPickup('wing', player.pos.clone());
+            else if (action === 'wave') advanceWave();
+            else if (action === 'clear') { clearRocks(); clearWings(); }
+            else if (action === 'invuln') state.forceInvuln = !state.forceInvuln;
+            updateDebugReadout();
+            refreshUi();
+        }
+
+        // ---- Input ----
+        function onKeyDown(event) {
+            if (event.code === 'Escape') {
+                event.preventDefault();
+                if (state.debugOpen) { closeDebug(false); return; }
+                state.controlsActive = false;
+                input.keys = Object.create(null);
+                input.firing = false;
+                showBanner('Controls Released', 'Click the shell or press a key to re-engage.');
+                return;
+            }
+            if (event.code === 'Backquote') { event.preventDefault(); toggleDebug(); return; }
+            if (event.code === 'Space') { event.preventDefault(); if (!state.gameOver) setPaused(!state.paused, 'Paused', 'Press Space or Pause to resume.'); return; }
+
+            if (!state.controlsActive) { state.controlsActive = true; hideBanner(); }
+            input.keys[event.code] = true;
+
+            if (FIRE_KEYS.has(event.code)) { if (!event.repeat) onFireDown(); event.preventDefault(); }
+            if (FLARE_KEYS.has(event.code)) { if (!event.repeat) requestFlare(); event.preventDefault(); }
+        }
+
+        function onKeyUp(event) {
+            input.keys[event.code] = false;
+            if (FIRE_KEYS.has(event.code)) onFireUp();
+        }
+
+        function bindEvents() {
+            window.addEventListener('resize', onResize);
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+
+            ui.stage.addEventListener('pointerdown', (event) => {
+                if (event.button === 2) { requestFlare(); return; }
+                if (event.button !== 0) return;
+                if (!state.controlsActive) { state.controlsActive = true; hideBanner(); }
+                onFireDown();
+            });
+            ui.stage.addEventListener('contextmenu', (e) => e.preventDefault());
+            window.addEventListener('pointerup', onFireUp);
+
+            ui.newRun.addEventListener('click', resetRun);
+            ui.fire.addEventListener('pointerdown', (e) => { e.preventDefault(); onFireDown(); });
+            ui.fire.addEventListener('pointerup', (e) => { e.preventDefault(); onFireUp(); });
+            ui.flare.addEventListener('click', requestFlare);
+            bindHold(ui.mvLeft, 'touchLeft');
+            bindHold(ui.mvRight, 'touchRight');
+            bindHold(ui.mvThrust, 'touchThrust');
+            bindHold(ui.mvBrake, 'touchBrake');
+            if (ui.mvFlare) ui.mvFlare.addEventListener('pointerdown', (e) => { e.preventDefault(); requestFlare(); });
+            ui.pause.addEventListener('click', () => setPaused(!state.paused, 'Paused', 'Press Space or Pause to resume.'));
+            ui.debug.addEventListener('click', toggleDebug);
+            ui.debugClose.addEventListener('click', () => closeDebug(false));
+            ui.debugResume.addEventListener('click', () => closeDebug(true));
+
+            document.querySelectorAll('[data-action]').forEach((b) => {
+                b.addEventListener('click', () => runDebugAction(b.dataset.action));
+            });
+            document.querySelectorAll('[data-shot]').forEach((b) => {
+                b.addEventListener('click', () => setShot(b.dataset.shot));
+            });
+
+            bindSlider('shake-slider', 'shake-label', 'tuneShake', (v) => v.toFixed(1) + 'x');
+            bindSlider('graze-slider', 'graze-label', 'tuneGraze', (v) => v.toFixed(1));
+            bindSlider('scoop-slider', 'scoop-label', 'tuneScoop', (v) => v.toFixed(1));
+            bindSlider('kindle-slider', 'kindle-label', 'tuneKindle', (v) => v.toFixed(1) + 'x');
+            bindSlider('thrust-slider', 'thrust-label', 'tuneThrust', (v) => v.toFixed(0));
+            bindSlider('drag-slider', 'drag-label', 'tuneDrag', (v) => v.toFixed(2));
+            bindSlider('turn-slider', 'turn-label', 'tuneTurn', (v) => v.toFixed(1));
+            bindSlider('speed-slider', 'speed-label', 'tuneMaxSpeed', (v) => v.toFixed(0));
+            bindSlider('bloom-slider', 'bloom-label', 'bloom', (v) => v.toFixed(2));
+            bindSlider('grade-slider', 'grade-label', 'grade', (v) => v.toFixed(2));
+            bindSlider('glow-slider', 'glow-label', 'tuneGlow', (v) => v.toFixed(1) + 'x');
+        }
+
+        // Hold-button wiring that survives finger drift off the button
+        function bindHold(el, key) {
+            if (!el) return;
+            const set = (v) => (e) => {
+                e.preventDefault();
+                if (v && !state.controlsActive) { state.controlsActive = true; hideBanner(); }
+                input[key] = v;
+            };
+            el.addEventListener('pointerdown', (e) => {
+                try { el.setPointerCapture(e.pointerId); } catch (_) {}
+                set(true)(e);
+            });
+            ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => el.addEventListener(ev, set(false)));
+        }
+
+        function bindSlider(sliderId, labelId, key, fmt) {
+            const slider = document.getElementById(sliderId);
+            const label = document.getElementById(labelId);
+            if (!slider) return;
+            const apply = () => {
+                state[key] = parseFloat(slider.value);
+                if (label) label.textContent = fmt(state[key]);
+            };
+            slider.addEventListener('input', apply);
+            apply();
+        }
+
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+            bloomPass.setSize(window.innerWidth, window.innerHeight);
+            const pr = Math.min(window.devicePixelRatio || 1, 2);
+            sparks.material.uniforms.uPixelRatio.value = pr;
+            emberField.material.uniforms.uPixelRatio.value = pr;
+            if (starField) starField.material.uniforms.uPixelRatio.value = pr;
+            if (dustField) dustField.material.uniforms.uPixelRatio.value = pr;
+        }
+
+        // ---- Main loop ----
+        let fpsAccum = 0;
+        let fpsFrames = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.033);
+            state.visualTime += dt;
+
+            if (!state.paused && !state.debugOpen && !state.gameOver) {
+                updateGame(dt);
+            } else {
+                const idle = dt * 0.3;
+                updateSparks(idle);
+                updateShards(idle);
+                updateRings(idle);
+                updateGeysers(idle);
+            }
+
+            updateCamera(dt);
+            updateKindle(dt);
+            updatePostProcessing();
+            updateRimArrows();
+            updateUi(dt);
+
+            fpsAccum += dt;
+            fpsFrames += 1;
+            if (fpsAccum >= 0.5) {
+                state.fps = Math.round(fpsFrames / fpsAccum);
+                fpsAccum = 0;
+                fpsFrames = 0;
+                if (state.debugOpen) updateDebugReadout();
+            }
+
+            composer.render();
+        }
+
+        function updateGame(dt) {
+            state.elapsed += dt;
+            state.invulnerable = Math.max(0, state.invulnerable - dt);
+            state.gunTimer = Math.max(0, state.gunTimer - dt);
+            state.wingTimer = Math.max(0, state.wingTimer - dt);
+            state.chainTimer = Math.max(0, state.chainTimer - dt);
+            if (state.chainTimer <= 0 && state.chain > 0) state.chain = 0;
+
+            if (input.firing && state.gunTimer <= 0) fireGuns();
+
+            updatePlayer(dt);
+            updateFlare(dt);
+            updateEruption(dt);
+            updateRocks(dt);
+            updateDuskwings(dt);
+            updateShots(dt);
+            updatePickups(dt);
+            updateEmbers(dt);
+            updateSparks(dt);
+            updateShards(dt);
+            updateRings(dt);
+            updateGeysers(dt);
+            resolveImplosions(dt);
+            checkCollisions();
+
+            if (rocks.length === 0 && duskwings.length === 0 && pendingImplode.length === 0 && !eruption.active) {
+                advanceWave();
+            }
+        }
+
+        // ---- Bootstrap last, so every top-level const/let is initialized before init()/animate() run ----
+        function webglAvailable() {
+            try {
+                const canvas = document.createElement('canvas');
+                return !!(window.WebGLRenderingContext && (canvas.getContext('webgl2') || canvas.getContext('webgl')));
+            } catch (e) {
+                return false;
+            }
+        }
+
+        try {
+            if (!webglAvailable()) throw new Error('WebGL unavailable');
+            init();
+            animate();
+        } catch (err) {
+            console.error(err);
+            // Only show the "WebGL unavailable" panel when WebGL is genuinely missing —
+            // a transient JS error should not leave the game hidden behind a false message.
+            if (!webglAvailable()) ui.fallback.classList.add('show');
+        }
+    </script>
+</body>
+</html>
