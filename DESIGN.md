@@ -154,6 +154,14 @@ Priorities:
 
 `asteroids-composer.html` is a useful comparison because it mostly preserves the Vesper Belt loop while changing the experience frame: chase/wide/tight/drift camera shots, quieter transparent HUDs, shader belt backdrop, nebula dome, film grain, letterboxing, color grading, and live bloom/grade tuning. The lesson is not to hand off taste to another tool. The lesson is that future Codex game passes should include this director layer from the start so movement, camera, combat, and presentation can be judged together.
 
+The later agent variants prove that a strong identity axis beats feature pile-on:
+
+- Glassquall owns **time** (hitstop, heat, Phase Lance).
+- Sunseed owns **light** on a sphere (kindling, lumen, flare).
+- Coilwake owns **mass/cascade** on the plane (tether, sling, overcoil).
+
+When evaluating or building the next asteroids pass, pick one axis and make every system reinforce it. Do not recombine hitstop + light economy + cascade into one overloaded hybrid.
+
 Do not add more mechanics until movement and combat feel good. Do not let cinematic presentation hide weak movement or shallow pressure. Avoid dead guidance elements such as a decorative nose vector; if aiming help is needed, use a reticule that communicates range and direction without being glued to the ship silhouette.
 
 ### Gravity Loom
