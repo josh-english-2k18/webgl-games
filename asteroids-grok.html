@@ -1,0 +1,4068 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <title>Coilwake — Orbital Ring</title>
+    <style>
+        :root {
+            --bg: #08040f;
+            --ink: #eef4ff;
+            --muted: rgba(238, 244, 255, 0.54);
+            --line: rgba(238, 244, 255, 0.1);
+            --panel: rgba(8, 13, 24, 0.22);
+            --coil: #c084ff;
+            --coil-deep: #7c5cff;
+            --amber: #ffc24d;
+            --gold: #ffd45f;
+            --hot: #ff6ec7;
+            --green: #8dffb4;
+            --red: #ff5f8d;
+            --volt: #6ef3ff;
+            --radius: 9px;
+            --charge: 0;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button { font: inherit; }
+
+        /* Kill double-tap zoom, tap delay, and gesture recognition on the play surface + controls */
+        #stage, .controls, .control-btn, .touch-btn { touch-action: none; }
+
+        #stage {
+            position: fixed;
+            inset: 0;
+            overflow: hidden;
+            background:
+                radial-gradient(ellipse 90% 70% at 50% 118%, rgba(255, 140, 90, 0.18), transparent 48%),
+                radial-gradient(circle at 18% 12%, rgba(120, 180, 255, 0.1), transparent 36%),
+                radial-gradient(circle at 82% 22%, rgba(180, 100, 255, 0.12), transparent 34%),
+                linear-gradient(180deg, #070414 0%, #0a0618 48%, #12080e 100%);
+        }
+
+        #stage canvas { display: block; width: 100%; height: 100%; }
+
+        .grain, .vignette, .scan, .letterbox, .charge-scrim, .coil-flash {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        .charge-scrim {
+            z-index: 6;
+            opacity: calc(var(--charge) * 0.42);
+            background:
+                radial-gradient(ellipse 120% 90% at 50% 50%, transparent 46%, rgba(160, 90, 255, 0.18) 78%, rgba(255, 90, 200, 0.28) 100%),
+                linear-gradient(to top, rgba(120, 60, 220, 0.14), transparent 26%);
+            mix-blend-mode: screen;
+            transition: opacity 0.18s linear;
+        }
+
+        .coil-flash {
+            z-index: 7;
+            opacity: 0;
+            background: radial-gradient(circle at 50% 55%, rgba(230, 180, 255, 0.55), transparent 62%);
+            mix-blend-mode: screen;
+        }
+
+        .grain {
+            z-index: 8;
+            opacity: 0.032;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.84' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+            mix-blend-mode: overlay;
+        }
+
+        .scan {
+            z-index: 8;
+            opacity: 0.028;
+            background: repeating-linear-gradient(to bottom, transparent 0, transparent 8px, rgba(255, 255, 255, 0.4) 9px);
+            mix-blend-mode: screen;
+        }
+
+        .vignette {
+            z-index: 9;
+            background:
+                radial-gradient(ellipse 80% 66% at 50% 46%, transparent 52%, rgba(0, 0, 0, 0.4) 100%),
+                linear-gradient(to right, rgba(0, 0, 0, 0.5), transparent 15%, transparent 85%, rgba(0, 0, 0, 0.46));
+        }
+
+        .letterbox::before, .letterbox::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: clamp(6px, 1.4vh, 16px);
+            background: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.36));
+            z-index: 9;
+        }
+        .letterbox::before { top: 0; }
+        .letterbox::after { bottom: 0; transform: rotate(180deg); }
+
+        /* ---- Rim threat arrows ---- */
+        #rim-arrows { position: fixed; inset: 0; z-index: 12; pointer-events: none; }
+        .rim-arrow {
+            position: absolute;
+            top: 0; left: 0;
+            width: 0; height: 0;
+            margin: -9px 0 0 -7px;
+            border-left: 7px solid transparent;
+            border-right: 7px solid transparent;
+            border-bottom: 15px solid var(--coil);
+            opacity: 0;
+            transition: opacity 0.12s linear;
+            filter: drop-shadow(0 0 5px currentColor);
+        }
+
+        /* ---- Score popups ---- */
+        #popups { position: fixed; inset: 0; z-index: 13; pointer-events: none; overflow: hidden; }
+        .popup {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            color: var(--coil);
+            text-shadow: 0 0 10px rgba(192, 132, 255, 0.7);
+            animation: pop 0.85s ease-out forwards;
+            white-space: nowrap;
+        }
+        .popup.hot { color: var(--amber); text-shadow: 0 0 12px rgba(255, 194, 77, 0.8); }
+        @keyframes pop {
+            0% { opacity: 0; transform: translate(-50%, -40%) scale(0.7); }
+            18% { opacity: 1; transform: translate(-50%, -55%) scale(1.12); }
+            100% { opacity: 0; transform: translate(-50%, -150%) scale(1); }
+        }
+
+        /* ---- Cockpit crosshair ---- */
+        .crosshair {
+            position: fixed;
+            top: 50%; left: 50%;
+            z-index: 14;
+            width: 72px; height: 72px;
+            opacity: 0;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            transition: opacity 0.2s linear;
+            filter: drop-shadow(0 0 6px rgba(192, 132, 255, 0.7));
+        }
+        .crosshair::before, .crosshair::after {
+            content: "";
+            position: absolute;
+            background: rgba(192, 132, 255, 0.85);
+        }
+        .crosshair::before { top: 50%; left: 0; width: 100%; height: 1px; transform: translateY(-50%); }
+        .crosshair::after { left: 50%; top: 0; height: 100%; width: 1px; transform: translateX(-50%); }
+        .crosshair .ring {
+            position: absolute; inset: 22px;
+            border: 1px solid rgba(192, 132, 255, 0.7);
+            border-radius: 50%;
+        }
+        .crosshair .dot {
+            position: absolute; top: 50%; left: 50%;
+            width: 4px; height: 4px; margin: -2px 0 0 -2px;
+            background: var(--amber); border-radius: 50%;
+        }
+
+        /* ---- Top-center combo + heat ---- */
+        .combo-wrap {
+            position: fixed;
+            top: clamp(14px, 3vh, 30px);
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 15;
+            text-align: center;
+            pointer-events: none;
+        }
+        .combo-mult {
+            font-size: clamp(34px, 6vw, 58px);
+            font-weight: 800;
+            line-height: 1;
+            letter-spacing: -0.02em;
+            color: var(--coil);
+            text-shadow: 0 0 18px rgba(192, 132, 255, 0.55);
+            transition: color 0.16s linear, text-shadow 0.16s linear;
+        }
+        .combo-label {
+            margin-top: 4px;
+            font-size: 10px;
+            letter-spacing: 0.42em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+        .heat-track {
+            margin: 8px auto 0;
+            width: clamp(160px, 22vw, 240px);
+            height: 5px;
+            border-radius: 99px;
+            background: rgba(238, 244, 255, 0.1);
+            overflow: hidden;
+        }
+        .heat-fill {
+            height: 100%;
+            width: 0%;
+            border-radius: 99px;
+            background: linear-gradient(90deg, var(--coil), var(--amber) 64%, var(--hot));
+            box-shadow: 0 0 12px rgba(255, 160, 80, 0.5);
+            transition: width 0.12s linear;
+        }
+
+        /* ---- Charge ring (bottom center): Overcoil capacitor ---- */
+        .charge-wrap {
+            position: fixed;
+            bottom: clamp(96px, 16vh, 150px);
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 15;
+            pointer-events: none;
+            text-align: center;
+        }
+        .charge-ring {
+            width: 76px; height: 76px;
+            border-radius: 50%;
+            margin: 0 auto;
+            background:
+                conic-gradient(var(--coil) calc(var(--charge-fill, 0) * 360deg), rgba(238, 244, 255, 0.08) 0deg);
+            -webkit-mask: radial-gradient(transparent 56%, #000 57%);
+            mask: radial-gradient(transparent 56%, #000 57%);
+            opacity: 0.66;
+            transition: opacity 0.15s linear, filter 0.15s linear;
+        }
+        .charge-wrap.ready .charge-ring { opacity: 0.95; filter: drop-shadow(0 0 10px rgba(192, 132, 255, 0.75)); }
+        .charge-wrap.latched .charge-ring {
+            background: conic-gradient(var(--volt) 360deg, var(--volt) 0deg);
+            filter: drop-shadow(0 0 12px rgba(110, 243, 255, 0.8));
+        }
+        .charge-wrap.overcoil .charge-ring {
+            opacity: 1;
+            background: conic-gradient(#ffe8ff 360deg, #ffe8ff 0deg);
+            filter: drop-shadow(0 0 18px rgba(255, 110, 200, 0.9));
+        }
+        .charge-label {
+            margin-top: 7px;
+            font-size: 9px;
+            letter-spacing: 0.34em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+        .charge-wrap.ready .charge-label { color: var(--coil); }
+        .charge-wrap.latched .charge-label { color: var(--volt); }
+        .score-panel .v.coil { color: var(--coil); text-shadow: 0 0 12px rgba(192, 132, 255, 0.45); }
+        .stat .v.coil { color: var(--coil); }
+
+        /* ---- Side rails ---- */
+        .rail {
+            position: fixed;
+            top: clamp(14px, 3vh, 28px);
+            z-index: 15;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: clamp(178px, 19vw, 222px);
+        }
+        .rail.left { left: clamp(14px, 2.4vw, 30px); }
+        .rail.right { right: clamp(14px, 2.4vw, 30px); align-items: stretch; }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            margin-bottom: 2px;
+        }
+        .brand-mark {
+            width: 22px; height: 22px;
+            border-radius: 6px;
+            background: conic-gradient(from 210deg, var(--coil), var(--coil-deep), var(--amber), var(--coil));
+            box-shadow: 0 0 14px rgba(192, 132, 255, 0.5);
+        }
+        .brand h1 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+        }
+        .brand .sub { font-size: 9px; letter-spacing: 0.3em; color: var(--muted); text-transform: uppercase; }
+
+        /* Unmissable arena badge — if you don't see this, the browser is caching the old file */
+        .arena-badge {
+            position: fixed;
+            top: clamp(12px, 2.5vh, 24px);
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 40;
+            pointer-events: none;
+            padding: 5px 12px;
+            border-radius: 999px;
+            border: 1px solid rgba(110, 243, 255, 0.35);
+            background: rgba(8, 4, 20, 0.55);
+            color: var(--volt);
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0.28em;
+            text-transform: uppercase;
+            opacity: 0.75;
+            backdrop-filter: blur(8px);
+        }
+
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            padding: 11px 13px;
+            backdrop-filter: blur(7px);
+            -webkit-backdrop-filter: blur(7px);
+        }
+        .panel .head {
+            font-size: 9px;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 7px;
+        }
+        .panel .mission-title { font-size: 14px; font-weight: 700; margin-bottom: 3px; }
+        .panel .mission-copy { font-size: 11px; line-height: 1.45; color: var(--muted); }
+
+        .meter { margin-bottom: 9px; }
+        .meter:last-child { margin-bottom: 0; }
+        .meter .row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+        .meter .row b { color: var(--ink); font-weight: 600; }
+        .track { height: 6px; border-radius: 99px; background: rgba(238, 244, 255, 0.1); overflow: hidden; }
+        .fill { height: 100%; width: 0%; border-radius: 99px; transition: width 0.14s linear; }
+        .fill.shield { background: linear-gradient(90deg, var(--coil-deep), var(--coil)); box-shadow: 0 0 10px rgba(160, 120, 255, 0.5); }
+        .fill.overload { background: linear-gradient(90deg, var(--amber), var(--red)); box-shadow: 0 0 10px rgba(255, 120, 90, 0.4); }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px 12px;
+        }
+        .stat .k { font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+        .stat .v { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .stat .v.coil { color: var(--coil); }
+        .stat .v.amber { color: var(--amber); }
+
+        .score-panel { text-align: right; }
+        .score-panel .v { font-size: 30px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+
+        .arsenal { display: flex; flex-direction: column; gap: 6px; }
+        .chip {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 9px;
+            border-radius: 7px;
+            border: 1px solid var(--line);
+            background: rgba(238, 244, 255, 0.03);
+            font-size: 10px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--muted);
+        }
+        .chip.active { border-color: rgba(192, 132, 255, 0.45); background: rgba(192, 132, 255, 0.08); color: var(--ink); }
+        .chip b { color: var(--ink); font-weight: 700; }
+        .chip.maxed { border-color: rgba(255, 212, 95, 0.7); background: rgba(255, 212, 95, 0.14); color: var(--gold); box-shadow: 0 0 12px rgba(255, 212, 95, 0.3); }
+        .chip.maxed b { color: var(--gold); }
+        .fill.shield.maxed { background: linear-gradient(90deg, var(--amber), var(--gold)); box-shadow: 0 0 14px rgba(255, 212, 95, 0.6); }
+
+        /* ---- Controls ---- */
+        .controls {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 16;
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: min(94vw, 880px);
+            bottom: calc(clamp(12px, 2.4vh, 24px) + env(safe-area-inset-bottom, 0px));
+        }
+        .control-panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            padding: 9px 11px;
+            backdrop-filter: blur(7px);
+            -webkit-backdrop-filter: blur(7px);
+        }
+        .control-panel .head { font-size: 8px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--muted); margin-bottom: 7px; text-align: center; }
+        .btn-row { display: flex; gap: 7px; }
+        .control-btn {
+            appearance: none;
+            border: 1px solid var(--line);
+            background: rgba(238, 244, 255, 0.04);
+            color: var(--ink);
+            border-radius: 7px;
+            padding: 8px 12px;
+            font-size: 11px;
+            letter-spacing: 0.06em;
+            cursor: pointer;
+            transition: background 0.14s, border-color 0.14s, transform 0.08s;
+            white-space: nowrap;
+        }
+        .control-btn:hover { background: rgba(192, 132, 255, 0.1); border-color: rgba(192, 132, 255, 0.4); }
+        .control-btn:active { transform: translateY(1px); }
+        .control-btn.primary { background: rgba(192, 132, 255, 0.16); border-color: rgba(192, 132, 255, 0.5); }
+        .control-btn.amber { background: rgba(255, 194, 77, 0.14); border-color: rgba(255, 194, 77, 0.45); }
+        .control-btn.active { background: rgba(192, 132, 255, 0.2); border-color: rgba(192, 132, 255, 0.6); }
+
+        /* ---- Pause banner ---- */
+        .banner {
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) scale(0.96);
+            z-index: 20;
+            text-align: center;
+            padding: 26px 40px;
+            border-radius: 14px;
+            background: rgba(6, 11, 22, 0.72);
+            border: 1px solid var(--line);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.2s, transform 0.2s;
+        }
+        .banner.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+        .banner h2 { margin: 0 0 8px; font-size: 24px; letter-spacing: 0.12em; text-transform: uppercase; }
+        .banner p { margin: 0; font-size: 12px; color: var(--muted); }
+
+        .wave-flash {
+            position: fixed;
+            top: 38%; left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 17;
+            text-align: center;
+            pointer-events: none;
+            opacity: 0;
+        }
+        .wave-flash.show { animation: waveflash 2.1s ease-out forwards; }
+        .wave-flash .t { font-size: clamp(22px, 4vw, 38px); font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; text-shadow: 0 0 22px rgba(192, 132, 255, 0.5); }
+        .wave-flash .s { font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--amber); margin-top: 6px; }
+        @keyframes waveflash {
+            0% { opacity: 0; transform: translate(-50%, -36%); }
+            16% { opacity: 1; transform: translate(-50%, -50%); }
+            74% { opacity: 1; transform: translate(-50%, -50%); }
+            100% { opacity: 0; transform: translate(-50%, -64%); }
+        }
+
+        /* ---- Debug modal ---- */
+        .debug-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 30;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(2, 4, 9, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+        .debug-modal.show { display: flex; }
+        .debug-panel {
+            width: min(92vw, 560px);
+            max-height: 86vh;
+            overflow-y: auto;
+            background: rgba(8, 13, 24, 0.94);
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 20px 22px;
+        }
+        .debug-panel h3 { margin: 0 0 4px; font-size: 16px; letter-spacing: 0.1em; }
+        .debug-panel .desc { font-size: 11px; color: var(--muted); margin-bottom: 16px; }
+        .debug-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 9px;
+            margin-bottom: 16px;
+        }
+        .debug-stat { background: rgba(238, 244, 255, 0.04); border-radius: 8px; padding: 8px 10px; }
+        .debug-stat .k { font-size: 8px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+        .debug-stat .v { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .debug-section-title { font-size: 9px; letter-spacing: 0.28em; text-transform: uppercase; color: var(--muted); margin: 14px 0 8px; }
+        .debug-tuning { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 16px; }
+        .tune label { display: block; font-size: 10px; color: var(--muted); margin-bottom: 4px; letter-spacing: 0.06em; }
+        .tune label b { color: var(--ink); font-variant-numeric: tabular-nums; }
+        .debug-actions { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0; }
+        .debug-btn {
+            border: 1px solid var(--line);
+            background: rgba(238, 244, 255, 0.04);
+            color: var(--ink);
+            border-radius: 7px;
+            padding: 7px 10px;
+            font-size: 10px;
+            cursor: pointer;
+            letter-spacing: 0.05em;
+        }
+        .debug-btn:hover { background: rgba(192, 132, 255, 0.1); border-color: rgba(192, 132, 255, 0.4); }
+        .debug-foot { display: flex; gap: 9px; justify-content: flex-end; margin-top: 6px; }
+
+        input[type="range"] {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            height: 4px;
+            border-radius: 99px;
+            background: rgba(238, 244, 255, 0.16);
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px; height: 14px;
+            border-radius: 50%;
+            background: var(--coil);
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(192, 132, 255, 0.6);
+        }
+        input[type="range"]::-moz-range-thumb {
+            width: 14px; height: 14px; border: none; border-radius: 50%;
+            background: var(--coil); cursor: pointer;
+        }
+
+        #fallback {
+            position: fixed;
+            inset: 0;
+            z-index: 40;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 30px;
+            background: var(--bg);
+        }
+        #fallback.show { display: flex; }
+        #fallback div { max-width: 440px; }
+        #fallback h2 { font-size: 20px; margin: 0 0 10px; }
+        #fallback p { color: var(--muted); font-size: 13px; line-height: 1.5; }
+
+        /* Touch movement pad — left thumb steers, right thumb thrust/brake. Fire = tap the field. */
+        .touch-pad {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+            z-index: 16;
+            display: none;
+            justify-content: space-between;
+            padding: 0 max(14px, env(safe-area-inset-left, 0px)) 0 max(14px, env(safe-area-inset-right, 0px));
+            pointer-events: none;
+        }
+        .touch-cluster { display: flex; gap: 12px; pointer-events: auto; }
+        .touch-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            border: 1px solid var(--line);
+            background: rgba(238, 244, 255, 0.07);
+            color: var(--ink);
+            font-size: 21px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+        }
+        .touch-btn:active { background: rgba(192, 132, 255, 0.22); border-color: rgba(192, 132, 255, 0.6); }
+        .touch-btn.tether {
+            color: var(--volt);
+            border-color: rgba(110, 243, 255, 0.35);
+            background: rgba(110, 243, 255, 0.1);
+        }
+        @media (pointer: coarse), (max-width: 720px) {
+            .touch-pad { display: flex; }
+        }
+
+        @media (max-width: 940px) {
+            .rail { width: clamp(150px, 30vw, 200px); }
+            .combo-mult { font-size: clamp(30px, 9vw, 46px); }
+        }
+        @media (max-width: 720px) {
+            .rail.right { display: none; }
+            .rail.left { display: none; }
+            .charge-wrap { bottom: 150px; }
+            .controls { gap: 7px; }
+            .btn-row { flex-wrap: wrap; justify-content: center; }
+            .control-btn { padding: 9px 11px; }
+            .debug-grid { grid-template-columns: repeat(2, 1fr); }
+            .debug-tuning { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div id="stage"></div>
+    <div class="arena-badge" id="arena-badge">Orbital ring · coplanar deck</div>
+    <div class="charge-scrim"></div>
+    <div class="coil-flash" id="coil-flash"></div>
+    <div class="scan"></div>
+    <div class="grain"></div>
+    <div class="vignette"></div>
+    <div class="letterbox"></div>
+
+    <div id="rim-arrows"></div>
+    <div id="popups"></div>
+
+    <div class="crosshair" id="crosshair">
+        <div class="ring"></div>
+        <div class="dot"></div>
+    </div>
+
+    <div class="combo-wrap">
+        <div class="combo-mult" id="combo-mult">x1</div>
+        <div class="combo-label">Cascade</div>
+        <div class="heat-track"><div class="heat-fill" id="heat-fill"></div></div>
+    </div>
+
+    <div class="charge-wrap" id="charge-wrap">
+        <div class="charge-ring" id="charge-ring"></div>
+        <div class="charge-label" id="charge-label">Charge</div>
+    </div>
+
+    <div class="rail left">
+        <div class="brand">
+            <div class="brand-mark"></div>
+            <div>
+                <h1>Coilwake</h1>
+                <div class="sub">Orbital Ring · v2</div>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="head">Hull Status</div>
+            <div class="meter">
+                <div class="row"><span>Shield</span><b id="shield-val">100</b></div>
+                <div class="track"><div class="fill shield" id="shield-fill"></div></div>
+            </div>
+            <div class="meter">
+                <div class="row"><span>Gun Heat</span><b id="overload-val">0</b></div>
+                <div class="track"><div class="fill overload" id="overload-fill"></div></div>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="head">Mission</div>
+            <div class="mission-title" id="mission-title">First Pull</div>
+            <div class="mission-copy" id="mission-copy">You are on a circular ring around the gas giant. Fly the full orbit — there is no square map edge.</div>
+        </div>
+    </div>
+
+    <div class="rail right">
+        <div class="panel score-panel">
+            <div class="head">Score</div>
+            <div class="v coil" id="score-val">0</div>
+        </div>
+        <div class="panel">
+            <div class="head">Ring Band</div>
+            <div class="stat-grid">
+                <div class="stat"><div class="k">Wave</div><div class="v" id="wave-val">1</div></div>
+                <div class="stat"><div class="k">Rocks</div><div class="v" id="rocks-val">0</div></div>
+                <div class="stat"><div class="k">Velocity</div><div class="v coil" id="vel-val">0</div></div>
+                <div class="stat"><div class="k">Best Cascade</div><div class="v amber" id="best-val">0</div></div>
+            </div>
+        </div>
+        <div class="panel">
+            <div class="head">Arsenal</div>
+            <div class="arsenal">
+                <div class="chip" id="chip-guns"><span>Guns</span><b id="guns-val">MK1</b></div>
+                <div class="chip" id="chip-tether"><span>Tether</span><b id="tether-val">READY</b></div>
+                <div class="chip" id="chip-charge"><span>Charge</span><b id="charge-val">0</b></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="touch-pad" id="touch-pad">
+        <div class="touch-cluster">
+            <button class="touch-btn" id="mv-left" aria-label="Turn left">&#9664;</button>
+            <button class="touch-btn" id="mv-right" aria-label="Turn right">&#9654;</button>
+        </div>
+        <div class="touch-cluster">
+            <button class="touch-btn tether" id="mv-tether" aria-label="Tether">&#9889;</button>
+            <button class="touch-btn" id="mv-brake" aria-label="Brake">&#9660;</button>
+            <button class="touch-btn" id="mv-thrust" aria-label="Thrust">&#9650;</button>
+        </div>
+    </div>
+
+    <div class="controls">
+        <div class="control-panel">
+            <div class="head">Flight</div>
+            <div class="btn-row">
+                <button class="control-btn primary" id="new-run">New Run</button>
+                <button class="control-btn amber" id="fire" title="Tap or hold: fire coil guns">Fire</button>
+                <button class="control-btn" id="tether" title="Latch a rock, press again to sling · Full charge: Overcoil">Tether</button>
+                <button class="control-btn" id="pause">Pause</button>
+                <button class="control-btn" id="debug">Debug</button>
+            </div>
+        </div>
+        <div class="control-panel">
+            <div class="head">Camera</div>
+            <div class="btn-row">
+                <button class="control-btn" data-shot="chase">Pursuit</button>
+                <button class="control-btn" data-shot="cockpit">Cockpit</button>
+                <button class="control-btn" data-shot="sweep">Sweep</button>
+                <button class="control-btn" data-shot="drift">Drift</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="banner" id="banner">
+        <h2 id="banner-title">Paused</h2>
+        <p id="banner-copy">Press Space to resume.</p>
+    </div>
+
+    <div class="wave-flash" id="wave-flash">
+        <div class="t" id="wave-flash-title">First Pull</div>
+        <div class="s" id="wave-flash-sub">Wave 1</div>
+    </div>
+
+    <div class="debug-modal" id="debug-modal">
+        <div class="debug-panel">
+            <h3>Coilwake — Director Console</h3>
+            <div class="desc">Live counters and feel levers. Tune movement, tether feel, and cascade while paused.</div>
+            <div class="debug-grid">
+                <div class="debug-stat"><div class="k">State</div><div class="v" id="debug-state">run</div></div>
+                <div class="debug-stat"><div class="k">Rocks</div><div class="v" id="debug-rocks">0</div></div>
+                <div class="debug-stat"><div class="k">Leeches</div><div class="v" id="debug-leeches">0</div></div>
+                <div class="debug-stat"><div class="k">Sparks</div><div class="v" id="debug-sparks">0</div></div>
+                <div class="debug-stat"><div class="k">Shards</div><div class="v" id="debug-shards">0</div></div>
+                <div class="debug-stat"><div class="k">FPS</div><div class="v" id="debug-fps">60</div></div>
+                <div class="debug-stat"><div class="k">Cascade</div><div class="v" id="debug-combo">0</div></div>
+                <div class="debug-stat"><div class="k">Charge</div><div class="v" id="debug-charge">0</div></div>
+                <div class="debug-stat"><div class="k">Tether</div><div class="v" id="debug-tether">free</div></div>
+            </div>
+
+            <div class="debug-section-title">Feel</div>
+            <div class="debug-tuning">
+                <div class="tune"><label>Screen Shake <b id="shake-label">1.0x</b></label><input type="range" id="shake-slider" min="0" max="2" step="0.05" value="1"></div>
+                <div class="tune"><label>Cascade Gain <b id="cascadegain-label">1.0x</b></label><input type="range" id="cascade-slider" min="0" max="2" step="0.05" value="1"></div>
+                <div class="tune"><label>Tether Pull <b id="pull-label">1.0x</b></label><input type="range" id="pull-slider" min="0.4" max="2" step="0.05" value="1"></div>
+                <div class="tune"><label>Sling Force <b id="sling-label">1.0x</b></label><input type="range" id="sling-slider" min="0.4" max="2.2" step="0.05" value="1"></div>
+            </div>
+
+            <div class="debug-section-title">Movement</div>
+            <div class="debug-tuning">
+                <div class="tune"><label>Thrust <b id="thrust-label">21</b></label><input type="range" id="thrust-slider" min="10" max="38" step="1" value="21"></div>
+                <div class="tune"><label>Coast Drag <b id="drag-label">0.62</b></label><input type="range" id="drag-slider" min="0.3" max="0.92" step="0.01" value="0.62"></div>
+                <div class="tune"><label>Turn Rate <b id="turn-label">4.2</b></label><input type="range" id="turn-slider" min="2.5" max="6.5" step="0.1" value="4.2"></div>
+                <div class="tune"><label>Max Speed <b id="speed-label">18</b></label><input type="range" id="speed-slider" min="10" max="30" step="1" value="18"></div>
+            </div>
+
+            <div class="debug-section-title">Presentation</div>
+            <div class="debug-tuning">
+                <div class="tune"><label>Bloom <b id="bloom-label">0.22</b></label><input type="range" id="bloom-slider" min="0" max="1" step="0.02" value="0.22"></div>
+                <div class="tune"><label>Grade <b id="grade-label">0.22</b></label><input type="range" id="grade-slider" min="0" max="1" step="0.02" value="0.22"></div>
+            </div>
+
+            <div class="debug-section-title">Actions</div>
+            <div class="debug-actions">
+                <button class="debug-btn" data-action="shield">Grant Shield</button>
+                <button class="debug-btn" data-action="guns">Upgrade Guns</button>
+                <button class="debug-btn" data-action="charge">Fill Charge</button>
+                <button class="debug-btn" data-action="overcoil">Force Overcoil</button>
+                <button class="debug-btn" data-action="overdrive">Overdrive</button>
+                <button class="debug-btn" data-action="wave">Spawn Wave</button>
+                <button class="debug-btn" data-action="clear">Clear Field</button>
+                <button class="debug-btn" data-action="invuln">Toggle Invuln</button>
+            </div>
+
+            <div class="debug-foot">
+                <button class="control-btn" id="debug-close">Close</button>
+                <button class="control-btn primary" id="debug-resume">Resume</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="fallback">
+        <div>
+            <h2>WebGL unavailable</h2>
+            <p>Coilwake needs a WebGL2-capable browser with hardware acceleration enabled. Try a recent Chrome, Firefox, Safari, or Edge.</p>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.174.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.174.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+        // ---- Constants ----
+        // True ring arena: planet at origin, play in an annular band. No square wrap.
+        // Scale chosen so the giant is always large in frame while you skim a clear annular lane
+        const PLANET_R = 90;
+        const RING_R0 = 148;          // nominal flight radius (close enough to read planet curvature)
+        const RING_R_MIN = 128;       // inner rail — outside planet atmosphere
+        const RING_R_MAX = 178;       // outer rail
+        const DECK_Y = 0.55;          // single combat plane — guns, rocks, ship all share this
+        const RING_Y_MAX = 0.8;        // tiny bob only; combat snaps to DECK_Y
+        const RING_VIS_INNER = 110;
+        const RING_VIS_OUTER = 220;
+        const PLAYER_RADIUS = 1.3;
+        const SPARK_CAP = 1600;
+        const SHARD_CAP = 360;
+        const RING_CAP = 72;
+        const SHOT_POOL = 110;
+        const STAR_COUNT = 2200;
+        const CHARGE_MAX = 100;
+        const OVERCOIL_COST = 100;
+        const CASCADE_MAX_COMBO = 22;
+        const TETHER_RANGE = 38;
+        const TETHER_SPEED = 72;
+        const SLING_SPEED = 34;
+        const ROCK_COLLIDE_COOLDOWN = 0.12;
+        const FIRE_KEYS = new Set(['KeyF', 'Enter']);
+        const TETHER_KEYS = new Set(['KeyE', 'KeyM', 'ShiftLeft', 'ShiftRight']);
+
+        // ---- DOM cache ----
+        const ui = {
+            stage: document.getElementById('stage'),
+            fallback: document.getElementById('fallback'),
+            chargeScrim: document.querySelector('.charge-scrim'),
+            coilFlash: document.getElementById('coil-flash'),
+            rimArrows: document.getElementById('rim-arrows'),
+            popups: document.getElementById('popups'),
+            crosshair: document.getElementById('crosshair'),
+            comboMult: document.getElementById('combo-mult'),
+            heatFill: document.getElementById('heat-fill'),
+            chargeWrap: document.getElementById('charge-wrap'),
+            chargeRing: document.getElementById('charge-ring'),
+            chargeLabel: document.getElementById('charge-label'),
+            shieldVal: document.getElementById('shield-val'),
+            shieldFill: document.getElementById('shield-fill'),
+            overloadVal: document.getElementById('overload-val'),
+            overloadFill: document.getElementById('overload-fill'),
+            missionTitle: document.getElementById('mission-title'),
+            missionCopy: document.getElementById('mission-copy'),
+            scoreVal: document.getElementById('score-val'),
+            waveVal: document.getElementById('wave-val'),
+            rocksVal: document.getElementById('rocks-val'),
+            velVal: document.getElementById('vel-val'),
+            bestVal: document.getElementById('best-val'),
+            gunsVal: document.getElementById('guns-val'),
+            tetherVal: document.getElementById('tether-val'),
+            chargeVal: document.getElementById('charge-val'),
+            chipGuns: document.getElementById('chip-guns'),
+            chipTether: document.getElementById('chip-tether'),
+            chipCharge: document.getElementById('chip-charge'),
+            newRun: document.getElementById('new-run'),
+            fire: document.getElementById('fire'),
+            tetherBtn: document.getElementById('tether'),
+            pause: document.getElementById('pause'),
+            debug: document.getElementById('debug'),
+            mvLeft: document.getElementById('mv-left'),
+            mvRight: document.getElementById('mv-right'),
+            mvThrust: document.getElementById('mv-thrust'),
+            mvBrake: document.getElementById('mv-brake'),
+            banner: document.getElementById('banner'),
+            bannerTitle: document.getElementById('banner-title'),
+            bannerCopy: document.getElementById('banner-copy'),
+            waveFlash: document.getElementById('wave-flash'),
+            waveFlashTitle: document.getElementById('wave-flash-title'),
+            waveFlashSub: document.getElementById('wave-flash-sub'),
+            debugModal: document.getElementById('debug-modal'),
+            debugClose: document.getElementById('debug-close'),
+            debugResume: document.getElementById('debug-resume'),
+            debugState: document.getElementById('debug-state'),
+            debugRocks: document.getElementById('debug-rocks'),
+            debugLeeches: document.getElementById('debug-leeches'),
+            debugSparks: document.getElementById('debug-sparks'),
+            debugShards: document.getElementById('debug-shards'),
+            debugFps: document.getElementById('debug-fps'),
+            debugCombo: document.getElementById('debug-combo'),
+            debugCharge: document.getElementById('debug-charge'),
+            debugTether: document.getElementById('debug-tether')
+        };
+
+        // ---- Color grade + chromatic + cascade-charge violet pass ----
+        const colorGradeShader = {
+            uniforms: {
+                tDiffuse: { value: null },
+                grade: { value: 0.22 },
+                charge: { value: 0 },
+                chroma: { value: 0 }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D tDiffuse;
+                uniform float grade;
+                uniform float charge;
+                uniform float chroma;
+                varying vec2 vUv;
+
+                void main() {
+                    vec2 uv = vUv;
+                    vec2 dir = uv - 0.5;
+                    vec2 offset = dir * (grade * 0.0012 + chroma * 0.004);
+                    vec3 color = vec3(
+                        texture2D(tDiffuse, uv + offset).r,
+                        texture2D(tDiffuse, uv).g,
+                        texture2D(tDiffuse, uv - offset).b
+                    );
+                    float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+                    vec3 cool = vec3(0.92, 0.9, 1.1);
+                    vec3 warm = vec3(1.08, 0.95, 1.06);
+                    color *= mix(vec3(1.0), mix(cool, warm, smoothstep(0.2, 0.85, luma)), grade * 0.32);
+                    // charge lifts toward violet; residual warm mids keep the giant present
+                    vec3 chargeTint = vec3(1.06, 0.96, 1.12);
+                    vec3 planetWarm = vec3(1.06, 1.0, 0.96);
+                    color *= mix(vec3(1.0), planetWarm, 0.08 + charge * 0.06);
+                    color *= mix(vec3(1.0), chargeTint, charge * 0.18);
+                    color = (color - 0.5) * (1.0 + grade * 0.07 + charge * 0.035) + 0.5;
+                    gl_FragColor = vec4(clamp(color, 0.0, 1.0), 1.0);
+                }
+            `
+        };
+
+        // ---- Camera shot presets (every label an honest viewpoint) ----
+        const shotModes = {
+            // Classic chase: slightly outside + above so the giant reads without fighting the aim plane
+            chase: { name: 'Pursuit', back: 13.5, up: 5.8, shoulder: 1.2, lookAhead: 18, lookUp: 0.35, lag: 11, planetPull: 0.06 },
+            cockpit: { name: 'Cockpit', eyeForward: 0.7, eyeUp: 0.55, lookAhead: 30, lookUp: 0.2, lag: 22, planetPull: 0.03 },
+            sweep: { name: 'Sweep', height: 26, out: 34, lag: 4.2, drift: 0.04 },
+            drift: { name: 'Drift', height: 42, out: 58, lag: 2.8, drift: 0.1 }
+        };
+
+        // ---- Central state (single source of truth) ----
+        const state = {
+            elapsed: 0,
+            visualTime: 0,
+            score: 0,
+            displayScore: 0,
+            wave: 1,
+            lives: 3,
+            kills: 0,
+            combo: 0,
+            comboTimer: 0,
+            bestCombo: 0,
+            shield: 100,
+            shieldMax: 100,
+            shieldTier: 0,
+            heat: 0,
+            gunsLevel: 1,
+            overdriveTimer: 0,
+            gunTimer: 0,
+            autoTimer: 0,
+            invulnerable: 2.6,
+            forceInvuln: false,
+            charge: 0,
+            chargeMax: CHARGE_MAX,
+            chargeLevel: 0,
+            cascadeLevel: 0,
+            timeScale: 1,
+            recentKills: 0,
+            shake: 0,
+            camPunch: 0,
+            chroma: 0,
+            paused: false,
+            debugOpen: false,
+            controlsActive: true,
+            gameOver: false,
+            missionIndex: 0,
+            bloom: 0.22,
+            grade: 0.18,
+            shot: 'chase',
+            cameraDriftX: 0,
+            cameraDriftY: 0,
+            fps: 60,
+            // tuning levers
+            tuneShake: 1,
+            tuneCascade: 1,
+            tunePull: 1,
+            tuneSling: 1,
+            tuneThrust: 21,
+            tuneDrag: 0.62,
+            tuneTurn: 4.2,
+            tuneMaxSpeed: 18
+        };
+
+        const tether = {
+            // free | flying | latched | overcoil
+            mode: 'free',
+            target: null,
+            bolt: null,
+            boltVel: new THREE.Vector3(),
+            boltLife: 0,
+            line: null,
+            lineGeo: null,
+            lineMat: null,
+            latchTimer: 0,
+            cooldown: 0,
+            slingImmune: 0, // brief window after sling so player doesn't re-hit own projectile rock
+            overcoilTimer: 0,
+            overcoilDuration: 0.55,
+            overcoilOrigin: new THREE.Vector3(),
+            arcs: []
+        };
+
+        const input = {
+            keys: Object.create(null),
+            thrusting: false,
+            firing: false,
+            fireStart: 0,
+            touchLeft: false,
+            touchRight: false,
+            touchThrust: false,
+            touchBrake: false
+        };
+
+        const missions = [
+            { title: 'First Pull', copy: 'Skim the rings. Latch slag. Sling cascades above the giant.' },
+            { title: 'Slag Field', copy: 'Iron slag is heavy ammo. Sling hard, cascade harder.' },
+            { title: 'Leech Tide', copy: 'Leeches drain your capacitor. Keep charge moving.' },
+            { title: 'Coil Tension', copy: 'Fill charge, then dump an Overcoil into the cluster.' },
+            { title: 'Forge Heart', copy: 'A Forge Core spins. Crack the shell, then the nucleus.' },
+            { title: 'Coilwake', copy: 'The field answers every sling. Ride the cascade home.' }
+        ];
+
+        // ---- Three.js globals ----
+        let scene, camera, renderer, composer, bloomPass, gradePass, clock;
+        let player, fieldGroup, effectRoot, starField, thrustLight;
+        let beltBackdrop, nebulaDome, gasGiant, ringSystem, ringDust, sunDisc;
+        let planetLight, sunLight;
+        let sparks;
+        const asteroids = [];
+        const hunters = [];
+        const shots = [];
+        const missiles = [];
+        const pickups = [];
+        const shards = [];
+        const rings = [];
+        const shotMeshPool = [];
+        const pendingShatter = [];
+        const rimArrows = [];
+
+        const geometries = {};
+        const geoPool = {};
+        const materials = {};
+        const tempVec = new THREE.Vector3();
+        const tempVecB = new THREE.Vector3();
+        const tempVecC = new THREE.Vector3();
+        const tempForward = new THREE.Vector3();
+        const tempRight = new THREE.Vector3();
+        const tempDelta = new THREE.Vector3();
+        const tempColor = new THREE.Color();
+        const Z_AXIS = new THREE.Vector3(0, 0, 1);
+        const Y_AXIS = new THREE.Vector3(0, 1, 0);
+        const WHITE = new THREE.Color(0xffffff);
+
+        const pickupSpecs = {
+            shield: { color: 0x8f7cff, label: 'Shield' },
+            guns: { color: 0xc084ff, label: 'Guns' },
+            charge: { color: 0xffb84d, label: 'Charge' },
+            overdrive: { color: 0x6ef3ff, label: 'Overdrive' },
+            tether: { color: 0xff6ec7, label: 'Tether Boost' }
+        };
+
+        const upgradeSpecs = {
+            // gunsLevel = number of parallel barrels (1..7); each tier also tightens cooldown / adds damage + pierce
+            guns: [
+                null,
+                { cooldown: 0.17, heat: 6, damage: 1, speed: 54, pierce: 0 },
+                { cooldown: 0.16, heat: 6, damage: 1, speed: 56, pierce: 0 },
+                { cooldown: 0.15, heat: 7, damage: 1, speed: 58, pierce: 0 },
+                { cooldown: 0.14, heat: 7, damage: 1.5, speed: 60, pierce: 1 },
+                { cooldown: 0.13, heat: 8, damage: 1.5, speed: 62, pierce: 1 },
+                { cooldown: 0.12, heat: 8, damage: 2, speed: 64, pierce: 2 },
+                { cooldown: 0.11, heat: 9, damage: 2.5, speed: 66, pierce: 3 }
+            ],
+            shield: [
+                { max: 100, regen: 3.4, absorb: 1, restore: 0 },
+                { max: 130, regen: 4.6, absorb: 0.86, restore: 40 },
+                { max: 165, regen: 5.8, absorb: 0.74, restore: 55 },
+                { max: 205, regen: 7.2, absorb: 0.64, restore: 70 }
+            ],
+        };
+
+        function gunSpec() { return upgradeSpecs.guns[Math.max(1, Math.min(state.gunsLevel, upgradeSpecs.guns.length - 1))]; }
+        function shieldSpec() { return upgradeSpecs.shield[Math.max(0, Math.min(state.shieldTier, upgradeSpecs.shield.length - 1))]; }
+
+        // ---- Math helpers ----
+        function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+        function lerp(a, b, t) { return a + (b - a) * t; }
+        function randomRange(min, max) { return min + Math.random() * (max - min); }
+        function randomPlanarVector(scale) {
+            const a = Math.random() * Math.PI * 2;
+            const r = Math.random() * scale;
+            // Strictly horizontal — never leave the combat deck
+            return new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r);
+        }
+        function getForward(rot) { return tempForward.set(Math.sin(rot), 0, Math.cos(rot)); }
+        function getRight(rot) { return tempRight.set(Math.cos(rot), 0, -Math.sin(rot)); }
+        function ringRadius(p) { return Math.hypot(p.x, p.z); }
+        function ringTheta(p) { return Math.atan2(p.z, p.x); }
+        function setOnRing(p, theta, r, y) {
+            p.set(Math.cos(theta) * r, y == null ? DECK_Y : y, Math.sin(theta) * r);
+            return p;
+        }
+        // Annular clamp + hard deck plane. Continuous orbit; no square teleport.
+        function wrapPosition(p, vel) {
+            p.y = DECK_Y;
+            if (vel) vel.y = 0;
+            let r = Math.hypot(p.x, p.z);
+            if (r < 1e-4) {
+                p.x = RING_R0;
+                p.z = 0;
+                r = RING_R0;
+            }
+            const clamped = clamp(r, RING_R_MIN, RING_R_MAX);
+            if (clamped !== r) {
+                const s = clamped / r;
+                p.x *= s;
+                p.z *= s;
+                if (vel) {
+                    const nx = p.x / clamped;
+                    const nz = p.z / clamped;
+                    const vr = vel.x * nx + vel.z * nz;
+                    if ((r > RING_R_MAX && vr > 0) || (r < RING_R_MIN && vr < 0)) {
+                        vel.x -= nx * vr;
+                        vel.z -= nz * vr;
+                    }
+                }
+            }
+        }
+        // Planar (XZ) delta for combat — ignores any residual height error
+        function wrapDelta(a, b) {
+            return tempDelta.set(b.x - a.x, 0, b.z - a.z);
+        }
+        function planarDist(a, b) {
+            const dx = b.x - a.x;
+            const dz = b.z - a.z;
+            return Math.hypot(dx, dz);
+        }
+        function randomRingPoint(rMin, rMax, y) {
+            const th = Math.random() * Math.PI * 2;
+            const r = randomRange(rMin, rMax);
+            return new THREE.Vector3(Math.cos(th) * r, y == null ? DECK_Y : y, Math.sin(th) * r);
+        }
+        function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+        function init() {
+            scene = new THREE.Scene();
+            // Soft space haze so the giant and rings recede without washing combat
+            scene.fog = new THREE.FogExp2(0x06030e, 0.0018);
+            scene.background = null;
+
+            camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 2400);
+            camera.position.set(0, 22, RING_R0 + 28);
+            camera.lookAt(0, 0, RING_R0 * 0.4);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 0.88;
+            ui.stage.appendChild(renderer.domElement);
+
+            composer = new EffectComposer(renderer);
+            composer.addPass(new RenderPass(scene, camera));
+            // High threshold + low strength: sparks/shots bloom, planet body does not white-out
+            bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.28, 0.32, 0.82);
+            composer.addPass(bloomPass);
+            gradePass = new ShaderPass(colorGradeShader);
+            composer.addPass(gradePass);
+            composer.addPass(new OutputPass());
+
+            clock = new THREE.Clock();
+            fieldGroup = new THREE.Group();
+            effectRoot = new THREE.Group();
+            scene.add(fieldGroup, effectRoot);
+
+            buildGeometries();
+            buildMaterials();
+            buildLights();
+            buildNebulaDome();
+            buildStarfield();
+            buildGasGiant();
+            buildRingSystem();
+            buildRingRails();
+            buildRingPlane();
+            buildRingDust();
+            buildSparks();
+            buildRimArrows();
+            buildAsteroidPool();
+            buildShardPool();
+            buildRingPool();
+            buildShotPool();
+            buildPopupPool();
+            player = createPlayer();
+            resetRun();
+            setShot(state.shot);
+            bindEvents();
+            updatePostProcessing();
+            window.__coilwakeReady = true;
+            window.__coilwakeArena = 'orbital-ring-v2';
+            console.info('[Coilwake] orbital-ring-v2 — planet origin, annular play band, no square wrap');
+        }
+
+        function buildGeometries() {
+            // Ship parts, nose pointing +Z
+            const body = new THREE.ConeGeometry(0.62, 2.6, 5);
+            body.rotateX(Math.PI / 2);
+            geometries.shipBody = body;
+
+            const wing = new THREE.BufferGeometry();
+            wing.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+                0, 0, 1.0, -1.5, 0, -1.1, 0, 0.18, -0.5,
+                0, 0, 1.0, 0, 0.18, -0.5, 1.5, 0, -1.1
+            ]), 3));
+            wing.computeVertexNormals();
+            geometries.shipWing = wing;
+
+            const tail = new THREE.BufferGeometry();
+            tail.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+                0, 0, -0.6, 0, 0.95, -1.3, -0.5, 0, -1.4,
+                0, 0, -0.6, 0.5, 0, -1.4, 0, 0.95, -1.3
+            ]), 3));
+            tail.computeVertexNormals();
+            geometries.shipTail = tail;
+
+            geometries.cockpit = new THREE.SphereGeometry(0.34, 14, 12);
+            geometries.engineGlow = new THREE.SphereGeometry(0.34, 12, 10);
+            geometries.flame = new THREE.ConeGeometry(0.26, 1.5, 10);
+            geometries.flame.rotateX(-Math.PI / 2);
+            geometries.shield = new THREE.SphereGeometry(2.4, 24, 18);
+            geometries.gravityAura = new THREE.TorusGeometry(3.6, 0.07, 8, 48);
+            geometries.gravityAura.rotateX(Math.PI / 2);
+
+            geometries.spark = new THREE.SphereGeometry(0.18, 6, 6);
+            geometries.ring = new THREE.TorusGeometry(1, 0.06, 8, 48);
+
+            // faceted glass shard (single triangle)
+            const shard = new THREE.BufferGeometry();
+            shard.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+                0, 0.5, 0, -0.45, -0.3, 0.1, 0.45, -0.35, -0.1
+            ]), 3));
+            shard.computeVertexNormals();
+            geometries.shard = shard;
+
+            geometries.shot = new THREE.CapsuleGeometry(0.16, 0.7, 4, 8);
+            geometries.shot.rotateX(Math.PI / 2);
+            geometries.missile = new THREE.ConeGeometry(0.22, 1.1, 8);
+            geometries.missile.rotateX(Math.PI / 2);
+            geometries.pickup = new THREE.OctahedronGeometry(0.62, 0);
+            geometries.hunter = new THREE.OctahedronGeometry(1.0, 0);
+            geometries.lanceCore = new THREE.BoxGeometry(0.5, 0.32, 1);
+            geometries.lanceOuter = new THREE.BoxGeometry(1.3, 0.7, 1);
+            geometries.reticule = new THREE.RingGeometry(0.7, 0.85, 4);
+        }
+
+        function buildMaterials() {
+            materials.shipBody = new THREE.MeshStandardMaterial({ color: 0xf0e8ff, metalness: 0.62, roughness: 0.3, emissive: 0x3a1858, emissiveIntensity: 0.5 });
+            materials.shipWing = new THREE.MeshStandardMaterial({ color: 0xb48cff, metalness: 0.5, roughness: 0.4, emissive: 0x2a1450, emissiveIntensity: 0.6, side: THREE.DoubleSide });
+            materials.cockpit = new THREE.MeshStandardMaterial({ color: 0xb070e8, metalness: 0.2, roughness: 0.15, emissive: 0x4a2870, emissiveIntensity: 0.55 });
+            materials.engineGlow = additive(0xa070d8, 0.55);
+            materials.flame = additive(0xc0a0e8, 0.35);
+            materials.shield = additive(0x8f7cff, 0.08);
+            materials.gravityAura = additive(0x6ef3ff, 0.08);
+            materials.shot = additive(0xd0a8f0, 0.85);
+            materials.missile = additive(0xff6ec7, 0.9);
+            materials.reticule = additive(0xffb84d, 0.4);
+        }
+
+        function additive(color, opacity) {
+            return new THREE.MeshBasicMaterial({
+                color,
+                transparent: true,
+                opacity,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+        }
+
+        function buildLights() {
+            scene.add(new THREE.AmbientLight(0x4a4060, 0.42));
+            // Distant star — moderate, not a bloom bomb
+            sunLight = new THREE.DirectionalLight(0xffe8d0, 1.15);
+            sunLight.position.set(220, 80, 160);
+            scene.add(sunLight);
+            // Soft planet bounce — dim on purpose
+            planetLight = new THREE.PointLight(0xc88860, 1.1, 420, 1.6);
+            planetLight.position.set(0, 8, 0);
+            scene.add(planetLight);
+            const ringFill = new THREE.DirectionalLight(0x8870b8, 0.35);
+            ringFill.position.set(-60, 100, -40);
+            scene.add(ringFill);
+            thrustLight = new THREE.PointLight(0xc084ff, 1.8, 12);
+            scene.add(thrustLight);
+
+            // Small sun disc — low opacity so bloom never detonates
+            const sunMat = new THREE.MeshBasicMaterial({
+                color: 0xffd9a0,
+                transparent: true,
+                opacity: 0.55,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            });
+            sunDisc = new THREE.Mesh(new THREE.SphereGeometry(4.2, 16, 12), sunMat);
+            sunDisc.position.set(320, 120, 240);
+            sunDisc.renderOrder = -4;
+            scene.add(sunDisc);
+        }
+
+        function buildNebulaDome() {
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    colorA: { value: new THREE.Color(0x12081c) },
+                    colorB: { value: new THREE.Color(0x080c18) },
+                    colorC: { value: new THREE.Color(0x1a0c18) }
+                },
+                vertexShader: `
+                    varying vec3 vWorld;
+                    void main() {
+                        vec4 world = modelMatrix * vec4(position, 1.0);
+                        vWorld = world.xyz;
+                        gl_Position = projectionMatrix * viewMatrix * world;
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform vec3 colorA;
+                    uniform vec3 colorB;
+                    uniform vec3 colorC;
+                    varying vec3 vWorld;
+                    void main() {
+                        vec3 dir = normalize(vWorld);
+                        float h = dir.y * 0.5 + 0.5;
+                        float swirl = sin(dir.x * 4.0 + time * 0.02) * sin(dir.z * 3.5 - time * 0.018);
+                        swirl = swirl * 0.5 + 0.5;
+                        vec3 color = mix(colorB, colorA, h * 0.5 + swirl * 0.15);
+                        color = mix(color, colorC, (1.0 - smoothstep(-0.2, 0.4, dir.y)) * 0.3);
+                        float alpha = smoothstep(-0.2, 0.7, h) * (0.035 + swirl * 0.02);
+                        gl_FragColor = vec4(color, alpha);
+                    }
+                `,
+                side: THREE.BackSide,
+                transparent: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
+            });
+            const mesh = new THREE.Mesh(new THREE.SphereGeometry(900, 40, 24), material);
+            mesh.renderOrder = -6;
+            scene.add(mesh);
+            nebulaDome = { mesh, material };
+        }
+
+        // ---- Gas giant at origin — deliberately mid-luma so UnrealBloom does not white-out ----
+        function buildGasGiant() {
+            const group = new THREE.Group();
+            group.position.set(0, 0, 0);
+
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    sunDir: { value: new THREE.Vector3(0.6, 0.25, 0.45).normalize() }
+                },
+                vertexShader: `
+                    varying vec3 vNormal;
+                    varying vec3 vWorld;
+                    varying vec3 vLocal;
+                    void main() {
+                        vLocal = position;
+                        vNormal = normalize(normalMatrix * normal);
+                        vec4 world = modelMatrix * vec4(position, 1.0);
+                        vWorld = world.xyz;
+                        gl_Position = projectionMatrix * viewMatrix * world;
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform vec3 sunDir;
+                    varying vec3 vNormal;
+                    varying vec3 vWorld;
+                    varying vec3 vLocal;
+
+                    float hash(vec2 p) {
+                        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+                    }
+                    float noise(vec2 p) {
+                        vec2 i = floor(p);
+                        vec2 f = fract(p);
+                        float a = hash(i);
+                        float b = hash(i + vec2(1.0, 0.0));
+                        float c = hash(i + vec2(0.0, 1.0));
+                        float d = hash(i + vec2(1.0, 1.0));
+                        vec2 u = f * f * (3.0 - 2.0 * f);
+                        return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+                    }
+                    float fbm(vec2 p) {
+                        float v = 0.0;
+                        float a = 0.5;
+                        for (int i = 0; i < 5; i++) {
+                            v += a * noise(p);
+                            p = p * 2.05 + vec2(1.7, 9.2);
+                            a *= 0.5;
+                        }
+                        return v;
+                    }
+
+                    void main() {
+                        vec3 n = normalize(vNormal);
+                        vec3 L = normalize(sunDir);
+                        float ndl = max(0.0, dot(n, L));
+                        float fres = pow(1.0 - max(0.0, dot(n, normalize(cameraPosition - vWorld))), 2.4);
+
+                        vec3 lp = normalize(vLocal);
+                        float lat = lp.y;
+                        float lon = atan(lp.z, lp.x);
+                        float shear = lat * 5.5 + time * 0.035;
+                        float bandNoise = fbm(vec2(lon * 1.6 + time * 0.015, lat * 3.6));
+                        float band = lat * 6.5 + sin(lon * 2.5 + shear) * 0.1 + bandNoise * 0.45;
+
+                        // Saturated mid-tones (luma hard-capped below) — readable planet, not bloom bomb
+                        vec3 cDeep = vec3(0.08, 0.05, 0.16);
+                        vec3 cViolet = vec3(0.32, 0.14, 0.48);
+                        vec3 cTeal = vec3(0.12, 0.32, 0.38);
+                        vec3 cCream = vec3(0.55, 0.42, 0.32);
+                        vec3 cCoral = vec3(0.55, 0.24, 0.20);
+                        vec3 cRose = vec3(0.42, 0.16, 0.30);
+                        vec3 cGold = vec3(0.52, 0.36, 0.18);
+
+                        float t0 = sin(band * 1.1) * 0.5 + 0.5;
+                        float t1 = sin(band * 2.2 + 1.1) * 0.5 + 0.5;
+                        float t2 = sin(band * 0.5 - 0.3) * 0.5 + 0.5;
+                        vec3 col = mix(cDeep, cViolet, smoothstep(0.15, 0.55, t0));
+                        col = mix(col, cTeal, smoothstep(0.35, 0.7, t1) * 0.5);
+                        col = mix(col, cCream, smoothstep(0.55, 0.85, t2) * 0.55);
+                        col = mix(col, cCoral, smoothstep(0.2, 0.45, t1) * (1.0 - abs(lat)) * 0.4);
+                        col = mix(col, cRose, smoothstep(-0.2, 0.35, lat) * 0.22);
+                        col = mix(col, cGold, pow(max(0.0, lat), 2.2) * 0.28);
+
+                        vec2 stormUv = vec2(lon - 0.55 + time * 0.008, (lat + 0.16) * 2.2);
+                        float storm = 1.0 - smoothstep(0.14, 0.4, length(stormUv * vec2(0.55, 1.0)));
+                        storm *= 0.5 + 0.5 * fbm(stormUv * 2.8 + time * 0.04);
+                        col = mix(col, cCoral * 1.05, storm * 0.55);
+
+                        float streaks = fbm(vec2(lon * 3.5 - time * 0.025, lat * 12.0));
+                        col += (streaks - 0.5) * 0.04;
+
+                        float wrap = ndl * 0.65 + 0.22;
+                        float spec = pow(max(0.0, dot(reflect(-L, n), normalize(cameraPosition - vWorld))), 36.0);
+                        vec3 night = cDeep * 1.4 + cViolet * 0.25;
+                        col = mix(night, col, wrap);
+                        col += vec3(0.55, 0.48, 0.38) * spec * 0.08;
+                        // thin limb only — not a glowing shell
+                        col += vec3(0.25, 0.32, 0.45) * fres * 0.18;
+
+                        // hard cap luma so post-bloom cannot invent a white sphere
+                        float luma = dot(col, vec3(0.2126, 0.7152, 0.0722));
+                        if (luma > 0.48) col *= 0.48 / luma;
+
+                        gl_FragColor = vec4(col, 1.0);
+                    }
+                `
+            });
+
+            const body = new THREE.Mesh(new THREE.SphereGeometry(PLANET_R, 96, 64), material);
+            body.renderOrder = -5;
+            group.add(body);
+
+            // Very soft atmosphere — normal blending, low alpha, no AdditiveBlending
+            const atmoMat = new THREE.ShaderMaterial({
+                uniforms: {
+                    sunDir: { value: new THREE.Vector3(0.6, 0.25, 0.45).normalize() },
+                    color: { value: new THREE.Color(0x4a6088) }
+                },
+                vertexShader: `
+                    varying vec3 vNormal;
+                    varying vec3 vWorld;
+                    void main() {
+                        vNormal = normalize(normalMatrix * normal);
+                        vec4 world = modelMatrix * vec4(position, 1.0);
+                        vWorld = world.xyz;
+                        gl_Position = projectionMatrix * viewMatrix * world;
+                    }
+                `,
+                fragmentShader: `
+                    uniform vec3 sunDir;
+                    uniform vec3 color;
+                    varying vec3 vNormal;
+                    varying vec3 vWorld;
+                    void main() {
+                        vec3 n = normalize(vNormal);
+                        vec3 view = normalize(cameraPosition - vWorld);
+                        float fres = pow(1.0 - max(0.0, dot(n, view)), 3.2);
+                        float lit = max(0.0, dot(n, normalize(sunDir))) * 0.4 + 0.35;
+                        float alpha = fres * 0.22 * lit;
+                        gl_FragColor = vec4(color * 0.7, alpha);
+                    }
+                `,
+                transparent: true,
+                depthWrite: false,
+                side: THREE.BackSide,
+                blending: THREE.NormalBlending
+            });
+            const atmo = new THREE.Mesh(new THREE.SphereGeometry(PLANET_R * 1.045, 64, 48), atmoMat);
+            atmo.renderOrder = -4;
+            group.add(atmo);
+
+            scene.add(group);
+            gasGiant = { group, body, material, atmo, atmoMat, radius: PLANET_R };
+        }
+
+        // Visual ring bands around the planet (equatorial, playable band is a subset)
+        function buildRingSystem() {
+            const group = new THREE.Group();
+            group.position.set(0, 0, 0);
+            // Flat equatorial rings — you fly along them, not above a tipped card
+            group.rotation.x = 0;
+            group.rotation.z = 0;
+
+            const bands = [
+                { inner: RING_VIS_INNER, outer: RING_R_MIN - 2, color: 0x7a68a0, opacity: 0.28, density: 0.7 },
+                { inner: RING_R_MIN, outer: RING_R0 - 4, color: 0xb09070, opacity: 0.32, density: 0.8 },
+                { inner: RING_R0 - 4, outer: RING_R0 + 6, color: 0xa080c0, opacity: 0.38, density: 0.9 }, // play lane
+                { inner: RING_R0 + 6, outer: RING_R_MAX, color: 0x7090b0, opacity: 0.3, density: 0.75 },
+                { inner: RING_R_MAX + 2, outer: RING_VIS_OUTER, color: 0x806070, opacity: 0.18, density: 0.45 }
+            ];
+
+            const bandMeshes = [];
+            for (const b of bands) {
+                const mat = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { value: 0 },
+                        color: { value: new THREE.Color(b.color) },
+                        opacity: { value: b.opacity },
+                        density: { value: b.density },
+                        inner: { value: b.inner },
+                        outer: { value: b.outer }
+                    },
+                    vertexShader: `
+                        varying vec2 vUv;
+                        void main() {
+                            vUv = uv;
+                            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                        }
+                    `,
+                    fragmentShader: `
+                        uniform float time;
+                        uniform vec3 color;
+                        uniform float opacity;
+                        uniform float density;
+                        uniform float inner;
+                        uniform float outer;
+                        varying vec2 vUv;
+
+                        float hash(vec2 p) {
+                            return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+                        }
+
+                        void main() {
+                            float u = vUv.y;
+                            float edge = smoothstep(0.0, 0.07, u) * smoothstep(1.0, 0.9, u);
+                            float spokes = 0.7 + 0.3 * sin(vUv.x * 90.0 + time * 0.12);
+                            float grain = hash(vec2(vUv.x * 500.0, u * 40.0 + time * 0.02));
+                            float lanes = 0.6 + 0.4 * sin((inner + u * (outer - inner)) * 1.4);
+                            float dens = edge * density * spokes * lanes * (0.75 + grain * 0.35);
+                            float alpha = dens * opacity;
+                            if (alpha < 0.008) discard;
+                            // keep ring luma low for bloom safety
+                            gl_FragColor = vec4(color * 0.85, alpha);
+                        }
+                    `,
+                    transparent: true,
+                    depthWrite: false,
+                    side: THREE.DoubleSide,
+                    blending: THREE.NormalBlending
+                });
+                const geo = new THREE.RingGeometry(b.inner, b.outer, 160, 3);
+                geo.rotateX(-Math.PI / 2);
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.renderOrder = -3;
+                mesh.position.y = -0.4;
+                group.add(mesh);
+                bandMeshes.push({ mesh, material: mat });
+            }
+
+            // Subtle structure lines (dim)
+            for (const r of [RING_R_MIN, RING_R0, RING_R_MAX]) {
+                const line = new THREE.Mesh(
+                    new THREE.TorusGeometry(r, 0.18, 6, 200),
+                    new THREE.MeshBasicMaterial({
+                        color: 0x9a88c0,
+                        transparent: true,
+                        opacity: 0.12,
+                        depthWrite: false
+                    })
+                );
+                line.rotation.x = Math.PI / 2;
+                line.position.y = -0.15;
+                line.renderOrder = -2;
+                group.add(line);
+            }
+
+            scene.add(group);
+            ringSystem = { group, bandMeshes };
+        }
+
+        // Tall translucent rails — make the annulus unmissable (inner wall = toward planet)
+        function buildRingRails() {
+            const group = new THREE.Group();
+            const specs = [
+                { r: RING_R_MIN, color: 0x6ef3ff, name: 'inner' },
+                { r: RING_R_MAX, color: 0xc084ff, name: 'outer' }
+            ];
+            for (const s of specs) {
+                // Low curb only — marks the ring lane without lamp-post clutter
+                const curb = new THREE.Mesh(
+                    new THREE.TorusGeometry(s.r, 0.38, 8, 160),
+                    new THREE.MeshBasicMaterial({
+                        color: s.color,
+                        transparent: true,
+                        opacity: 0.42,
+                        depthWrite: false,
+                        blending: THREE.AdditiveBlending
+                    })
+                );
+                curb.rotation.x = Math.PI / 2;
+                curb.position.y = DECK_Y - 0.45;
+                curb.renderOrder = -1;
+                group.add(curb);
+            }
+            // Midline dashed feel: thin torus at RING_R0
+            const mid = new THREE.Mesh(
+                new THREE.TorusGeometry(RING_R0, 0.22, 6, 180),
+                new THREE.MeshBasicMaterial({
+                    color: 0xffd080,
+                    transparent: true,
+                    opacity: 0.35,
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending
+                })
+            );
+            mid.rotation.x = Math.PI / 2;
+            mid.position.y = DECK_Y - 0.5;
+            group.add(mid);
+            scene.add(group);
+            if (!ringSystem) ringSystem = { group: new THREE.Group(), bandMeshes: [] };
+            ringSystem.rails = group;
+        }
+
+        // No square floor — only a faint local glow under the skiff (follows player via update)
+        function buildRingPlane() {
+            const material = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    heat: { value: 0 },
+                    colorA: { value: new THREE.Color(0x6a5090) },
+                    colorB: { value: new THREE.Color(0x705040) }
+                },
+                vertexShader: `
+                    varying vec2 vUv;
+                    void main() {
+                        vUv = uv;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: `
+                    uniform float time;
+                    uniform float heat;
+                    uniform vec3 colorA;
+                    uniform vec3 colorB;
+                    varying vec2 vUv;
+                    void main() {
+                        vec2 uv = vUv - 0.5;
+                        float r = length(uv);
+                        float fade = smoothstep(0.5, 0.05, r);
+                        float flow = sin(uv.x * 20.0 + time * 0.4) * 0.5 + 0.5;
+                        vec3 col = mix(colorA, colorB, flow);
+                        float alpha = fade * (0.04 + heat * 0.03);
+                        gl_FragColor = vec4(col, alpha);
+                    }
+                `,
+                transparent: true,
+                depthWrite: false,
+                blending: THREE.NormalBlending,
+                side: THREE.DoubleSide
+            });
+            const mesh = new THREE.Mesh(new THREE.CircleGeometry(22, 48), material);
+            mesh.rotation.x = -Math.PI / 2;
+            mesh.position.y = -0.6;
+            mesh.renderOrder = -1;
+            fieldGroup.add(mesh);
+            beltBackdrop = { mesh, material };
+        }
+
+        function buildRingDust() {
+            const count = window.innerWidth < 720 ? 2200 : 4200;
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            const sizes = new Float32Array(count);
+            const alphas = new Float32Array(count);
+            const color = new THREE.Color();
+            for (let i = 0; i < count; i++) {
+                const ang = Math.random() * Math.PI * 2;
+                // bias density into the playable band
+                const r = Math.random() < 0.7
+                    ? randomRange(RING_R_MIN - 4, RING_R_MAX + 8)
+                    : randomRange(RING_VIS_INNER, RING_VIS_OUTER);
+                const y = randomRange(-3.5, 3.5) * (0.4 + Math.random() * 0.6);
+                positions[i * 3] = Math.cos(ang) * r;
+                positions[i * 3 + 1] = y;
+                positions[i * 3 + 2] = Math.sin(ang) * r;
+                if (Math.random() < 0.2) color.setHSL(randomRange(0.05, 0.12), 0.35, randomRange(0.35, 0.55));
+                else color.setHSL(randomRange(0.7, 0.85), randomRange(0.2, 0.4), randomRange(0.35, 0.55));
+                colors[i * 3] = color.r;
+                colors[i * 3 + 1] = color.g;
+                colors[i * 3 + 2] = color.b;
+                sizes[i] = randomRange(1.1, 3.6);
+                alphas[i] = randomRange(0.12, 0.32);
+            }
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+            geometry.setAttribute('aAlpha', new THREE.BufferAttribute(alphas, 1));
+            geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), RING_VIS_OUTER + 20);
+            const material = makePointMaterial(0.15);
+            material.depthTest = true;
+            material.depthWrite = false;
+            const points = new THREE.Points(geometry, material);
+            points.frustumCulled = false;
+            points.renderOrder = -1;
+            scene.add(points);
+            ringDust = { points, material, geometry };
+        }
+
+        function buildStarfield() {
+            const count = window.innerWidth < 720 ? 1600 : STAR_COUNT;
+            const positions = new Float32Array(count * 3);
+            const colors = new Float32Array(count * 3);
+            const sizes = new Float32Array(count);
+            const color = new THREE.Color();
+            for (let i = 0; i < count; i++) {
+                const r = randomRange(280, 780);
+                const theta = Math.random() * Math.PI * 2;
+                const phi = Math.acos(randomRange(-0.95, 0.95));
+                positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+                positions[i * 3 + 1] = r * Math.cos(phi) * 0.72;
+                positions[i * 3 + 2] = r * Math.sin(phi) * Math.sin(theta);
+                // Cool field + a few warm giants-of-the-sky
+                if (Math.random() < 0.12) color.setHSL(randomRange(0.05, 0.12), 0.55, randomRange(0.55, 0.8));
+                else color.setHSL(randomRange(0.55, 0.72), randomRange(0.2, 0.55), randomRange(0.45, 0.85));
+                colors[i * 3] = color.r;
+                colors[i * 3 + 1] = color.g;
+                colors[i * 3 + 2] = color.b;
+                sizes[i] = randomRange(1.2, 4.2);
+            }
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+            geometry.setAttribute('aAlpha', new THREE.BufferAttribute(new Float32Array(count).fill(0.62), 1));
+            geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 900);
+            starField = new THREE.Points(geometry, makePointMaterial(0.45));
+            starField.frustumCulled = false;
+            starField.renderOrder = -6;
+            scene.add(starField);
+        }
+
+        // Hygiene-safe shader points: capped gl_PointSize + circular discard, never square sprites.
+        function makePointMaterial(bloomBoost) {
+            return new THREE.ShaderMaterial({
+                transparent: true,
+                depthWrite: false,
+                depthTest: false,
+                blending: THREE.AdditiveBlending,
+                vertexColors: true,
+                uniforms: {
+                    uPixelRatio: { value: Math.min(window.devicePixelRatio || 1, 2) },
+                    uBloom: { value: bloomBoost || 0 }
+                },
+                vertexShader: `
+                    attribute float aSize;
+                    attribute float aAlpha;
+                    varying vec3 vColor;
+                    varying float vAlpha;
+                    uniform float uPixelRatio;
+                    uniform float uBloom;
+                    void main() {
+                        vColor = color;
+                        vAlpha = aAlpha;
+                        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+                        gl_Position = projectionMatrix * mv;
+                        float atten = 240.0 / max(1.0, -mv.z);
+                        gl_PointSize = clamp(aSize * uPixelRatio * atten * (1.0 + uBloom * 0.3), 2.0, 30.0);
+                    }
+                `,
+                fragmentShader: `
+                    varying vec3 vColor;
+                    varying float vAlpha;
+                    void main() {
+                        vec2 uv = gl_PointCoord * 2.0 - 1.0;
+                        float d = dot(uv, uv);
+                        if (d > 1.0) discard;
+                        float core = smoothstep(0.4, 0.0, d);
+                        float halo = smoothstep(1.0, 0.1, d) * 0.5;
+                        gl_FragColor = vec4(vColor * (1.0 + core * 0.8), vAlpha * (core + halo));
+                    }
+                `
+            });
+        }
+
+        function buildSparks() {
+            const positions = new Float32Array(SPARK_CAP * 3);
+            const colors = new Float32Array(SPARK_CAP * 3);
+            const sizes = new Float32Array(SPARK_CAP);
+            const alphas = new Float32Array(SPARK_CAP);
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geometry.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+            geometry.setAttribute('aAlpha', new THREE.BufferAttribute(alphas, 1));
+            geometry.setDrawRange(0, 0);
+            geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 400);
+            const material = makePointMaterial(0.5);
+            const points = new THREE.Points(geometry, material);
+            points.frustumCulled = false;
+            scene.add(points);
+            // pre-allocated pool: spawning a spark reuses a struct (no per-spawn allocation)
+            const pool = new Array(SPARK_CAP);
+            for (let i = 0; i < SPARK_CAP; i++) {
+                pool[i] = { pos: new THREE.Vector3(), vel: new THREE.Vector3(), color: new THREE.Color(), life: 0, maxLife: 1, size: 3, drag: 0.8, gravity: 0, active: false };
+            }
+            sparks = { geometry, material, positions, colors, sizes, alphas, pool, head: 0, activeCount: 0 };
+        }
+
+        function buildRimArrows() {
+            for (let i = 0; i < 10; i++) {
+                const el = document.createElement('div');
+                el.className = 'rim-arrow';
+                ui.rimArrows.appendChild(el);
+                rimArrows.push(el);
+            }
+        }
+
+        function createPlayer() {
+            const group = new THREE.Group();
+            const body = new THREE.Mesh(geometries.shipBody, materials.shipBody);
+            const wing = new THREE.Mesh(geometries.shipWing, materials.shipWing);
+            const tail = new THREE.Mesh(geometries.shipTail, materials.shipWing);
+            const cockpit = new THREE.Mesh(geometries.cockpit, materials.cockpit);
+            cockpit.position.set(0, 0.2, 0.5);
+            cockpit.scale.set(0.8, 0.6, 1.1);
+            group.add(body, wing, tail, cockpit);
+
+            const glows = [];
+            const flames = [];
+            for (const sx of [-0.5, 0.5]) {
+                const glow = new THREE.Mesh(geometries.engineGlow, materials.engineGlow.clone());
+                glow.position.set(sx, 0, -1.2);
+                glow.scale.set(0.7, 0.5, 0.9);
+                group.add(glow);
+                glows.push(glow);
+                const flame = new THREE.Mesh(geometries.flame, materials.flame.clone());
+                flame.position.set(sx, 0, -1.9);
+                group.add(flame);
+                flames.push(flame);
+            }
+            group.userData.glows = glows;
+            group.userData.flames = flames;
+
+            const shield = new THREE.Mesh(geometries.shield, materials.shield.clone());
+            group.add(shield);
+
+            const gravityAura = new THREE.Mesh(geometries.gravityAura, materials.gravityAura.clone());
+            group.add(gravityAura);
+
+            scene.add(group);
+
+            const reticule = new THREE.Mesh(geometries.reticule, materials.reticule.clone());
+            reticule.rotation.x = Math.PI / 2;
+            reticule.rotation.z = Math.PI / 4;
+            scene.add(reticule);
+
+            return {
+                group,
+                shield,
+                gravityAura,
+                reticule,
+                engine: group,
+                position: new THREE.Vector3(0, 0.8, 0),
+                velocity: new THREE.Vector3(),
+                rotation: 0,
+                radius: PLAYER_RADIUS
+            };
+        }
+
+        function bindEvents() {
+            window.addEventListener('resize', onResize);
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+
+            ui.stage.addEventListener('pointerdown', (event) => {
+                if (event.button !== 0) return;
+                if (!state.controlsActive) { state.controlsActive = true; hideBanner(); }
+                onFireDown();
+            });
+            window.addEventListener('pointerup', onFireUp);
+
+            ui.newRun.addEventListener('click', resetRun);
+            ui.fire.addEventListener('pointerdown', (e) => { e.preventDefault(); onFireDown(); });
+            ui.fire.addEventListener('pointerup', (e) => { e.preventDefault(); onFireUp(); });
+            ui.tetherBtn.addEventListener('click', onTetherPress);
+            const mvTether = document.getElementById('mv-tether');
+            if (mvTether) mvTether.addEventListener('pointerdown', (e) => { e.preventDefault(); onTetherPress(); });
+            bindHold(ui.mvLeft, 'touchLeft');
+            bindHold(ui.mvRight, 'touchRight');
+            bindHold(ui.mvThrust, 'touchThrust');
+            bindHold(ui.mvBrake, 'touchBrake');
+            ui.pause.addEventListener('click', () => setPaused(!state.paused, 'Paused', 'Press Space or Pause to resume.'));
+            ui.debug.addEventListener('click', toggleDebug);
+            ui.debugClose.addEventListener('click', () => closeDebug(false));
+            ui.debugResume.addEventListener('click', () => closeDebug(true));
+
+            document.querySelectorAll('[data-action]').forEach((b) => {
+                b.addEventListener('click', () => runDebugAction(b.dataset.action));
+            });
+            document.querySelectorAll('[data-shot]').forEach((b) => {
+                b.addEventListener('click', () => setShot(b.dataset.shot));
+            });
+
+            bindSlider('shake-slider', 'shake-label', 'tuneShake', (v) => v.toFixed(1) + 'x');
+            bindSlider('cascade-slider', 'cascadegain-label', 'tuneCascade', (v) => v.toFixed(1) + 'x');
+            bindSlider('pull-slider', 'pull-label', 'tunePull', (v) => v.toFixed(1) + 'x');
+            bindSlider('sling-slider', 'sling-label', 'tuneSling', (v) => v.toFixed(1) + 'x');
+            bindSlider('thrust-slider', 'thrust-label', 'tuneThrust', (v) => v.toFixed(0));
+            bindSlider('drag-slider', 'drag-label', 'tuneDrag', (v) => v.toFixed(2));
+            bindSlider('turn-slider', 'turn-label', 'tuneTurn', (v) => v.toFixed(1));
+            bindSlider('speed-slider', 'speed-label', 'tuneMaxSpeed', (v) => v.toFixed(0));
+            bindSlider('bloom-slider', 'bloom-label', 'bloom', (v) => v.toFixed(2));
+            bindSlider('grade-slider', 'grade-label', 'grade', (v) => v.toFixed(2));
+        }
+
+        // Hold-button wiring that survives finger drift off the button
+        function bindHold(el, key) {
+            if (!el) return;
+            const set = (v) => (e) => {
+                e.preventDefault();
+                if (v && !state.controlsActive) { state.controlsActive = true; hideBanner(); }
+                input[key] = v;
+            };
+            el.addEventListener('pointerdown', (e) => {
+                try { el.setPointerCapture(e.pointerId); } catch (_) {}
+                set(true)(e);
+            });
+            ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => el.addEventListener(ev, set(false)));
+        }
+
+        function bindSlider(sliderId, labelId, key, fmt) {
+            const slider = document.getElementById(sliderId);
+            const label = document.getElementById(labelId);
+            if (!slider) return;
+            const apply = () => {
+                state[key] = parseFloat(slider.value);
+                if (label) label.textContent = fmt(state[key]);
+            };
+            slider.addEventListener('input', apply);
+            apply();
+        }
+
+        function resetRun() {
+            clearCollection(asteroids);
+            clearCollection(hunters);
+            resetShots();
+            clearTetherLatch(true);
+            clearCollection(pickups);
+            resetShardPool();
+            resetRingPool();
+            pendingShatter.length = 0;
+            // tether cleared above
+            sparks.head = 0;
+            sparks.activeCount = 0;
+            for (let i = 0; i < SPARK_CAP; i++) sparks.pool[i].active = false;
+
+            Object.assign(state, {
+                elapsed: 0,
+                score: 0,
+                displayScore: 0,
+                wave: 1,
+                lives: 3,
+                kills: 0,
+                combo: 0,
+                comboTimer: 0,
+                bestCombo: 0,
+                shield: 100,
+                shieldMax: 100,
+                shieldTier: 0,
+                heat: 0,
+                gunsLevel: 1,
+                overdriveTimer: 0,
+                gunTimer: 0,
+                autoTimer: 0,
+                invulnerable: 2.6,
+                forceInvuln: false,
+                charge: 0,
+                chargeMax: CHARGE_MAX,
+                timeScale: 1,
+                recentKills: 0,
+                chargeLevel: 0,
+                cascadeLevel: 0,
+                shake: 0,
+                camPunch: 0,
+                chroma: 0,
+                paused: false,
+                debugOpen: false,
+                controlsActive: true,
+                gameOver: false,
+                missionIndex: 0
+            });
+
+            const sShield = shieldSpec();
+            state.shieldMax = sShield.max;
+            state.shield = sShield.max;
+
+            // Start on the ring, facing prograde (counter-clockwise tangent)
+            setOnRing(player.position, 0, RING_R0, DECK_Y);
+            player.velocity.set(0, 0, 0);
+            player.rotation = Math.PI * 0.5; // +X at theta=0
+            input.firing = false;
+
+            ui.debugModal.classList.remove('show');
+            hideBanner();
+            snapCameraToShot(true);
+            spawnWave(1);
+            flashWave();
+            refreshUi();
+        }
+
+        function spawnWave(wave) {
+            state.missionIndex = Math.min(missions.length - 1, wave - 1);
+            const isPrism = wave % 5 === 0;
+            const speedScale = 1 + (wave - 1) * 0.08;
+
+            if (isPrism) {
+                spawnForgeCore();
+                const support = 3 + Math.floor(wave / 5);
+                for (let i = 0; i < support; i++) {
+                    createAsteroid('large', edgeSpawn(), null, speedScale, 'glass');
+                }
+            } else {
+                const count = Math.min(22, 5 + wave * 2);
+                for (let i = 0; i < count; i++) {
+                    let type = 'glass';
+                    if (wave >= 4 && Math.random() < 0.16) type = 'iron';
+                    const size = type === 'iron' ? 'medium' : 'large';
+                    createAsteroid(size, edgeSpawn(), null, speedScale, type);
+                }
+                if (wave >= 2) {
+                    const slag = Math.min(5, Math.floor(wave / 2) + 1);
+                    for (let i = 0; i < slag; i++) {
+                        createAsteroid('small', edgeSpawn(), null, speedScale * 1.35, 'slag');
+                    }
+                }
+            }
+
+            if (wave >= 3) {
+                const singers = Math.min(3, Math.floor((wave - 1) / 2));
+                for (let i = 0; i < singers; i++) spawnHunter(speedScale);
+            }
+        }
+
+        function edgeSpawn() {
+            // Spread around the ring so you see curvature, not a local square cluster
+            const baseTheta = player ? ringTheta(player.position) : 0;
+            let theta;
+            if (Math.random() < 0.55) {
+                // nearby combat threat (still curved arc, not a flat box)
+                theta = baseTheta + randomRange(0.5, 2.4) * (Math.random() < 0.5 ? 1 : -1);
+            } else {
+                // anywhere on the orbit — sells the full ring
+                theta = Math.random() * Math.PI * 2;
+            }
+            const r = randomRange(RING_R_MIN + 3, RING_R_MAX - 3);
+            return new THREE.Vector3(Math.cos(theta) * r, DECK_Y, Math.sin(theta) * r);
+        }
+
+        const asteroidSpecs = {
+            glass: { large: { radius: 3.4, score: 60, hp: 1 }, medium: { radius: 2.1, score: 90, hp: 1 }, small: { radius: 1.15, score: 130, hp: 1 } },
+            iron: { large: { radius: 3.4, score: 140, hp: 4 }, medium: { radius: 2.2, score: 150, hp: 3 }, small: { radius: 1.25, score: 160, hp: 2 } },
+            slag: { small: { radius: 0.95, score: 120, hp: 1 } }
+        };
+
+        function buildAsteroidPool() {
+            const defs = [
+                ['glass', 'large'], ['glass', 'medium'], ['glass', 'small'],
+                ['iron', 'large'], ['iron', 'medium'], ['iron', 'small'],
+                ['slag', 'small']
+            ];
+            for (const [type, size] of defs) {
+                const spec = (asteroidSpecs[type] && asteroidSpecs[type][size]) || asteroidSpecs.glass[size];
+                const variants = [];
+                for (let v = 0; v < 4; v++) {
+                    const geo = createAsteroidGeometry(spec.radius, type);
+                    variants.push({ geo, edges: new THREE.EdgesGeometry(geo) });
+                }
+                const lineMat = new THREE.LineBasicMaterial({
+                    color: type === 'iron' ? 0xffe08a : 0xd4b8ff,
+                    transparent: true,
+                    opacity: 0.4,
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
+                });
+                geoPool[type + ':' + size] = { variants, lineMat };
+            }
+        }
+
+        function createAsteroid(size, position, inheritedVelocity, speedScale = 1, type = 'glass') {
+            const spec = (asteroidSpecs[type] && asteroidSpecs[type][size]) || asteroidSpecs.glass[size];
+            const radius = spec.radius;
+            const pool = geoPool[type + ':' + size] || geoPool['glass:' + size];
+            const variant = pool.variants[(Math.random() * pool.variants.length) | 0];
+            let baseColor;
+            if (type === 'iron') baseColor = 0x9a7d52;
+            else if (type === 'slag') baseColor = 0x9ff0ff;
+            else baseColor = size === 'large' ? 0x9fcfff : size === 'medium' ? 0x8fb6ff : 0xc084ff;
+
+            const material = new THREE.MeshStandardMaterial({
+                color: baseColor,
+                metalness: 0.4,
+                roughness: 0.5,
+                emissive: type === 'iron' ? 0x3a2410 : 0x142838,
+                emissiveIntensity: type === 'iron' ? 0.22 : 0.25,
+                flatShading: true
+            });
+            // geo + edges geo + line material are shared from the pool (never disposed per-asteroid)
+            const mesh = new THREE.Mesh(variant.geo, material);
+            const edges = new THREE.LineSegments(variant.edges, pool.lineMat);
+            mesh.add(edges);
+
+            const group = new THREE.Group();
+            group.add(mesh);
+            group.position.copy(position);
+            wrapPosition(group.position);
+            fieldGroup.add(group);
+
+            const speed = randomRange(2.2, 5.4) / Math.sqrt(radius) * speedScale;
+            let velocity;
+            // Prefer tangential drift so rocks orbit the ring instead of flying into the planet
+            const th = ringTheta(group.position);
+            const tangent = new THREE.Vector3(-Math.sin(th), 0, Math.cos(th));
+            const radial = new THREE.Vector3(Math.cos(th), 0, Math.sin(th));
+            if (inheritedVelocity) {
+                velocity = inheritedVelocity.clone().multiplyScalar(0.65)
+                    .addScaledVector(tangent, randomRange(-speed, speed) * 0.5)
+                    .addScaledVector(radial, randomRange(-0.4, 0.4) * speed);
+            } else {
+                velocity = tangent.multiplyScalar(randomRange(-speed, speed) * (Math.random() < 0.5 ? 1 : -1))
+                    .addScaledVector(radial, randomRange(-0.35, 0.35) * speed);
+            }
+            velocity.y = 0;
+            group.position.y = DECK_Y;
+
+            const rock = {
+                type,
+                size,
+                group,
+                mesh,
+                edges,
+                pooled: true,
+                material,
+                velocity,
+                spin: new THREE.Vector3(randomRange(-1, 1), randomRange(-1, 1), randomRange(-1, 1)).multiplyScalar(0.6),
+                radius,
+                score: spec.score,
+                hp: spec.hp,
+                maxHp: spec.hp,
+                flash: 0,
+                dying: false,
+                shatterTimer: 0,
+                tethered: false,
+                slingTimer: 0,
+                slingDamage: 0,
+                cascadeSource: false,
+                collideCd: 0
+            };
+            asteroids.push(rock);
+            return rock;
+        }
+
+        function createAsteroidGeometry(radius, type) {
+            const detail = type === 'slag' ? 0 : 1;
+            const geometry = new THREE.IcosahedronGeometry(radius, detail);
+            const pos = geometry.attributes.position;
+            const v = new THREE.Vector3();
+            for (let i = 0; i < pos.count; i++) {
+                v.fromBufferAttribute(pos, i);
+                const n = 0.74 + Math.random() * 0.5;
+                v.multiplyScalar(n);
+                pos.setXYZ(i, v.x, v.y, v.z);
+            }
+            geometry.computeVertexNormals();
+            return geometry;
+        }
+
+        function spawnForgeCore() {
+            const radius = 5.0;
+            const geometry = new THREE.IcosahedronGeometry(radius, 1);
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x9a7ab8,
+                metalness: 0.5,
+                roughness: 0.28,
+                emissive: 0x3a1f5a,
+                emissiveIntensity: 0.28,
+                flatShading: true
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geometry), new THREE.LineBasicMaterial({
+                color: 0xff9aff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false
+            }));
+            mesh.add(edges);
+            const core = new THREE.Mesh(new THREE.IcosahedronGeometry(radius * 0.5, 1), additive(0xffd0ff, 0.0));
+            mesh.add(core);
+
+            const group = new THREE.Group();
+            group.add(mesh);
+            {
+                const th = (player ? ringTheta(player.position) : 0) + Math.PI * 0.55;
+                setOnRing(group.position, th, RING_R0, DECK_Y);
+            }
+            fieldGroup.add(group);
+
+            asteroids.push({
+                type: 'prism',
+                size: 'large',
+                group,
+                mesh,
+                core,
+                edges,
+                geometry,
+                material,
+                velocity: randomPlanarVector(1.4),
+                spin: new THREE.Vector3(0.1, 0.4, 0.1),
+                radius,
+                score: 900,
+                hp: 8,
+                maxHp: 8,
+                flash: 0,
+                dying: false,
+                shatterTimer: 0,
+                spawnTimer: 2.6,
+                tethered: false,
+                slingTimer: 0,
+                slingDamage: 0,
+                cascadeSource: false,
+                collideCd: 0
+            });
+        }
+
+        function spawnHunter(speedScale) {
+            const geometry = geometries.hunter;
+            const material = new THREE.MeshStandardMaterial({
+                color: 0xd060a0,
+                metalness: 0.4,
+                roughness: 0.4,
+                emissive: 0x4a1838,
+                emissiveIntensity: 0.3,
+                flatShading: true
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            const edges = new THREE.LineSegments(new THREE.EdgesGeometry(geometry), new THREE.LineBasicMaterial({
+                color: 0xff9ad8, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false
+            }));
+            mesh.add(edges);
+            const group = new THREE.Group();
+            group.add(mesh);
+            group.position.copy(edgeSpawn());
+            group.position.y = DECK_Y;
+            fieldGroup.add(group);
+            hunters.push({
+                group,
+                mesh,
+                material,
+                edges,
+                velocity: randomPlanarVector(2),
+                radius: 1.3,
+                hp: 2,
+                maxHp: 2,
+                score: 220,
+                flash: 0,
+                dying: false,
+                shatterTimer: 0,
+                speed: 9 * speedScale,
+                lockPulse: 0
+            });
+        }
+
+        function advanceWave() {
+            state.wave += 1;
+            state.invulnerable = Math.max(state.invulnerable, 1.0);
+            spawnWave(state.wave);
+            flashWave();
+        }
+
+        let fpsAccum = 0;
+        let fpsFrames = 0;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const rawDt = Math.min(clock.getDelta(), 0.033);
+            state.visualTime += rawDt;
+
+            // Coilwake identity is continuous cascade momentum — no hitstop, no bullet-time.
+            state.timeScale = 1;
+            const playerDt = rawDt;
+            const worldDt = rawDt;
+
+            if (!state.paused && !state.debugOpen && !state.gameOver) {
+                updateGame(worldDt, rawDt, playerDt);
+            } else {
+                const idle = rawDt * 0.3;
+                updateSparks(idle);
+                updateShards(idle);
+                updateRings(idle);
+            }
+
+            updateCamera(rawDt);
+            updateHeat(rawDt);
+            updateBackdropTime(state.visualTime);
+            updatePostProcessing();
+            updateRimArrows();
+            updateUi(rawDt);
+
+            fpsAccum += rawDt;
+            fpsFrames += 1;
+            if (fpsAccum >= 0.5) {
+                state.fps = Math.round(fpsFrames / fpsAccum);
+                fpsAccum = 0;
+                fpsFrames = 0;
+                if (state.debugOpen) updateDebugReadout();
+            }
+
+            composer.render();
+        }
+
+        function updateGame(worldDt, rawDt, playerDt) {
+            state.elapsed += worldDt;
+            state.invulnerable = Math.max(0, state.invulnerable - rawDt);
+            state.gunTimer = Math.max(0, state.gunTimer - playerDt);
+            state.overdriveTimer = Math.max(0, state.overdriveTimer - playerDt);
+            state.heat = Math.max(0, state.heat - playerDt * 24);
+            state.recentKills = Math.max(0, state.recentKills - rawDt * 4);
+            tether.cooldown = Math.max(0, tether.cooldown - rawDt);
+            tether.slingImmune = Math.max(0, tether.slingImmune - rawDt);
+
+            state.comboTimer = Math.max(0, state.comboTimer - rawDt);
+            if (state.comboTimer <= 0 && state.combo > 0) state.combo = 0;
+
+            const sShield = shieldSpec();
+            if (state.shield < state.shieldMax) state.shield = Math.min(state.shieldMax, state.shield + sShield.regen * playerDt);
+            // passive trickle is tiny — cascades and kills should fund the capacitor
+            state.charge = Math.min(state.chargeMax, state.charge + 1.8 * playerDt);
+
+            updateWeapons(worldDt, rawDt);
+            updatePlayer(playerDt);
+            updateTether(rawDt, playerDt);
+            updateAsteroids(worldDt);
+            updateHunters(worldDt);
+            updateRockCollisions(worldDt);
+            updateShots(playerDt);
+            updatePickups(worldDt);
+            updateSparks(worldDt);
+            updateShards(worldDt);
+            updateRings(worldDt);
+            resolveShatter(worldDt);
+            checkCollisions();
+
+            // auto-fire only when a target sits in the forward cone
+            if (state.gunTimer <= 0 && hasForwardTarget()) {
+                fireGuns(true);
+            }
+
+            if (asteroids.length === 0 && hunters.length === 0 && pendingShatter.length === 0 && tether.mode !== 'overcoil') {
+                advanceWave();
+            }
+        }
+
+        function updatePlayer(worldDt) {
+            const keyLeft = input.keys.KeyA || input.keys.ArrowLeft || input.touchLeft;
+            const keyRight = input.keys.KeyD || input.keys.ArrowRight || input.touchRight;
+            const keyUp = input.keys.KeyW || input.keys.ArrowUp || input.touchThrust;
+            const keyDown = input.keys.KeyS || input.keys.ArrowDown || input.touchBrake;
+
+            {
+                const boost = state.overdriveTimer > 0 ? 1.4 : 1;
+                const rotate = (keyLeft ? 1 : 0) - (keyRight ? 1 : 0);
+                const speed = player.velocity.length();
+                player.rotation += rotate * worldDt * (state.tuneTurn + speed * 0.012);
+
+                const forward = getForward(player.rotation);
+                input.thrusting = Boolean(keyUp);
+                if (input.thrusting) {
+                    player.velocity.addScaledVector(forward, worldDt * state.tuneThrust * boost);
+                    spawnEngineTrail(forward);
+                }
+                if (keyDown) player.velocity.multiplyScalar(Math.pow(0.03, worldDt));
+                player.velocity.multiplyScalar(Math.pow(input.thrusting ? Math.min(0.92, state.tuneDrag + 0.12) : state.tuneDrag, worldDt));
+                player.velocity.y = 0;
+                player.velocity.clampLength(0, state.overdriveTimer > 0 ? state.tuneMaxSpeed * 1.4 : state.tuneMaxSpeed);
+                player.position.addScaledVector(player.velocity, worldDt);
+                wrapPosition(player.position, player.velocity);
+            }
+
+            player.group.position.copy(player.position);
+            player.group.visible = state.shot !== 'cockpit';
+            player.group.rotation.y = player.rotation;
+            const rotate = (keyLeft ? 1 : 0) - (keyRight ? 1 : 0);
+            // light bank into turn; keep skiff reading level on the deck
+            player.group.rotation.z = -rotate * 0.22;
+            player.group.rotation.x = 0;
+
+            updateEngineAnimation();
+
+            player.shield.visible = state.shield > 0 || state.invulnerable > 0;
+            player.shield.material.opacity = (state.invulnerable > 0 ? 0.2 : 0.07) + clamp(state.shield / state.shieldMax, 0, 1) * 0.08;
+            player.shield.scale.setScalar(1 + Math.sin(state.visualTime * 7) * 0.03 + state.shieldTier * 0.02);
+
+            const auraPulse = 1 + Math.sin(state.visualTime * 5) * 0.04 + (state.overdriveTimer > 0 ? 0.1 : 0);
+            player.gravityAura.scale.setScalar(auraPulse);
+            player.gravityAura.material.opacity = state.overdriveTimer > 0 ? 0.16 : 0.1;
+
+            // reticule: range/direction tick, not glued to the nose
+            const forward = getForward(player.rotation);
+            const speed = player.velocity.length();
+            const reticuleDist = 8.4 + Math.min(4.4, speed * 0.3);
+            player.reticule.visible = state.shot !== 'cockpit';
+            player.reticule.position.copy(player.position).addScaledVector(forward, reticuleDist);
+            player.reticule.position.y = DECK_Y;
+            wrapPosition(player.reticule.position);
+            player.reticule.rotation.z = state.visualTime * 0.6;
+            player.reticule.scale.setScalar(clamp(0.9 - state.heat * 0.002, 0.6, 1));
+            player.reticule.material.opacity = clamp(0.42 - state.heat * 0.002, 0.2, 0.46);
+
+            thrustLight.position.copy(player.position).addScaledVector(forward, -2);
+            thrustLight.intensity = input.thrusting ? 4.2 : 1.3;
+        }
+
+        function updateEngineAnimation() {
+            const thrust = input.thrusting ? 1 : 0;
+            const idle = 0.34 + Math.sin(state.visualTime * 10) * 0.05;
+            const burn = thrust ? 1 + Math.sin(state.visualTime * 44) * 0.18 : idle;
+            const glowOpacity = thrust ? 0.72 + burn * 0.18 : 0.28 + idle * 0.16;
+            const flameOpacity = thrust ? 0.32 + burn * 0.2 : 0.05 + idle * 0.05;
+            player.group.userData.glows.forEach((glow, i) => {
+                const energy = Math.max(0.1, burn + Math.sin(state.visualTime * 38 + i * 1.7) * 0.12);
+                glow.scale.set(0.7 + energy * 0.22, 0.5 + energy * 0.08, 0.9 + energy * 0.5);
+                glow.material.opacity = glowOpacity;
+            });
+            player.group.userData.flames.forEach((flame, i) => {
+                const energy = Math.max(0.08, burn + Math.sin(state.visualTime * 52 + i * 2.1) * 0.16);
+                flame.scale.set(0.7 + energy * 0.2, 0.7 + energy * 0.2, 0.5 + energy * (thrust ? 1.1 : 0.2));
+                flame.material.opacity = flameOpacity;
+            });
+        }
+
+        // ---- Firing: press fires instantly; holding sustains coil guns. Tether is a separate verb. ----
+        function onFireDown() {
+            if (state.gameOver || state.paused || state.debugOpen) return;
+            if (input.firing) return;
+            input.firing = true;
+            input.fireStart = state.visualTime;
+            fireGuns(false);
+        }
+
+        function onFireUp() {
+            if (!input.firing) return;
+            input.firing = false;
+        }
+
+        function updateWeapons(worldDt, rawDt) {
+            if (input.firing && state.gunTimer <= 0) {
+                fireGuns(true);
+            }
+        }
+
+        function fireGuns(auto) {
+            if (state.gameOver) return;
+            if (state.gunTimer > 0) return;
+            const spec = gunSpec();
+            state.gunTimer = spec.cooldown;
+            state.autoTimer = spec.cooldown * 1.25;
+            if (state.heat >= 100) return;
+            state.heat = Math.min(112, state.heat + spec.heat);
+
+            const forward = getForward(player.rotation).clone();
+            const right = getRight(player.rotation).clone();
+            const muzzle = player.position.clone().addScaledVector(forward, 1.7);
+            muzzle.y = DECK_Y;
+            // V-shaped spread in the deck plane only
+            const barrels = Math.min(state.gunsLevel, 7);
+            const halfAngle = 0.13;
+            const wing = 0.5;
+            for (let i = 0; i < barrels; i++) {
+                const frac = barrels > 1 ? (i - (barrels - 1) / 2) / ((barrels - 1) / 2) : 0;
+                tempVecB.copy(forward).applyAxisAngle(Y_AXIS, frac * halfAngle);
+                tempVecB.y = 0;
+                tempVecB.normalize();
+                tempVec.copy(muzzle).addScaledVector(right, frac * wing);
+                tempVec.y = DECK_Y;
+                spawnShot(tempVec, tempVecB, spec);
+            }
+            spawnSparks(muzzle, tempColor.set(0xe0b3ff), 3, 0.2, 0.5, { speed: 6, life: 0.25 });
+        }
+
+        // is any rock/hunter inside the ship's forward cone + range? (drives target-gated auto-fire)
+        function hasForwardTarget() {
+            const forward = getForward(player.rotation);
+            const fx = forward.x;
+            const fz = forward.z;
+            const range = 46;
+            const cosCone = 0.9; // ~25deg half-cone
+            for (let k = 0; k < 2; k++) {
+                const list = k === 0 ? asteroids : hunters;
+                for (const t of list) {
+                    if (t.dying) continue;
+                    const d = wrapDelta(player.position, t.group.position);
+                    const dist = Math.hypot(d.x, d.z);
+                    if (dist > range || dist < 0.001) continue;
+                    if ((d.x * fx + d.z * fz) / dist > cosCone) return true;
+                }
+            }
+            return false;
+        }
+
+        function buildShotPool() {
+            for (let i = 0; i < SHOT_POOL; i++) {
+                const m = new THREE.Mesh(geometries.shot, materials.shot);
+                m.visible = false;
+                scene.add(m);
+                shotMeshPool.push(m);
+            }
+        }
+
+        function acquireShotMesh() {
+            for (let i = 0; i < shotMeshPool.length; i++) {
+                if (!shotMeshPool[i].visible) return shotMeshPool[i];
+            }
+            const m = new THREE.Mesh(geometries.shot, materials.shot);
+            scene.add(m);
+            shotMeshPool.push(m);
+            return m;
+        }
+
+        function spawnShot(position, dir, spec) {
+            const mesh = acquireShotMesh();
+            mesh.visible = true;
+            mesh.position.copy(position);
+            mesh.position.y = DECK_Y;
+            const velocity = dir.clone();
+            velocity.y = 0;
+            if (velocity.lengthSq() < 1e-6) velocity.copy(getForward(player.rotation));
+            velocity.normalize();
+            mesh.quaternion.setFromUnitVectors(Z_AXIS, velocity);
+            // carry only planar ship velocity so shots stay on the deck
+            velocity.multiplyScalar(spec.speed);
+            velocity.x += player.velocity.x * 0.4;
+            velocity.z += player.velocity.z * 0.4;
+            velocity.y = 0;
+            shots.push({ group: mesh, velocity, damage: spec.damage, pierce: spec.pierce, radius: 0.85, life: 1.15 });
+        }
+
+        // ---- Tether / Sling / Overcoil (signature verb) ----
+        // free: fire a magnetic bolt that latches a rock
+        // latched: pull the rock and press again to SLING it as kinetic ammo
+        // full charge + free: OVERCOIL — radial pull then arc damage through the cluster
+
+        function ensureTetherVisuals() {
+            if (tether.line) return;
+            tether.lineGeo = new THREE.BufferGeometry();
+            const positions = new Float32Array(6);
+            tether.lineGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            tether.lineMat = new THREE.LineBasicMaterial({
+                color: 0x6ef3ff,
+                transparent: true,
+                opacity: 0.85,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            tether.line = new THREE.Line(tether.lineGeo, tether.lineMat);
+            tether.line.frustumCulled = false;
+            tether.line.visible = false;
+            effectRoot.add(tether.line);
+
+            const boltMat = additive(0xe0b3ff, 0.95);
+            tether.bolt = new THREE.Mesh(geometries.shot, boltMat);
+            tether.bolt.visible = false;
+            effectRoot.add(tether.bolt);
+        }
+
+        function onTetherPress() {
+            if (state.gameOver || state.paused || state.debugOpen) return;
+            if (tether.cooldown > 0) return;
+            ensureTetherVisuals();
+
+            if (tether.mode === 'latched') {
+                slingLatchedRock();
+                return;
+            }
+            if (tether.mode === 'flying' || tether.mode === 'overcoil') return;
+
+            // free: full charge dumps Overcoil, otherwise fire latch bolt
+            if (state.charge >= OVERCOIL_COST) {
+                fireOvercoil();
+            } else {
+                fireTetherBolt();
+            }
+        }
+
+        function fireTetherBolt() {
+            const forward = getForward(player.rotation).clone().normalize();
+            const muzzle = player.position.clone().addScaledVector(forward, 1.8);
+            muzzle.y = DECK_Y;
+            tether.mode = 'flying';
+            tether.target = null;
+            tether.bolt.visible = true;
+            tether.bolt.position.copy(muzzle);
+            tether.boltVel.copy(forward).multiplyScalar(TETHER_SPEED).addScaledVector(player.velocity, 0.35);
+            tether.boltLife = 0.55;
+            tether.cooldown = 0.18;
+            spawnSparks(muzzle, tempColor.set(0x6ef3ff), 6, 0.2, 0.5, { speed: 7, life: 0.28 });
+            state.shake = Math.max(state.shake, 0.15);
+        }
+
+        function latchRock(rock) {
+            if (!rock || rock.dying) return;
+            tether.mode = 'latched';
+            tether.target = rock;
+            tether.latchTimer = 0;
+            tether.bolt.visible = false;
+            rock.tethered = true;
+            // brief pull impulse toward ship so latch reads immediately
+            const toShip = wrapDelta(rock.group.position, player.position).normalize();
+            rock.velocity.addScaledVector(toShip, 2.5);
+            spawnRing(rock.group.position, tempColor.set(0x6ef3ff), rock.radius * 1.2, 0.5);
+            spawnSparks(rock.group.position, tempColor.set(0xc084ff), 10, 0.3, 0.6, { speed: 8, life: 0.35 });
+            spawnPopup(rock.group.position.clone(), 'LATCH', false);
+            state.shake = Math.max(state.shake, 0.25);
+            tether.cooldown = 0.12;
+        }
+
+        function clearTetherLatch(silent) {
+            if (tether.target) tether.target.tethered = false;
+            tether.target = null;
+            tether.mode = 'free';
+            if (tether.bolt) tether.bolt.visible = false;
+            if (tether.line) tether.line.visible = false;
+            tether.latchTimer = 0;
+        }
+
+        function slingLatchedRock() {
+            const rock = tether.target;
+            if (!rock || rock.dying) {
+                clearTetherLatch(true);
+                return;
+            }
+            // sling direction: ship forward with a bias of current tether direction
+            const forward = getForward(player.rotation).clone().normalize();
+            const toRock = wrapDelta(player.position, rock.group.position);
+            const dist = toRock.length();
+            const along = dist > 0.01 ? toRock.normalize() : forward;
+            // blend aim: mostly forward, a little current line direction
+            tempVec.copy(forward).multiplyScalar(0.72).addScaledVector(along, 0.28).normalize();
+
+            const massBoost = rock.size === 'large' ? 0.72 : rock.size === 'medium' ? 0.9 : 1.15;
+            const ironBoost = rock.type === 'iron' ? 1.25 : 1;
+            const speed = SLING_SPEED * state.tuneSling * massBoost * ironBoost;
+            rock.velocity.copy(tempVec).multiplyScalar(speed).addScaledVector(player.velocity, 0.25);
+            rock.slingTimer = 1.6;
+            rock.slingDamage = rock.size === 'large' ? 4 : rock.size === 'medium' ? 2.5 : 1.5;
+            if (rock.type === 'iron') rock.slingDamage *= 1.4;
+            rock.cascadeSource = true;
+
+            spawnSparks(rock.group.position, tempColor.set(0xff6ec7), 16, 0.4, 0.9, { speed: 12, life: 0.4 });
+            spawnRing(rock.group.position, tempColor.set(0xff6ec7), rock.radius * 1.4, 0.55);
+            spawnPopup(rock.group.position.clone(), 'SLING', true);
+            state.shake = Math.max(state.shake, 0.55);
+            state.camPunch = Math.max(state.camPunch, 0.35);
+            state.chroma = Math.max(state.chroma, 0.45);
+            flashCoil(0.55);
+
+            // recoil the skiff slightly opposite the sling
+            player.velocity.addScaledVector(tempVec, -3.2);
+
+            clearTetherLatch(true);
+            tether.slingImmune = 0.35;
+            tether.cooldown = 0.22;
+        }
+
+        function fireOvercoil() {
+            if (state.charge < OVERCOIL_COST * 0.95) return;
+            state.charge = 0;
+            tether.mode = 'overcoil';
+            tether.overcoilTimer = tether.overcoilDuration;
+            tether.overcoilOrigin.copy(player.position);
+            tether.cooldown = 0.4;
+            state.invulnerable = Math.max(state.invulnerable, 0.35);
+            state.shake = Math.max(state.shake, 1.3);
+            state.camPunch = Math.max(state.camPunch, 0.9);
+            state.chroma = Math.max(state.chroma, 1.1);
+            flashCoil(0.85);
+            spawnRing(player.position, tempColor.set(0xc084ff), 8, 0.8);
+            spawnRing(player.position, tempColor.set(0xff6ec7), 12, 0.55);
+            spawnSparks(player.position, tempColor.set(0xe0b3ff), 36, 1.2, 1.1, { speed: 16, life: 0.55 });
+            spawnPopup(player.position.clone(), 'OVERCOIL', true);
+
+            // Phase 1: strong radial pull
+            for (const a of asteroids) {
+                if (a.dying) continue;
+                const d = wrapDelta(a.group.position, player.position);
+                const dist = d.length();
+                if (dist > 34 || dist < 0.01) continue;
+                const pull = (1 - dist / 34) * 22 * state.tunePull;
+                a.velocity.addScaledVector(d.normalize(), pull);
+                a.slingTimer = Math.max(a.slingTimer || 0, 0.8);
+                a.slingDamage = Math.max(a.slingDamage || 0, 1.2);
+                a.cascadeSource = true;
+            }
+            for (const h of hunters) {
+                if (h.dying) continue;
+                const d = wrapDelta(h.group.position, player.position);
+                const dist = d.length();
+                if (dist < 22) {
+                    h.velocity.addScaledVector(d.normalize(), 14);
+                }
+            }
+        }
+
+        function updateTether(rawDt, playerDt) {
+            ensureTetherVisuals();
+
+            if (tether.mode === 'overcoil') {
+                tether.overcoilTimer -= rawDt;
+                const t = 1 - clamp(tether.overcoilTimer / tether.overcoilDuration, 0, 1);
+                // Phase 2 (mid): arc damage between nearby rocks
+                if (t > 0.35 && t < 0.85 && Math.random() < 0.55) {
+                    arcDamagePulse();
+                }
+                if (tether.overcoilTimer <= 0) {
+                    tether.mode = 'free';
+                    // residual outward shove
+                    for (const a of asteroids) {
+                        if (a.dying) continue;
+                        const d = wrapDelta(player.position, a.group.position);
+                        const dist = d.length();
+                        if (dist < 28 && dist > 0.01) {
+                            a.velocity.addScaledVector(d.normalize(), (1 - dist / 28) * 10);
+                        }
+                    }
+                }
+                return;
+            }
+
+            if (tether.mode === 'flying') {
+                tether.boltLife -= rawDt;
+                tether.bolt.position.addScaledVector(tether.boltVel, playerDt);
+                wrapPosition(tether.bolt.position, tether.boltVel);
+                if (tether.bolt.velocity) { /* noop */ }
+                // face travel
+                if (tether.boltVel.lengthSq() > 0.01) {
+                    tempVec.copy(tether.boltVel).normalize();
+                    tether.bolt.quaternion.setFromUnitVectors(Z_AXIS, tempVec);
+                }
+                // seek nearest rock in forward path (soft magnet)
+                let best = null;
+                let bestScore = -Infinity;
+                for (const a of asteroids) {
+                    if (a.dying) continue;
+                    const d = wrapDelta(tether.bolt.position, a.group.position);
+                    const dist = d.length();
+                    if (dist > 14) continue;
+                    const heading = tether.boltVel.lengthSq() > 0.01 ? tether.boltVel.clone().normalize() : getForward(player.rotation);
+                    const dot = dist > 0.001 ? (d.x * heading.x + d.z * heading.z) / dist : 1;
+                    const score = dot * 2 - dist / 14;
+                    if (score > bestScore) { bestScore = score; best = a; }
+                }
+                if (best) {
+                    const desired = wrapDelta(tether.bolt.position, best.group.position).normalize().multiplyScalar(TETHER_SPEED * 1.05);
+                    tether.boltVel.lerp(desired, 1 - Math.exp(-rawDt * 6));
+                }
+                // latch test
+                for (const a of asteroids) {
+                    if (a.dying) continue;
+                    if (wrapDelta(tether.bolt.position, a.group.position).length() < a.radius + 0.7) {
+                        latchRock(a);
+                        return;
+                    }
+                }
+                if (tether.boltLife <= 0) {
+                    tether.mode = 'free';
+                    tether.bolt.visible = false;
+                }
+                return;
+            }
+
+            if (tether.mode === 'latched') {
+                const rock = tether.target;
+                if (!rock || rock.dying || asteroids.indexOf(rock) === -1) {
+                    clearTetherLatch(true);
+                    return;
+                }
+                tether.latchTimer += rawDt;
+                // magnetic pull: rock toward ship, ship slightly toward rock (mass-scaled)
+                const delta = wrapDelta(rock.group.position, player.position);
+                const dist = delta.length();
+                if (dist > 0.01) {
+                    const dir = delta.normalize();
+                    const pull = 14 * state.tunePull * (rock.size === 'large' ? 0.7 : 1);
+                    rock.velocity.addScaledVector(dir, pull * playerDt);
+                    // reel limit — don't yank through the hull
+                    if (dist < rock.radius + player.radius + 1.2) {
+                        rock.velocity.multiplyScalar(0.85);
+                    }
+                    // ship feels the mass
+                    const recoil = rock.size === 'large' ? 3.5 : rock.size === 'medium' ? 2.2 : 1.2;
+                    player.velocity.addScaledVector(dir, -recoil * playerDt * state.tunePull);
+                }
+                // max latch duration
+                if (tether.latchTimer > 4.5) {
+                    clearTetherLatch(true);
+                    spawnPopup(player.position.clone(), 'TETHER CUT', false);
+                    return;
+                }
+                // update line
+                const pos = tether.lineGeo.attributes.position.array;
+                pos[0] = player.position.x;
+                pos[1] = player.position.y + 0.3;
+                pos[2] = player.position.z;
+                pos[3] = rock.group.position.x;
+                pos[4] = rock.group.position.y + 0.2;
+                pos[5] = rock.group.position.z;
+                tether.lineGeo.attributes.position.needsUpdate = true;
+                tether.line.visible = true;
+                tether.lineMat.opacity = 0.55 + Math.sin(state.visualTime * 18) * 0.2;
+                if (Math.random() < 0.35) {
+                    const mid = player.position.clone().lerp(rock.group.position, 0.5);
+                    spawnSparks(mid, tempColor.set(0x6ef3ff), 1, 0.1, 0.25, { speed: 2, life: 0.25 });
+                }
+                // highlight latched rock
+                rock.material.emissiveIntensity = 0.9 + Math.sin(state.visualTime * 14) * 0.3;
+            } else {
+                if (tether.line) tether.line.visible = false;
+                if (tether.bolt) tether.bolt.visible = false;
+            }
+        }
+
+        function arcDamagePulse() {
+            // pick a rock near the player and damage it + nearest neighbor (visual cascade)
+            if (asteroids.length < 1) return;
+            let a = null;
+            let best = 1e9;
+            for (const r of asteroids) {
+                if (r.dying) continue;
+                const d = wrapDelta(player.position, r.group.position).length();
+                if (d < best && d < 26) { best = d; a = r; }
+            }
+            if (!a) return;
+            let b = null;
+            let bestB = 1e9;
+            for (const r of asteroids) {
+                if (r === a || r.dying) continue;
+                const d = wrapDelta(a.group.position, r.group.position).length();
+                if (d < bestB && d < 14) { bestB = d; b = r; }
+            }
+            const idx = asteroids.indexOf(a);
+            if (idx !== -1) hitAsteroid(idx, a.group.position.clone(), 1.2, false, true);
+            if (b) {
+                const j = asteroids.indexOf(b);
+                if (j !== -1) hitAsteroid(j, b.group.position.clone(), 0.8, false, true);
+                spawnSparks(a.group.position, tempColor.set(0xff6ec7), 4, 0.2, 0.5, { speed: 6, life: 0.3 });
+                spawnSparks(b.group.position, tempColor.set(0xc084ff), 4, 0.2, 0.5, { speed: 6, life: 0.3 });
+            }
+        }
+
+        // ---- Rock-on-rock cascade collisions (the identity payoff) ----
+        function updateRockCollisions(dt) {
+            const n = asteroids.length;
+            if (n < 2) return;
+            for (let i = 0; i < n; i++) {
+                const a = asteroids[i];
+                if (!a || a.dying) continue;
+                if (a.slingTimer > 0) a.slingTimer -= dt;
+                if (a.collideCd > 0) a.collideCd -= dt;
+            }
+            for (let i = 0; i < n; i++) {
+                const a = asteroids[i];
+                if (!a || a.dying) continue;
+                for (let j = i + 1; j < n; j++) {
+                    const b = asteroids[j];
+                    if (!b || b.dying) continue;
+                    const delta = wrapDelta(a.group.position, b.group.position);
+                    const dist = Math.hypot(delta.x, delta.z);
+                    const minDist = a.radius + b.radius;
+                    if (dist >= minDist || dist < 1e-4) continue;
+
+                    // separate
+                    const nx = delta.x / dist;
+                    const nz = delta.z / dist;
+                    const overlap = (minDist - dist) * 0.5;
+                    a.group.position.x -= nx * overlap;
+                    a.group.position.z -= nz * overlap;
+                    b.group.position.x += nx * overlap;
+                    b.group.position.z += nz * overlap;
+                    wrapPosition(a.group.position, a.velocity);
+                    wrapPosition(b.group.position, b.velocity);
+
+                    // relative velocity along normal
+                    const rvx = b.velocity.x - a.velocity.x;
+                    const rvz = b.velocity.z - a.velocity.z;
+                    const vn = rvx * nx + rvz * nz;
+                    if (vn >= 0) continue; // separating
+
+                    const impact = Math.abs(vn);
+                    // elastic-ish bounce
+                    const bounce = 0.55;
+                    a.velocity.x += nx * vn * bounce;
+                    a.velocity.z += nz * vn * bounce;
+                    b.velocity.x -= nx * vn * bounce;
+                    b.velocity.z -= nz * vn * bounce;
+
+                    // damage if either was slung hard or impact is violent
+                    const aHot = (a.slingTimer > 0) || a.cascadeSource;
+                    const bHot = (b.slingTimer > 0) || b.cascadeSource;
+                    if ((aHot || bHot || impact > 12) && (a.collideCd <= 0 && b.collideCd <= 0)) {
+                        a.collideCd = ROCK_COLLIDE_COOLDOWN;
+                        b.collideCd = ROCK_COLLIDE_COOLDOWN;
+                        const dmgA = (bHot ? (b.slingDamage || 1.5) : 0) + impact * 0.08;
+                        const dmgB = (aHot ? (a.slingDamage || 1.5) : 0) + impact * 0.08;
+                        const mid = a.group.position.clone().lerp(b.group.position, 0.5);
+                        if (dmgA > 0.6) {
+                            const ia = asteroids.indexOf(a);
+                            if (ia !== -1) hitAsteroid(ia, mid, dmgA, false, true, 0, true);
+                        }
+                        if (dmgB > 0.6) {
+                            const ib = asteroids.indexOf(b);
+                            if (ib !== -1) hitAsteroid(ib, mid, dmgB, false, true, 0, true);
+                        }
+                        if (impact > 8 || aHot || bHot) {
+                            spawnSparks(mid, tempColor.set(0xff6ec7), 8, 0.3, 0.7, { speed: 9, life: 0.35 });
+                            if (aHot || bHot) {
+                                state.shake = Math.max(state.shake, 0.35);
+                            }
+                        }
+                    }
+                }
+            }
+            // decay cascadeSource flags
+            for (const a of asteroids) {
+                if (a.cascadeSource && (a.slingTimer || 0) <= 0) a.cascadeSource = false;
+            }
+        }
+
+        function updateShots(dt) {
+            for (let i = shots.length - 1; i >= 0; i--) {
+                const s = shots[i];
+                s.life -= dt;
+                s.velocity.y = 0;
+                s.group.position.addScaledVector(s.velocity, dt);
+                wrapPosition(s.group.position, s.velocity);
+                s.group.position.y = DECK_Y;
+                if (s.life <= 0) { s.group.visible = false; shots.splice(i, 1); }
+            }
+        }
+
+        function resetShots() {
+            shots.length = 0;
+            for (let i = 0; i < shotMeshPool.length; i++) shotMeshPool[i].visible = false;
+        }
+
+        function updateAsteroids(dt) {
+            for (const a of asteroids) {
+                a.velocity.y = 0;
+                a.group.position.addScaledVector(a.velocity, dt);
+                wrapPosition(a.group.position, a.velocity);
+                a.group.position.y = DECK_Y;
+                a.mesh.rotation.x += a.spin.x * dt;
+                a.mesh.rotation.y += a.spin.y * dt;
+                a.mesh.rotation.z += a.spin.z * dt;
+
+                if (a.type === 'prism') {
+                    a.spawnTimer -= dt;
+                    if (a.spawnTimer <= 0 && asteroids.length < 40) {
+                        a.spawnTimer = 3.2;
+                        createAsteroid('small', a.group.position.clone().add(randomPlanarVector(a.radius + 1)), a.velocity, 1.2, 'slag');
+                    }
+                    if (a.core) {
+                        const exposed = 1 - a.hp / a.maxHp;
+                        a.core.material.opacity = exposed * 0.7 + Math.sin(state.visualTime * 6) * 0.1 * exposed;
+                        a.core.scale.setScalar(0.8 + exposed * 0.4);
+                    }
+                }
+
+                // pre-shatter white flash / sling telegraph
+                if (a.flash > 0) {
+                    a.flash = Math.max(0, a.flash - dt);
+                    const f = a.flash / 0.06;
+                    a.material.emissiveIntensity = 0.6 + f * 4;
+                    a.mesh.scale.setScalar(1 + f * 0.12);
+                } else if (a.tethered) {
+                    a.material.emissiveIntensity = 0.95 + Math.sin(state.visualTime * 14) * 0.25;
+                } else if (a.slingTimer > 0) {
+                    a.material.emissiveIntensity = 0.85 + Math.sin(state.visualTime * 20) * 0.2;
+                    a.mesh.scale.setScalar(1.04);
+                } else if (a.mesh.scale.x !== 1) {
+                    a.material.emissiveIntensity = a.type === 'iron' ? 0.5 : 0.6;
+                    a.mesh.scale.setScalar(1);
+                }
+            }
+        }
+
+        function updateHunters(dt) {
+            for (const h of hunters) {
+                const toPlayer = wrapDelta(h.group.position, player.position);
+                const dist = toPlayer.length();
+                const desired = toPlayer.normalize().multiplyScalar(h.speed);
+                h.velocity.lerp(desired, 1 - Math.exp(-dt * 1.6));
+                h.velocity.y = 0;
+                h.group.position.addScaledVector(h.velocity, dt);
+                wrapPosition(h.group.position, h.velocity);
+                h.group.position.y = DECK_Y;
+                h.mesh.rotation.y += dt * 2;
+                h.mesh.rotation.x += dt * 1.4;
+                h.lockPulse = dist < 26 ? Math.min(1, h.lockPulse + dt * 2) : Math.max(0, h.lockPulse - dt * 2);
+                h.mesh.scale.setScalar(1 + Math.sin(state.visualTime * 9) * 0.06 * h.lockPulse);
+                if (h.flash > 0) {
+                    h.flash = Math.max(0, h.flash - dt);
+                    h.material.emissiveIntensity = 0.9 + (h.flash / 0.06) * 4;
+                } else {
+                    h.material.emissiveIntensity = 0.9;
+                }
+                if (h.lockPulse > 0.5 && Math.random() < 0.3) {
+                    spawnSparks(h.group.position, tempColor.set(0xff6ec7), 1, 0.2, 0.3, { speed: 2, life: 0.3 });
+                }
+                // siphon capacitor when close
+                if (dist < 10 && state.charge > 0) {
+                    state.charge = Math.max(0, state.charge - (1 - dist / 10) * 18 * dt);
+                    if (Math.random() < 0.18) {
+                        spawnSparks(h.group.position, tempColor.set(0xc084ff), 1, 0.15, 0.25, { speed: 3, life: 0.25 });
+                    }
+                }
+            }
+        }
+
+        function killHunter(index, pos, viaSpecial) {
+            const h = hunters[index];
+            if (!h) return;
+            spawnShardBurst(pos, tempColor.set(0xff6ec7), 1.4, false);
+            spawnSparks(pos, tempColor.set(0xff9ad8), 16, 0.5, 0.9, { speed: 9, life: 0.5 });
+            spawnRing(pos, tempColor.set(0xff6ec7), 2.4, 0.5);
+            registerKill(h.score, pos, viaSpecial, false);
+            bankCharge(10);
+            // hunters live in fieldGroup, not the scene root
+            (h.group.parent || fieldGroup).remove(h.group);
+            disposeEntity(h);
+            hunters.splice(index, 1);
+        }
+
+        // ---- Collisions ----
+        function checkCollisions() {
+            for (let i = shots.length - 1; i >= 0; i--) {
+                const s = shots[i];
+                const hit = findProjectileHit(s.group.position, s.radius);
+                if (hit) {
+                    if (hit.list === hunters) {
+                        hitHunter(hit.index, s.group.position, s.damage);
+                    } else {
+                        hitAsteroid(hit.index, s.group.position, s.damage, false, false);
+                    }
+                    if (s.pierce > 0) {
+                        s.pierce -= 1;
+                    } else {
+                        s.group.visible = false;
+                        shots.splice(i, 1);
+                    }
+                }
+            }
+
+            if (state.invulnerable <= 0 && !state.forceInvuln && tether.mode !== 'overcoil') {
+                for (let i = asteroids.length - 1; i >= 0; i--) {
+                    const a = asteroids[i];
+                    if (a.dying) continue;
+                    if (planarDist(a.group.position, player.position) < a.radius + player.radius) {
+                        handlePlayerImpact(a.group.position.clone(), a.radius);
+                        break;
+                    }
+                }
+                for (let i = hunters.length - 1; i >= 0; i--) {
+                    const h = hunters[i];
+                    if (h.dying) continue;
+                    if (planarDist(h.group.position, player.position) < h.radius + player.radius) {
+                        const pos = h.group.position.clone();
+                        killHunter(i, pos, false);
+                        handlePlayerImpact(pos, h.radius);
+                        break;
+                    }
+                }
+            }
+        }
+
+        function findProjectileHit(position, radius) {
+            // XZ-only collision so deck combat stays fair even if a mesh center sits slightly off
+            for (let i = asteroids.length - 1; i >= 0; i--) {
+                const a = asteroids[i];
+                if (a.dying) continue;
+                if (planarDist(a.group.position, position) < a.radius + radius) {
+                    return { list: asteroids, index: i };
+                }
+            }
+            for (let i = hunters.length - 1; i >= 0; i--) {
+                const h = hunters[i];
+                if (h.dying) continue;
+                if (planarDist(h.group.position, position) < h.radius + radius) {
+                    return { list: hunters, index: i };
+                }
+            }
+            return null;
+        }
+
+        function hitHunter(index, pos, damage) {
+            const h = hunters[index];
+            if (!h || h.dying) return;
+            h.hp -= damage;
+            h.flash = 0.06;
+            spawnSparks(pos, tempColor.set(0xff9ad8), 4, 0.2, 0.5, { speed: 5, life: 0.3 });
+            if (h.hp <= 0) {
+                h.dying = true;
+                killHunter(index, h.group.position.clone(), false);
+            }
+        }
+
+        // Apply damage; on lethal hit, mark dying + flash + queue shatter.
+        // viaCascade = rock-rock / overcoil chain — pays more charge and score.
+        function hitAsteroid(index, impactPos, damage, explosive, viaSpecial, blastRadius = 4.5, viaCascade = false) {
+            const a = asteroids[index];
+            if (!a || a.dying) return false;
+            a.hp -= damage;
+            if (a.hp > 0) {
+                a.flash = 0.06;
+                spawnSparks(impactPos, tempColor.set(0xd4b8ff), 4, 0.2, 0.5, { speed: 5, life: 0.3 });
+                state.shake = Math.max(state.shake, 0.18);
+                return false;
+            }
+            a.dying = true;
+            a.flash = 0.06;
+            pendingShatter.push({ a, impactPos: impactPos.clone(), explosive, blastRadius, viaSpecial, viaCascade });
+            a.shatterTimer = 0.05;
+            return true;
+        }
+
+        function resolveShatter(dt) {
+            for (let i = pendingShatter.length - 1; i >= 0; i--) {
+                const p = pendingShatter[i];
+                p.a.shatterTimer -= dt;
+                if (p.a.shatterTimer <= 0) {
+                    const idx = asteroids.indexOf(p.a);
+                    if (idx !== -1) destroyAsteroid(idx, p.impactPos, p.explosive, p.blastRadius, p.viaSpecial, p.viaCascade);
+                    pendingShatter.splice(i, 1);
+                }
+            }
+        }
+
+        function destroyAsteroid(index, impactPos, explosive, blastRadius, viaSpecial, viaCascade) {
+            const a = asteroids[index];
+            if (!a) return;
+            // clear tether if this was the latched rock
+            if (tether.target === a) clearTetherLatch(true);
+            const position = a.group.position.clone();
+            const velocity = a.velocity.clone();
+            let color;
+            if (a.type === 'iron') color = tempColor.set(0xffe08a).clone();
+            else if (a.type === 'prism') color = tempColor.set(0xff9aff).clone();
+            else color = tempColor.set(a.size === 'large' ? 0xb8a0ff : a.size === 'medium' ? 0x9b7cff : 0xc084ff).clone();
+
+            spawnSparks(impactPos || position, color, explosive || viaCascade ? 14 : 8, a.radius * 0.34, explosive || viaCascade ? 1.0 : 0.66, { speed: 11, life: 0.55 });
+            spawnSparks(position, tempColor.set(0xffffff), 5, a.radius * 0.2, 0.7, { speed: 7, life: 0.35 });
+            spawnShardBurst(position, color, a.radius, explosive || viaCascade);
+            spawnRing(position, color, a.radius * 1.1, explosive || viaCascade ? 0.72 : 0.44);
+            spawnRing(position, tempColor.set(0xc084ff), a.radius * 1.55, explosive || viaCascade ? 0.42 : 0.24);
+
+            state.shake = Math.max(state.shake, explosive ? 0.8 : viaCascade ? 0.55 : viaSpecial ? 0.4 : 0.32);
+            state.camPunch = Math.max(state.camPunch, viaCascade ? 0.4 : viaSpecial ? 0.18 : 0.28);
+            registerKill(a.score, position, viaSpecial, viaCascade);
+
+            // children inherit a fraction of parent velocity so cascades keep rolling
+            const childKick = viaCascade ? 1.35 : 1.08;
+
+            if (a.type === 'prism') {
+                state.shake = Math.max(state.shake, 1.4);
+                state.camPunch = Math.max(state.camPunch, 1.0);
+                spawnSparks(position, tempColor.set(0xffffff), 22, a.radius * 0.5, 1.2, { speed: 16, life: 0.7 });
+                for (let i = 0; i < 3; i++) {
+                    const child = createAsteroid('medium', position.clone().add(randomPlanarVector(2)), velocity, 1.1, 'glass');
+                    if (child && viaCascade) {
+                        child.slingTimer = 0.7;
+                        child.slingDamage = 1.4;
+                        child.cascadeSource = true;
+                        child.velocity.add(randomPlanarVector(6));
+                    }
+                }
+                spawnPopup(position.clone(), 'FORGE CORE +' + a.score, true);
+                bankCharge(28);
+            } else if (a.size === 'large') {
+                const childType = a.type === 'iron' ? 'glass' : a.type;
+                for (let i = 0; i < 2; i++) {
+                    const child = createAsteroid('medium', position.clone().add(randomPlanarVector(1.2)), velocity, childKick, childType);
+                    if (child && (viaCascade || a.cascadeSource)) {
+                        child.slingTimer = 0.55;
+                        child.slingDamage = 1.2;
+                        child.cascadeSource = true;
+                        child.velocity.add(randomPlanarVector(4));
+                    }
+                }
+            } else if (a.size === 'medium') {
+                const childType = a.type === 'iron' ? 'glass' : a.type;
+                for (let i = 0; i < 3; i++) {
+                    const child = createAsteroid('small', position.clone().add(randomPlanarVector(0.9)), velocity, childKick * 1.05, childType);
+                    if (child && (viaCascade || a.cascadeSource)) {
+                        child.slingTimer = 0.4;
+                        child.slingDamage = 1.0;
+                        child.cascadeSource = true;
+                        child.velocity.add(randomPlanarVector(3.5));
+                    }
+                }
+            }
+
+            if (explosive && blastRadius) {
+                for (const other of asteroids) {
+                    if (other === a || other.dying) continue;
+                    if (wrapDelta(position, other.group.position).length() < a.radius + other.radius + blastRadius) {
+                        other.velocity.add(randomPlanarVector(4.5));
+                    }
+                }
+            }
+
+            if (Math.random() < pickupChance()) spawnPickup(position);
+
+            // asteroids live in fieldGroup, not the scene root — remove from the actual parent
+            (a.group.parent || fieldGroup).remove(a.group);
+            disposeEntity(a);
+            asteroids.splice(index, 1);
+        }
+
+        function registerKill(baseScore, position, viaSpecial, viaCascade) {
+            state.combo = state.comboTimer > 0 ? Math.min(99, state.combo + 1) : 1;
+            state.comboTimer = clamp(2.5 - state.combo * 0.012, 1.3, 2.5);
+            state.bestCombo = Math.max(state.bestCombo, state.combo);
+            const comboBonus = Math.max(0, state.combo - 1) * 10;
+            let mult = 1;
+            if (viaCascade) mult = 1.55;
+            else if (viaSpecial) mult = 1.2;
+            mult *= (0.85 + 0.15 * state.tuneCascade);
+            const gained = Math.round((baseScore + state.wave * 6 + comboBonus) * mult);
+            state.score += gained;
+            state.kills += 1;
+            // Charge economy: cascades fill the capacitor, gun kills trickle
+            bankCharge(viaCascade ? 14 + Math.min(10, state.combo) : viaSpecial ? 8 : 5);
+            const label = viaCascade ? ('CASCADE +' + gained) : ('+' + gained);
+            spawnPopup(position.clone(), label, viaCascade || state.combo >= 6);
+            if (state.combo > 1 && state.combo % 5 === 0) {
+                spawnRing(position, tempColor.set(0xffe8ff), 3.2, 0.5);
+                spawnSparks(position, tempColor.set(0xff6ec7), 16, 0.4, 0.7, { speed: 9, life: 0.5 });
+                spawnPopup(position.clone().add(new THREE.Vector3(0, 0.5, 0)), 'x' + state.combo + ' CASCADE', true);
+            }
+            state.recentKills += 1;
+        }
+
+        function bankCharge(amount) {
+            const before = state.charge;
+            state.charge = Math.min(state.chargeMax, state.charge + amount * state.tuneCascade);
+            if (before < OVERCOIL_COST && state.charge >= OVERCOIL_COST) {
+                spawnPopup(player.position.clone(), 'OVERCOIL READY', true);
+                spawnRing(player.position, tempColor.set(0xc084ff), 4, 0.6);
+            }
+        }
+
+        function handlePlayerImpact(position, radius) {
+            if (state.shield > 0) {
+                const spec = shieldSpec();
+                state.shield = Math.max(0, state.shield - Math.ceil(radius * 9 * spec.absorb));
+                state.invulnerable = 0.8;
+                state.shake = Math.max(state.shake, 1.35);
+                state.camPunch = Math.max(state.camPunch, 0.7);
+                state.chroma = Math.max(state.chroma, 0.8);
+                spawnSparks(player.position, tempColor.set(0x8f7cff), 24, 1.4, 0.9, { speed: 10, life: 0.5 });
+                spawnRing(player.position, tempColor.set(0x8f7cff), 3.0, 0.55);
+                return;
+            }
+            state.lives -= 1;
+            state.combo = 0;
+            state.invulnerable = 2.6;
+            state.shake = Math.max(state.shake, 1.6);
+            state.camPunch = Math.max(state.camPunch, 1.0);
+            state.chroma = Math.max(state.chroma, 1.2);
+            state.charge = Math.max(0, state.charge * 0.45);
+            clearTetherLatch(true);
+            spawnSparks(player.position, tempColor.set(0xff5f8d), 42, 2.2, 1.0, { speed: 13, life: 0.6 });
+            spawnRing(player.position, tempColor.set(0xff5f8d), 4.4, 0.78);
+
+            if (state.lives <= 0) {
+                state.gameOver = true;
+                setPaused(true, 'Run Complete', 'Score ' + state.score.toLocaleString() + ' · Best chain x' + state.bestCombo + '. New Run to dive again.');
+                return;
+            }
+
+            setOnRing(player.position, ringTheta(player.position), RING_R0, DECK_Y);
+            player.velocity.set(0, 0, 0);
+            player.rotation = ringTheta(player.position) + Math.PI * 0.5;
+            snapCameraToShot(true);
+            state.shield = Math.max(state.shield, Math.round(state.shieldMax * 0.34));
+        }
+
+        // ---- Pickups ----
+        function pickupChance() { return 0.24 + state.wave * 0.006; }
+
+        function spawnPickup(position) {
+            const roll = Math.random();
+            let type = 'overdrive';
+            if (roll < 0.36) type = 'guns';
+            else if (roll < 0.58) type = 'shield';
+            else if (roll < 0.8) type = 'charge';
+            else if (roll < 0.92) type = 'tether';
+            const spec = pickupSpecs[type];
+            const group = new THREE.Group();
+            const core = new THREE.Mesh(geometries.pickup, new THREE.MeshStandardMaterial({
+                color: spec.color, metalness: 0.4, roughness: 0.35, emissive: spec.color, emissiveIntensity: 0.28
+            }));
+            const halo = new THREE.Mesh(geometries.ring, additive(spec.color, 0.5));
+            halo.rotation.x = Math.PI / 2;
+            halo.scale.setScalar(1.1);
+            group.add(core, halo);
+            group.position.copy(position);
+            group.position.y = DECK_Y;
+            scene.add(group);
+            pickups.push({ type, group, core, halo, life: 12, radius: 1.1, spin: randomRange(1, 2.5) });
+        }
+
+        function updatePickups(dt) {
+            const gravityRadius = state.overdriveTimer > 0 ? 18 : 12;
+            for (let i = pickups.length - 1; i >= 0; i--) {
+                const p = pickups[i];
+                p.life -= dt;
+                p.group.rotation.y += p.spin * dt;
+                p.halo.scale.setScalar(1.1 + Math.sin(state.visualTime * 4 + i) * 0.12);
+                const delta = wrapDelta(p.group.position, player.position);
+                const dist = delta.length();
+                if (dist < gravityRadius) {
+                    const pull = (1 - dist / gravityRadius);
+                    p.group.position.addScaledVector(delta.normalize(), pull * pull * 26 * dt);
+                    wrapPosition(p.group.position);
+                }
+                if (dist < player.radius + p.radius + 0.6) {
+                    applyPickup(p.type, p.group.position.clone());
+                    removePickup(i);
+                    continue;
+                }
+                if (p.life <= 0) { removePickup(i); continue; }
+                if (p.life < 3) p.core.material.opacity = (Math.sin(state.visualTime * 12) * 0.5 + 0.5);
+            }
+        }
+
+        function applyPickup(type, position) {
+            const spec = pickupSpecs[type] || pickupSpecs.charge;
+            if (type === 'shield') {
+                state.shieldTier = Math.min(upgradeSpecs.shield.length - 1, state.shieldTier + 1);
+                const s = shieldSpec();
+                state.shieldMax = s.max;
+                state.shield = Math.min(s.max, state.shield + s.restore);
+            } else if (type === 'guns') {
+                state.gunsLevel = Math.min(upgradeSpecs.guns.length - 1, state.gunsLevel + 1);
+            } else if (type === 'charge') {
+                bankCharge(45);
+            } else if (type === 'tether') {
+                // temporary sling/pull boost via overdrive-adjacent feel
+                state.overdriveTimer = Math.max(state.overdriveTimer, 5);
+                bankCharge(20);
+            } else if (type === 'overdrive') {
+                state.overdriveTimer = 7;
+                bankCharge(15);
+            }
+            spawnSparks(position, tempColor.set(spec.color), 14, 0.5, 0.7, { speed: 8, life: 0.5 });
+            spawnPopup(position, spec.label.toUpperCase(), false);
+            refreshUi();
+        }
+
+        function removePickup(index) {
+            const p = pickups[index];
+            if (!p) return;
+            scene.remove(p.group);
+            p.group.traverse((c) => { if (c.material) c.material.dispose(); });
+            pickups.splice(index, 1);
+        }
+
+        // ---- Sparks (shader points, circular discard, size-capped) ----
+        function spawnEngineTrail(forward) {
+            if (Math.random() > 0.5) return;
+            const right = getRight(player.rotation);
+            for (const shoulder of [-0.5, 0.5]) {
+                const pos = player.position.clone().addScaledVector(forward, -1.6).addScaledVector(right, shoulder);
+                spawnSparks(pos, tempColor.set(0xc084ff), 1, 0.1, 0.3, { speed: 2.5, life: 0.35, gravity: 0 });
+            }
+        }
+
+        function spawnSparks(position, color, count, spread, power, opts = {}) {
+            const pool = sparks.pool;
+            const speed = opts.speed || 8;
+            const life = opts.life || 0.5;
+            const drag = opts.drag || 0.8;
+            const gravity = opts.gravity == null ? 0 : opts.gravity;
+            for (let i = 0; i < count; i++) {
+                const s = pool[sparks.head];
+                sparks.head = (sparks.head + 1) % SPARK_CAP;
+                s.active = true;
+                const oa = Math.random() * Math.PI * 2;
+                const orr = Math.random() * spread;
+                s.pos.set(position.x + Math.cos(oa) * orr, position.y, position.z + Math.sin(oa) * orr);
+                const sp = randomRange(0.4, 1) * speed * power;
+                const va = Math.random() * Math.PI * 2;
+                s.vel.set(Math.cos(va) * sp, randomRange(-0.4, 1.2) * power, Math.sin(va) * sp);
+                s.color.copy(color).lerp(WHITE, Math.random() * 0.3);
+                s.life = randomRange(life * 0.7, life);
+                s.maxLife = life;
+                s.size = randomRange(2.5, 6) * (power + 0.4);
+                s.drag = drag;
+                s.gravity = gravity;
+            }
+        }
+
+        function updateSparks(dt) {
+            const pool = sparks.pool;
+            const positions = sparks.positions;
+            const colors = sparks.colors;
+            const sizes = sparks.sizes;
+            const alphas = sparks.alphas;
+            let n = 0;
+            for (let i = 0; i < SPARK_CAP; i++) {
+                const s = pool[i];
+                if (!s.active) continue;
+                s.life -= dt;
+                if (s.life <= 0) { s.active = false; continue; }
+                s.vel.multiplyScalar(Math.pow(s.drag, dt));
+                s.vel.y += s.gravity * dt;
+                s.pos.addScaledVector(s.vel, dt);
+                positions[n * 3] = s.pos.x;
+                positions[n * 3 + 1] = s.pos.y;
+                positions[n * 3 + 2] = s.pos.z;
+                colors[n * 3] = s.color.r;
+                colors[n * 3 + 1] = s.color.g;
+                colors[n * 3 + 2] = s.color.b;
+                sizes[n] = s.size;
+                alphas[n] = clamp(s.life / s.maxLife, 0, 1) * 0.9;
+                n++;
+            }
+            sparks.activeCount = n;
+            sparks.geometry.setDrawRange(0, n);
+            sparks.geometry.attributes.position.needsUpdate = true;
+            sparks.geometry.attributes.color.needsUpdate = true;
+            sparks.geometry.attributes.aSize.needsUpdate = true;
+            sparks.geometry.attributes.aAlpha.needsUpdate = true;
+        }
+
+        // ---- Glass shards (pooled real-geometry triangles; zero per-kill allocation) ----
+        let shardHead = 0;
+        let shardActiveCount = 0;
+        const ICE = new THREE.Color(0xe8f5ff);
+
+        function buildShardPool() {
+            for (let i = 0; i < SHARD_CAP; i++) {
+                const material = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+                const mesh = new THREE.Mesh(geometries.shard, material);
+                mesh.visible = false;
+                effectRoot.add(mesh);
+                shards.push({ mesh, material, velocity: new THREE.Vector3(), angular: new THREE.Vector3(), life: 0, maxLife: 1, opacity: 1, drag: 0.78, active: false });
+            }
+        }
+
+        function resetShardPool() {
+            shardHead = 0;
+            shardActiveCount = 0;
+            for (let i = 0; i < shards.length; i++) { shards[i].active = false; shards[i].mesh.visible = false; }
+        }
+
+        function spawnShardBurst(position, color, radius, explosive) {
+            const count = radius > 3 ? 14 : radius > 1.8 ? 10 : 6;
+            const blast = explosive ? 1.3 : 1;
+            for (let i = 0; i < count; i++) {
+                const s = shards[shardHead];
+                shardHead = (shardHead + 1) % SHARD_CAP;
+                const a = Math.random() * Math.PI * 2;
+                tempVecC.set(Math.cos(a), randomRange(-0.2, 0.7), Math.sin(a)).normalize();
+                const off = randomRange(0.2, radius * 0.5);
+                s.mesh.position.set(position.x + tempVecC.x * off, position.y + tempVecC.y * off, position.z + tempVecC.z * off);
+                s.mesh.rotation.set(Math.random() * 6.28, Math.random() * 6.28, Math.random() * 6.28);
+                s.mesh.scale.setScalar(randomRange(0.4, 1.0) * radius * 0.5 * blast);
+                s.mesh.visible = true;
+                s.material.color.copy(color).lerp(ICE, randomRange(0.2, 0.55));
+                const op = randomRange(0.5, 0.85);
+                s.opacity = op;
+                s.material.opacity = op;
+                s.velocity.copy(tempVecC).multiplyScalar(randomRange(5, 13) * blast);
+                s.angular.set(randomRange(-9, 9), randomRange(-11, 11), randomRange(-9, 9));
+                s.life = randomRange(0.7, 1.4);
+                s.maxLife = 1.4;
+                s.active = true;
+            }
+        }
+
+        function updateShards(dt) {
+            let n = 0;
+            for (let i = 0; i < shards.length; i++) {
+                const s = shards[i];
+                if (!s.active) continue;
+                s.life -= dt;
+                if (s.life <= 0) { s.active = false; s.mesh.visible = false; continue; }
+                s.velocity.multiplyScalar(Math.pow(s.drag, dt));
+                s.mesh.position.addScaledVector(s.velocity, dt);
+                s.mesh.rotation.x += s.angular.x * dt;
+                s.mesh.rotation.y += s.angular.y * dt;
+                s.mesh.rotation.z += s.angular.z * dt;
+                s.material.opacity = s.opacity * clamp(s.life / 0.6, 0, 1);
+                n++;
+            }
+            shardActiveCount = n;
+        }
+
+        // ---- Shock rings (pooled) ----
+        let ringHead = 0;
+
+        function buildRingPool() {
+            for (let i = 0; i < RING_CAP; i++) {
+                const material = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+                const mesh = new THREE.Mesh(geometries.ring, material);
+                mesh.rotation.x = Math.PI / 2;
+                mesh.visible = false;
+                effectRoot.add(mesh);
+                rings.push({ mesh, material, life: 0, maxLife: 0.72, start: 0.1, expansion: 1, opacity: 1, active: false });
+            }
+        }
+
+        function resetRingPool() {
+            ringHead = 0;
+            for (let i = 0; i < rings.length; i++) { rings[i].active = false; rings[i].mesh.visible = false; }
+        }
+
+        function spawnRing(position, color, expansion, opacity) {
+            const r = rings[ringHead];
+            ringHead = (ringHead + 1) % RING_CAP;
+            r.mesh.position.set(position.x, Math.max(0.18, position.y), position.z);
+            r.mesh.scale.setScalar(0.1);
+            r.mesh.visible = true;
+            r.material.color.copy(color);
+            r.material.opacity = opacity;
+            r.life = 0.72;
+            r.maxLife = 0.72;
+            r.start = 0.1;
+            r.expansion = expansion;
+            r.opacity = opacity;
+            r.active = true;
+        }
+
+        function updateRings(dt) {
+            for (let i = 0; i < rings.length; i++) {
+                const r = rings[i];
+                if (!r.active) continue;
+                r.life -= dt;
+                if (r.life <= 0) { r.active = false; r.mesh.visible = false; continue; }
+                const t = 1 - r.life / r.maxLife;
+                r.mesh.scale.setScalar(r.start + r.expansion * easeOutCubic(t));
+                r.material.opacity = r.opacity * (1 - t);
+            }
+        }
+
+        const popupPool = [];
+        let popupCursor = 0;
+
+        function buildPopupPool() {
+            for (let i = 0; i < 32; i++) {
+                const el = document.createElement('div');
+                el.className = 'popup';
+                el.style.opacity = '0';
+                ui.popups.appendChild(el);
+                popupPool.push(el);
+            }
+        }
+
+        function spawnPopup(worldPos, text, hot) {
+            tempVecB.copy(worldPos);
+            tempVecB.project(camera);
+            if (tempVecB.z > 1) return;
+            const x = (tempVecB.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-tempVecB.y * 0.5 + 0.5) * window.innerHeight;
+            const el = popupPool[popupCursor];
+            popupCursor = (popupCursor + 1) % popupPool.length;
+            el.textContent = text;
+            el.className = 'popup' + (hot ? ' hot' : '');
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            el.style.animation = 'none';
+            void el.offsetWidth; // reflow to restart the rise/fade animation on this pooled node
+            el.style.animation = '';
+        }
+
+        function disposeEntity(e) {
+            if (e.geometry) e.geometry.dispose();
+            if (e.material) e.material.dispose();
+            // pooled asteroids share geo + edges geo + line material — never dispose those
+            if (e.edges && !e.pooled) { e.edges.geometry.dispose(); e.edges.material.dispose(); }
+            if (e.core) { e.core.geometry.dispose(); e.core.material.dispose(); }
+        }
+
+        function clearCollection(collection) {
+            while (collection.length) {
+                const item = collection.pop();
+                const root = item.group || item.mesh || item;
+                if (root && root.parent) root.parent.remove(root);
+                if (item.material) item.material.dispose();
+                if (item.geometry) item.geometry.dispose();
+                if (item.edges && !item.pooled) { item.edges.geometry.dispose(); item.edges.material.dispose(); }
+                if (item.core) { item.core.geometry.dispose(); item.core.material.dispose(); }
+            }
+        }
+
+        function updateBackdropTime(time) {
+            if (beltBackdrop && player) {
+                beltBackdrop.material.uniforms.time.value = time;
+                beltBackdrop.material.uniforms.heat.value = state.cascadeLevel * state.tuneCascade * 0.5;
+                // local deck glow under the skiff
+                beltBackdrop.mesh.position.x = player.position.x;
+                beltBackdrop.mesh.position.z = player.position.z;
+                beltBackdrop.mesh.position.y = player.position.y - 1.1;
+            }
+            if (nebulaDome) nebulaDome.material.uniforms.time.value = time;
+            if (starField) starField.rotation.y = time * 0.003;
+            if (gasGiant) {
+                gasGiant.material.uniforms.time.value = time;
+                gasGiant.body.rotation.y = time * 0.015;
+            }
+            if (ringSystem) {
+                for (const b of ringSystem.bandMeshes) {
+                    b.material.uniforms.time.value = time;
+                }
+            }
+            if (planetLight) {
+                planetLight.position.set(0, 12, 0);
+                planetLight.intensity = 1.0 + state.cascadeLevel * 0.15;
+            }
+        }
+
+        // ---- Camera (a feel instrument: zoom-punch, overcoil framing, shake) ----
+        function updateCamera(dt, instant = false) {
+            state.shake = Math.max(0, state.shake - dt * 3.2);
+            state.camPunch = Math.max(0, state.camPunch - dt * 3.4);
+            state.chroma = Math.max(0, state.chroma - dt * 3);
+            if (state.shot === 'cockpit') cockpitCam(dt, instant);
+            else if (state.shot === 'chase') chaseCam(dt, instant);
+            else broadcastCam(dt, instant);
+        }
+
+        function applyShake(vec, amount) {
+            if (state.shake <= 0) return;
+            const s = state.shake * state.tuneShake * amount;
+            vec.x += randomRange(-1, 1) * s;
+            vec.y += randomRange(-0.4, 0.4) * s;
+            vec.z += randomRange(-1, 1) * s;
+        }
+
+        function chaseCam(dt, instant) {
+            const shot = shotModes.chase;
+            const forward = getForward(player.rotation).clone();
+            const right = getRight(player.rotation).clone();
+            const speed = player.velocity.length();
+            const coilBlend = tether.mode === 'overcoil' ? 1 : tether.mode === 'latched' ? 0.35 : 0;
+
+            const back = shot.back + speed * 0.07 - state.camPunch * 1.4 - coilBlend * 1.2;
+            const up = shot.up - state.camPunch * 0.3 - coilBlend * 0.5;
+            const lag = shot.lag + coilBlend * 3;
+
+            // Mild outward bias so the planet peeks into frame without skewing aim
+            const radial = tempVecC.set(player.position.x, 0, player.position.z);
+            if (radial.lengthSq() > 1e-4) radial.normalize();
+            else radial.set(1, 0, 0);
+
+            tempVec.copy(player.position)
+                .addScaledVector(forward, -back)
+                .addScaledVector(right, shot.shoulder)
+                .addScaledVector(radial, 2.2);
+            tempVec.y = DECK_Y + up;
+            applyShake(tempVec, tether.mode === 'overcoil' ? 0.55 : 0.28);
+
+            camera.position.lerp(tempVec, instant ? 1 : 1 - Math.exp(-dt * lag));
+            tempVecB.copy(player.position).addScaledVector(forward, shot.lookAhead + speed * 0.2);
+            tempVecB.addScaledVector(radial, -shot.planetPull * 12);
+            tempVecB.y = DECK_Y + shot.lookUp;
+            camera.lookAt(tempVecB);
+        }
+
+        function cockpitCam(dt, instant) {
+            const shot = shotModes.cockpit;
+            const forward = getForward(player.rotation).clone();
+            const speed = player.velocity.length();
+            const bob = input.thrusting ? Math.sin(state.visualTime * 18) * 0.03 : Math.sin(state.visualTime * 7) * 0.015;
+
+            tempVec.copy(player.position).addScaledVector(forward, shot.eyeForward + speed * 0.014);
+            tempVec.y = DECK_Y + shot.eyeUp + bob;
+            applyShake(tempVec, 0.14);
+            camera.position.lerp(tempVec, instant ? 1 : 1 - Math.exp(-dt * shot.lag));
+
+            tempVecB.copy(player.position).addScaledVector(forward, shot.lookAhead + speed * 0.25);
+            tempVecB.y = DECK_Y + shot.lookUp + bob * 0.3;
+            camera.lookAt(tempVecB);
+        }
+
+        function broadcastCam(dt, instant) {
+            // Stable exterior: sit outside the lane, look at the skiff (planet stays in the bowl)
+            const shot = shotModes[state.shot] || shotModes.sweep;
+            const th = ringTheta(player.position);
+            const r = ringRadius(player.position);
+            const drift = Math.sin(state.visualTime * 0.08) * (shot.drift || 0) * 5;
+            const camR = r + (shot.out || 34) + drift;
+            // Keep camera roughly behind the ship's heading for readability
+            const heading = player.rotation;
+            const camTh = th + Math.sin(heading - th) * 0.15 + 0.55;
+
+            tempVec.set(
+                Math.cos(camTh) * camR,
+                DECK_Y + (shot.height || 26) - state.camPunch * 1.2,
+                Math.sin(camTh) * camR
+            );
+            applyShake(tempVec, 0.28);
+            camera.position.lerp(tempVec, instant ? 1 : 1 - Math.exp(-dt * (shot.lag || 3.5)));
+
+            tempVecB.copy(player.position);
+            tempVecB.y = DECK_Y;
+            // soft look toward planet so the giant stays in frame
+            tempVecB.x *= 0.82;
+            tempVecB.z *= 0.82;
+            camera.lookAt(tempVecB);
+        }
+
+        function snapCameraToShot(instant) {
+            updateCamera(0, instant);
+        }
+
+        function setShot(name) {
+            if (!shotModes[name]) return;
+            state.shot = name;
+            document.querySelectorAll('[data-shot]').forEach((b) => b.classList.toggle('active', b.dataset.shot === name));
+            snapCameraToShot(true);
+        }
+
+        // ---- Heat + post-processing ----
+        function updateHeat(dt) {
+            const comboTarget = clamp(state.combo / CASCADE_MAX_COMBO, 0, 1);
+            const chargeTarget = clamp(state.charge / state.chargeMax, 0, 1);
+            state.cascadeLevel = lerp(state.cascadeLevel, comboTarget, 1 - Math.exp(-dt * 3.5));
+            state.chargeLevel = lerp(state.chargeLevel, chargeTarget, 1 - Math.exp(-dt * 4));
+        }
+
+        function updatePostProcessing() {
+            const cascade = state.cascadeLevel * state.tuneCascade;
+            const charge = state.chargeLevel;
+            // Keep bloom conservative — planet body must stay below threshold
+            bloomPass.threshold = 0.82;
+            bloomPass.strength = 0.22 + state.bloom * 0.35 + cascade * 0.06;
+            bloomPass.radius = 0.3 + cascade * 0.05;
+            gradePass.uniforms.grade.value = state.grade;
+            gradePass.uniforms.charge.value = clamp(Math.max(cascade * 0.6, charge * 0.4), 0, 0.7);
+            gradePass.uniforms.chroma.value = clamp(state.chroma * 0.5, 0, 0.7);
+            document.documentElement.style.setProperty('--charge', clamp(Math.max(cascade, charge), 0, 1).toFixed(3));
+        }
+
+        // ---- Off-screen rim threat arrows ----
+        const RIM_COLORS = { prism: '#ff6ec7', iron: '#ffe08a', large: '#c084ff', hunter: '#ff6ec7' };
+        let rimUsed = 0;
+
+        function placeRimArrow(pos, color, cx, cy, margin) {
+            if (rimUsed >= rimArrows.length) return;
+            tempVec.copy(pos).project(camera);
+            const behind = tempVec.z > 1;
+            if (!behind && Math.abs(tempVec.x) <= 1 && Math.abs(tempVec.y) <= 1) return; // on-screen: no arrow
+            let nx = tempVec.x;
+            let ny = tempVec.y;
+            if (behind) { nx = -nx; ny = -ny; }
+            const ang = Math.atan2(ny, nx);
+            const ex = Math.cos(ang);
+            const ey = Math.sin(ang);
+            const scale = Math.min((cx - margin) / Math.max(1e-3, Math.abs(ex)), (cy - margin) / Math.max(1e-3, Math.abs(ey)));
+            const el = rimArrows[rimUsed++];
+            el.style.transform = `translate(${cx + ex * scale}px, ${cy - ey * scale}px) rotate(${Math.atan2(-ey, ex) + Math.PI / 2}rad)`;
+            el.style.color = color;
+            el.style.borderBottomColor = color;
+            el.style.opacity = '0.85';
+        }
+
+        function updateRimArrows() {
+            const cx = window.innerWidth / 2;
+            const cy = window.innerHeight / 2;
+            const margin = 40;
+            rimUsed = 0;
+            for (const a of asteroids) {
+                if (rimUsed >= rimArrows.length) break;
+                if (a.dying) continue;
+                if (a.type === 'prism') placeRimArrow(a.group.position, RIM_COLORS.prism, cx, cy, margin);
+                else if (a.type === 'iron') placeRimArrow(a.group.position, RIM_COLORS.iron, cx, cy, margin);
+                else if (a.size === 'large') placeRimArrow(a.group.position, RIM_COLORS.large, cx, cy, margin);
+            }
+            for (const hu of hunters) {
+                if (rimUsed >= rimArrows.length) break;
+                if (!hu.dying) placeRimArrow(hu.group.position, RIM_COLORS.hunter, cx, cy, margin);
+            }
+            for (let i = rimUsed; i < rimArrows.length; i++) rimArrows[i].style.opacity = '0';
+        }
+
+        // ---- HUD (only touch the DOM on change to avoid per-frame style recalc) ----
+        function updateUi(dt) {
+            state.displayScore = lerp(state.displayScore, state.score, 1 - Math.exp(-dt * 9));
+            const sr = Math.round(state.displayScore);
+            if (sr !== uiCache.score) { ui.scoreVal.textContent = sr.toLocaleString(); uiCache.score = sr; }
+
+            const combo = Math.max(1, state.combo);
+            if (combo !== uiCache.combo) {
+                ui.comboMult.textContent = 'x' + combo;
+                ui.heatFill.style.width = (clamp(state.combo / CASCADE_MAX_COMBO, 0, 1) * 100).toFixed(0) + '%';
+                uiCache.combo = combo;
+            }
+
+            const heatQ = Math.round(state.cascadeLevel * 60);
+            if (heatQ !== uiCache.heatQ) {
+                uiCache.heatQ = heatQ;
+                const hl = heatQ / 60;
+                tempColor.set(0xc084ff).lerp(tempVecColorTarget, hl);
+                ui.comboMult.style.color = '#' + tempColor.getHexString();
+                ui.comboMult.style.textShadow = `0 0 ${Math.round(14 + hl * 22)}px rgba(255, ${Math.round(140 - hl * 40)}, ${Math.round(220)}, ${(0.5 + hl * 0.3).toFixed(2)})`;
+            }
+
+            const cf = (state.charge / state.chargeMax).toFixed(3);
+            if (cf !== uiCache.chargeFrac) {
+                ui.chargeRing.style.setProperty('--charge-fill', cf);
+                uiCache.chargeFrac = cf;
+            }
+            const ready = state.charge >= OVERCOIL_COST && tether.mode === 'free';
+            const latched = tether.mode === 'latched';
+            const overcoil = tether.mode === 'overcoil';
+            if (ready !== uiCache.ready) { ui.chargeWrap.classList.toggle('ready', ready); uiCache.ready = ready; }
+            if (latched !== uiCache.latched) { ui.chargeWrap.classList.toggle('latched', latched); uiCache.latched = latched; }
+            if (overcoil !== uiCache.overcoil) { ui.chargeWrap.classList.toggle('overcoil', overcoil); uiCache.overcoil = overcoil; }
+            let clabel = 'Charge';
+            if (overcoil) clabel = 'Overcoil';
+            else if (latched) clabel = 'Latched';
+            else if (ready) clabel = 'Overcoil Ready';
+            if (clabel !== uiCache.clabel) { ui.chargeLabel.textContent = clabel; uiCache.clabel = clabel; }
+
+            const shield = Math.round(state.shield);
+            if (shield !== uiCache.shield) {
+                ui.shieldVal.textContent = shield;
+                ui.shieldFill.style.width = clamp(shield / state.shieldMax, 0, 1) * 100 + '%';
+                uiCache.shield = shield;
+            }
+            const overload = Math.round(state.heat);
+            if (overload !== uiCache.overload) {
+                ui.overloadVal.textContent = overload;
+                ui.overloadFill.style.width = clamp(overload / 100, 0, 1) * 100 + '%';
+                uiCache.overload = overload;
+            }
+            if (state.wave !== uiCache.wave) { ui.waveVal.textContent = state.wave; uiCache.wave = state.wave; }
+            const rocks = asteroids.length + hunters.length;
+            if (rocks !== uiCache.rocks) { ui.rocksVal.textContent = rocks; uiCache.rocks = rocks; }
+            const vel = player.velocity.length().toFixed(1);
+            if (vel !== uiCache.vel) { ui.velVal.textContent = vel; uiCache.vel = vel; }
+            if (state.bestCombo !== uiCache.best) { ui.bestVal.textContent = state.bestCombo; uiCache.best = state.bestCombo; }
+            const chargeR = Math.round(state.charge);
+            if (chargeR !== uiCache.chargeChip) { ui.chargeVal.textContent = chargeR; uiCache.chargeChip = chargeR; }
+            let teth = 'READY';
+            if (tether.mode === 'flying') teth = 'FLYING';
+            else if (tether.mode === 'latched') teth = 'LATCH';
+            else if (tether.mode === 'overcoil') teth = 'COIL';
+            else if (state.charge >= OVERCOIL_COST) teth = 'OVER';
+            if (teth !== uiCache.tether) {
+                ui.tetherVal.textContent = teth;
+                ui.chipTether.classList.toggle('active', tether.mode !== 'free' || state.charge >= OVERCOIL_COST);
+                uiCache.tether = teth;
+            }
+            ui.chipCharge.classList.toggle('active', state.charge >= OVERCOIL_COST * 0.5);
+            const cross = state.shot === 'cockpit' ? '0.9' : '0';
+            if (cross !== uiCache.cross) { ui.crosshair.style.opacity = cross; uiCache.cross = cross; }
+        }
+
+        const tempVecColorTarget = new THREE.Color(0xff6ec7);
+        const uiCache = {};
+
+        function refreshUi() {
+            ui.missionTitle.textContent = missions[state.missionIndex].title;
+            ui.missionCopy.textContent = missions[state.missionIndex].copy;
+            ui.gunsVal.textContent = 'MK' + state.gunsLevel;
+            ui.chipGuns.classList.toggle('active', state.gunsLevel > 1);
+            updateMaxedHues();
+        }
+
+        function updateMaxedHues() {
+            const gunsMax = state.gunsLevel >= upgradeSpecs.guns.length - 1;
+            const shieldMax = state.shieldTier >= upgradeSpecs.shield.length - 1;
+            materials.shot.color.set(gunsMax ? 0xffe08a : 0xe0b3ff);
+            if (player && player.shield) player.shield.material.color.set(shieldMax ? 0xffe08a : 0x8f7cff);
+            ui.chipGuns.classList.toggle('maxed', gunsMax);
+            ui.shieldFill.classList.toggle('maxed', shieldMax);
+        }
+
+        function updateDebugReadout() {
+            ui.debugState.textContent = state.gameOver ? 'over' : state.paused ? 'paused' : 'run';
+            ui.debugRocks.textContent = asteroids.length;
+            ui.debugLeeches.textContent = hunters.length;
+            ui.debugSparks.textContent = sparks.activeCount;
+            ui.debugShards.textContent = shardActiveCount;
+            ui.debugFps.textContent = state.fps;
+            ui.debugCombo.textContent = state.combo;
+            ui.debugCharge.textContent = Math.round(state.charge);
+            ui.debugTether.textContent = tether.mode;
+        }
+
+        // ---- Banners / flashes ----
+        function setPaused(paused, title, copy) {
+            state.paused = paused;
+            ui.pause.textContent = paused && !state.gameOver ? 'Resume' : 'Pause';
+            if (paused) showBanner(title || 'Paused', copy || 'Press Space to resume.');
+            else hideBanner();
+        }
+        function showBanner(title, copy) {
+            ui.bannerTitle.textContent = title;
+            ui.bannerCopy.textContent = copy;
+            ui.banner.classList.add('show');
+        }
+        function hideBanner() { ui.banner.classList.remove('show'); }
+
+        function flashWave() {
+            ui.waveFlashTitle.textContent = missions[state.missionIndex].title;
+            ui.waveFlashSub.textContent = 'Wave ' + state.wave;
+            ui.waveFlash.classList.remove('show');
+            void ui.waveFlash.offsetWidth;
+            ui.waveFlash.classList.add('show');
+            refreshUi();
+        }
+        function flashCoil(strength = 0.7) {
+            const el = ui.coilFlash;
+            if (!el) return;
+            el.style.transition = 'opacity 0.04s linear';
+            el.style.opacity = String(strength);
+            setTimeout(() => { el.style.transition = 'opacity 0.4s ease-out'; el.style.opacity = '0'; }, 50);
+        }
+
+        // ---- Debug ----
+        function toggleDebug() {
+            state.debugOpen = !state.debugOpen;
+            ui.debugModal.classList.toggle('show', state.debugOpen);
+            if (state.debugOpen) updateDebugReadout();
+        }
+        function closeDebug(resume) {
+            state.debugOpen = false;
+            ui.debugModal.classList.remove('show');
+            if (resume && state.paused && !state.gameOver) setPaused(false);
+        }
+        function runDebugAction(action) {
+            if (action === 'shield') applyPickup('shield', player.position.clone());
+            else if (action === 'guns') applyPickup('guns', player.position.clone());
+            else if (action === 'charge') { bankCharge(100); }
+            else if (action === 'overcoil') { state.charge = state.chargeMax; fireOvercoil(); }
+            else if (action === 'overdrive') applyPickup('overdrive', player.position.clone());
+            else if (action === 'wave') { advanceWave(); }
+            else if (action === 'clear') { clearCollection(asteroids); clearCollection(hunters); pendingShatter.length = 0; clearTetherLatch(true); }
+            else if (action === 'invuln') { state.forceInvuln = !state.forceInvuln; }
+            updateDebugReadout();
+            refreshUi();
+        }
+
+        // ---- Input ----
+        function onKeyDown(event) {
+            if (event.code === 'Escape') {
+                event.preventDefault();
+                if (state.debugOpen) { closeDebug(false); return; }
+                state.controlsActive = false;
+                input.keys = Object.create(null);
+                input.firing = false;
+                showBanner('Controls Released', 'Click the field or press a key to re-engage.');
+                return;
+            }
+            if (event.code === 'Backquote') { event.preventDefault(); toggleDebug(); return; }
+            if (event.code === 'Space') { event.preventDefault(); if (!state.gameOver) setPaused(!state.paused, 'Paused', 'Press Space or Pause to resume.'); return; }
+
+            if (!state.controlsActive) { state.controlsActive = true; hideBanner(); }
+            input.keys[event.code] = true;
+
+            if (FIRE_KEYS.has(event.code)) { if (!event.repeat) onFireDown(); event.preventDefault(); }
+            if (TETHER_KEYS.has(event.code)) { if (!event.repeat) onTetherPress(); event.preventDefault(); }
+        }
+
+        function onKeyUp(event) {
+            input.keys[event.code] = false;
+            if (FIRE_KEYS.has(event.code)) onFireUp();
+        }
+
+        function onResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+            bloomPass.setSize(window.innerWidth, window.innerHeight);
+            sparks.material.uniforms.uPixelRatio.value = Math.min(window.devicePixelRatio || 1, 2);
+            if (starField) starField.material.uniforms.uPixelRatio.value = Math.min(window.devicePixelRatio || 1, 2);
+        }
+
+        // ---- Bootstrap last, so every top-level const/let is initialized before init()/animate() run ----
+        function webglAvailable() {
+            try {
+                const canvas = document.createElement('canvas');
+                return !!(window.WebGLRenderingContext && (canvas.getContext('webgl2') || canvas.getContext('webgl')));
+            } catch (e) {
+                return false;
+            }
+        }
+
+        try {
+            if (!webglAvailable()) throw new Error('WebGL unavailable');
+            init();
+            animate();
+        } catch (err) {
+            console.error(err);
+            // Only show the "WebGL unavailable" panel when WebGL is genuinely missing —
+            // a transient JS error should not leave the game hidden behind a false message.
+            if (!webglAvailable()) ui.fallback.classList.add('show');
+        }
+    </script>
+</body>
+</html>
