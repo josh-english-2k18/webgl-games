@@ -244,6 +244,7 @@ The agent comparison set now has three distinct identity axes:
 - Glassquall (`asteroids-claude.html`) — **time**: hitstop, combo heat, Phase Lance.
 - Sunseed (`asteroids-fable.html`) — **light economy** on a spherical shell: kindling, eruption, lumen, flare.
 - Coilwake (`asteroids-grok.html`) — **mass as weapon** on the planar wrap field: tether latch, sling, rock-on-rock cascade, charge/overcoil. No hitstop, no star-core.
+- Gyrewake (`asteroids-grok-4.6.html`) — **guidance** on Coilwake's orbital ring: hold-to-lock seekers, corkscrew ion gyres, tempest dump. Gravity weapon removed. Blue-purple ice presentation. No hitstop, no star-core.
 
 Iterations tried:
 
@@ -251,6 +252,7 @@ Iterations tried:
 - Added AI prompts to the Asteroids source.
 - Added GPT-5 and Grok 4 variants for comparison.
 - Added Glassquall, Sunseed, and Coilwake as full agent comparison variants with honest cameras, director consoles, and distinct signature verbs.
+- Added Gyrewake (`asteroids-grok-4.6.html`) as the Grok 4.6 Coilwake successor: removed tether/sling/overcoil, restored missiles as a lock-and-seek verb (hold to paint, release corkscrew seekers, tempest dump), shifted the palette to ice blue-purple, and upgraded ship/giant/missile/lock presentation without mixing Glassquall time or Sunseed light.
 - Upgraded the main Asteroids presentation into Vesper Belt.
 - Compared Vesper Belt against the active Vesper Belt Composer variant. The composer file mostly keeps the same gameplay backbone while adding a stronger director layer: chase/wide/tight/drift camera shots, transparent compact HUDs, shader belt backdrop, nebula dome, color grading, film grain, letterboxing, and live bloom/grade tuning.
 - Upgraded the main `asteroids.html` directly with those lessons instead of leaving them in the comparison variant: directed camera modes, atmospheric belt and nebula framing, transparent HUD surfaces, debug bloom/grade tuning, tighter thrust/drag tuning, and chain scoring for consecutive asteroid breaks.

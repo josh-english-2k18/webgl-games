@@ -159,6 +159,7 @@ The later agent variants prove that a strong identity axis beats feature pile-on
 - Glassquall owns **time** (hitstop, heat, Phase Lance).
 - Sunseed owns **light** on a sphere (kindling, lumen, flare).
 - Coilwake owns **mass/cascade** on the plane (tether, sling, overcoil).
+- Gyrewake owns **guidance** on the same ring theater (lock-paint, corkscrew seekers, tempest swarm). It is the Grok 4.6 successor, not a hybrid of the other axes.
 
 When evaluating or building the next asteroids pass, pick one axis and make every system reinforce it. Do not recombine hitstop + light economy + cascade into one overloaded hybrid.
 
