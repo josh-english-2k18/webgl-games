@@ -160,8 +160,15 @@ The later agent variants prove that a strong identity axis beats feature pile-on
 - Sunseed owns **light** on a sphere (kindling, lumen, flare).
 - Coilwake owns **mass/cascade** on the plane (tether, sling, overcoil).
 - Gyrewake owns **guidance** on the same ring theater (lock-paint, corkscrew seekers, tempest swarm). It is the Grok 4.6 successor, not a hybrid of the other axes.
+- AetherTwin owns **duality/geometry** (a live ship-to-twin blade, phase-swap traversal cleave, and superposition overdrive).
 
 When evaluating or building the next asteroids pass, pick one axis and make every system reinforce it. Do not recombine hitstop + light economy + cascade into one overloaded hybrid.
+
+Tempest Meridian is a fidelity evolution of Gyrewake's guidance axis, not another mechanic axis. Its lesson is that sustained review and manual iteration can turn the same core loop into a more coherent world through projectile correctness, camera honesty, seeker behavior, spacecraft construction, atmospheric rendering, ring material language, sky detail, and orbital context.
+
+The planned `asteroids-3d.html` conversion changes the spatial contract rather than adding a mechanic. A valid 3D pass must make orientation, thrust, spawning, broadphase, swept collision, aiming, missiles, enemies, cameras, trails, effects, and HUD agree about the same 3D reality. Allowing Y movement while retaining XZ collision, planar targeting, or world-up cameras is not a 3D flight game.
+
+AetherTwin adds a useful spatial-design constraint: the signature weapon is the relationship between two moving bodies, not an effect emitted from one ship. Both endpoints, the blade between them, its collision area, swap destination, and resulting lane cleave must remain readable in every camera. If the twin becomes a cosmetic follower or automatic turret, the identity collapses.
 
 Do not add more mechanics until movement and combat feel good. Do not let cinematic presentation hide weak movement or shallow pressure. Avoid dead guidance elements such as a decorative nose vector; if aiming help is needed, use a reticule that communicates range and direction without being glued to the ship silhouette.
 

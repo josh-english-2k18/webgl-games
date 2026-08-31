@@ -235,16 +235,19 @@ Key lesson: tactical experiments benefit from clear board state, obvious consequ
 
 ### Vesper Belt / Asteroids
 
-Files: `asteroids.html`, `asteroids-composer.html`, `asteroids-claude.html`, `asteroids-fable.html`, `asteroids-grok.html`, `gpt-5-asteroids.html`, `grok-4-asteroids.html`
+Files: `asteroids.html`, `asteroids-composer.html`, `asteroids-claude.html`, `asteroids-fable.html`, `asteroids-gemini.html`, `asteroids-gpt-5.6-sol.html`, `asteroids-grok.html`, `asteroids-grok-4.6.html`, `asteroids-3d.html`, `gpt-5-asteroids.html`, `grok-4-asteroids.html`
 
 Asteroids has had several versions and model-generated variants. The current visual direction is acceptable, but manual playtesting showed that movement, playability, powerups, combat feel, escalation, and recovery windows require more iteration.
 
-The agent comparison set now has three distinct identity axes:
+The agent comparison set now has five distinct identity axes:
 
 - Glassquall (`asteroids-claude.html`) — **time**: hitstop, combo heat, Phase Lance.
 - Sunseed (`asteroids-fable.html`) — **light economy** on a spherical shell: kindling, eruption, lumen, flare.
 - Coilwake (`asteroids-grok.html`) — **mass as weapon** on the planar wrap field: tether latch, sling, rock-on-rock cascade, charge/overcoil. No hitstop, no star-core.
 - Gyrewake (`asteroids-grok-4.6.html`) — **guidance** on Coilwake's orbital ring: hold-to-lock seekers, corkscrew ion gyres, tempest dump. Gravity weapon removed. Blue-purple ice presentation. No hitstop, no star-core.
+- AetherTwin (`asteroids-gemini.html`) — **duality as geometry** in a binary-pulsar belt: position a ship and quantum twin around threats, cleave with the live blade between them, swap endpoints to slice the traversal lane, and spend charge on Quad-Superposition.
+
+Tempest Meridian (`asteroids-gpt-5.6-sol.html`) is a deep quality and fidelity iteration on the guidance axis rather than a sixth identity axis. Its revisions concentrated on projectile correctness and pooling, smarter and longer-lived seekers, a wider ring arena, true camera behavior, spacecraft and thruster presentation, asteroid motion and wrapping, a Polyphemus-inspired gas giant, mineral-colored rings, fractal storm detail, a richer Milky Way, and procedural orbiting moons.
 
 Iterations tried:
 
@@ -253,6 +256,9 @@ Iterations tried:
 - Added GPT-5 and Grok 4 variants for comparison.
 - Added Glassquall, Sunseed, and Coilwake as full agent comparison variants with honest cameras, director consoles, and distinct signature verbs.
 - Added Gyrewake (`asteroids-grok-4.6.html`) as the Grok 4.6 Coilwake successor: removed tether/sling/overcoil, restored missiles as a lock-and-seek verb (hold to paint, release corkscrew seekers, tempest dump), shifted the palette to ice blue-purple, and upgraded ship/giant/missile/lock presentation without mixing Glassquall time or Sunseed light.
+- Added AetherTwin (`asteroids-gemini.html`) as the Gemini comparison variant: paired the player with a spring-following quantum twin, made the connecting Entanglement Blade the primary spatial weapon, turned Phase Swap into a traversal cleave and recovery move, and used Quad-Superposition as the charged cash-out. Entangled asteroid pairs, blade-seeking leeches, the fifth-wave Gemini Colossus, four cameras, touch controls, procedural WebAudio, and a live director console support that identity.
+- Evolved the Grok 4.6 guidance baseline into Tempest Meridian (`asteroids-gpt-5.6-sol.html`) through repeated professional review and manual visual iteration. The pass fixed swept projectile collision and pool initialization, improved seeker targeting/range, removed weapon collisions at the arena edge, widened the ring field, restored full planet/ring/weather visibility, upgraded the world to a natural gas-giant palette, refined the storm and sky, and replaced the placeholder sun disc with three cratered orbiting moons.
+- Created `asteroids-3d.html` as a byte-identical Tempest Meridian baseline and wrote `ASTEROIDS_3D_GAUNTLET.md` to govern its future conversion from a planar ring arena into coherent 3D flight combat. The prompt treats input, quaternion orientation, world topology, broadphase, swept collision, targeting, AI, cameras, HUD, VFX, and performance as coupled concerns with independent builder/critic loops.
 - Upgraded the main Asteroids presentation into Vesper Belt.
 - Compared Vesper Belt against the active Vesper Belt Composer variant. The composer file mostly keeps the same gameplay backbone while adding a stronger director layer: chase/wide/tight/drift camera shots, transparent compact HUDs, shader belt backdrop, nebula dome, color grading, film grain, letterboxing, and live bloom/grade tuning.
 - Upgraded the main `asteroids.html` directly with those lessons instead of leaving them in the comparison variant: directed camera modes, atmospheric belt and nebula framing, transparent HUD surfaces, debug bloom/grade tuning, tighter thrust/drag tuning, and chain scoring for consecutive asteroid breaks.
@@ -266,6 +272,7 @@ Lessons from the comparison:
 - Camera is part of game design. A readable 3rd-person camera and alternate framing modes can make thrust, threat direction, and speed easier to judge.
 - Transparent HUDs, environmental framing, and grading can dramatically raise perceived quality when they support the playfield instead of competing with it.
 - Live visual tuning belongs in the workflow. Bloom, grade, opacity, and framing controls make taste testable instead of hardcoded.
+- A weapon can be a spatial relationship rather than a projectile. AetherTwin works only when both endpoints, the dangerous line between them, and the consequence of swapping those endpoints stay legible under motion.
 - The correct process lesson is to fold these principles into Codex-built first passes. External variants should challenge our approach, not become the place where taste lives.
 
 Future priority: improve feel before adding more mechanics. Ship acceleration, drag, rotation, shooting cadence, collision feedback, powerup readability, camera readability, and scoring pressure matter more than feature count.
