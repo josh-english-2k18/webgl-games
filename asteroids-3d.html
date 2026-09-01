@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <title>Tempest Meridian — Orbital Ring</title>
+    <title>Tempest Meridian — 3D Gauntlet</title>
     <style>
         :root {
             --bg: #030304;
@@ -57,7 +57,8 @@
                 linear-gradient(180deg, #020203 0%, #050505 48%, #090806 100%);
         }
 
-        #stage canvas { display: block; width: 100%; height: 100%; }
+        #stage canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+        body.pointer-locked #stage canvas { cursor: none; }
 
         .grain, .vignette, .scan, .letterbox, .charge-scrim, .coil-flash {
             position: fixed;
@@ -182,6 +183,87 @@
             width: 4px; height: 4px; margin: -2px 0 0 -2px;
             background: var(--amber); border-radius: 50%;
         }
+
+        #tgt-hud {
+            position: fixed;
+            inset: 0;
+            z-index: 21;
+            pointer-events: none;
+        }
+        .tgt-mark {
+            position: absolute;
+            left: 0; top: 0;
+            width: 44px; height: 44px;
+            margin: -22px 0 0 -22px;
+            opacity: 0;
+            border: 2px solid rgba(116, 226, 220, 0.88);
+            box-shadow: 0 0 14px rgba(116, 226, 220, 0.45);
+            background: rgba(116, 226, 220, 0.04);
+        }
+        .tgt-mark .c {
+            position: absolute;
+            width: 12px; height: 12px;
+            border: 2px solid var(--volt);
+        }
+        .tgt-mark .c.tl { top: -2px; left: -2px; border-right: 0; border-bottom: 0; }
+        .tgt-mark .c.tr { top: -2px; right: -2px; border-left: 0; border-bottom: 0; }
+        .tgt-mark .c.bl { bottom: -2px; left: -2px; border-right: 0; border-top: 0; }
+        .tgt-mark .c.br { bottom: -2px; right: -2px; border-left: 0; border-top: 0; }
+        .tgt-mark .lbl {
+            position: absolute;
+            left: 50%;
+            top: 100%;
+            transform: translate(-50%, 3px);
+            font-size: 8px;
+            letter-spacing: 0.16em;
+            color: var(--volt);
+            text-transform: uppercase;
+            white-space: nowrap;
+            text-shadow: 0 0 8px rgba(0, 0, 0, 0.8);
+        }
+        .tgt-mark.gun {
+            border-color: rgba(242, 163, 79, 0.95);
+            box-shadow: 0 0 16px rgba(242, 163, 79, 0.55);
+            background: rgba(242, 163, 79, 0.06);
+        }
+        .tgt-mark.gun .c { border-color: var(--amber); }
+        .tgt-mark.gun .lbl { color: var(--amber); }
+        .tgt-mark.lock {
+            border-color: rgba(116, 226, 220, 0.95);
+        }
+        .tgt-mark.lock .c { border-color: var(--volt); }
+        .tgt-mark.lock.gun {
+            border-color: rgba(231, 191, 130, 0.95);
+            box-shadow: 0 0 16px rgba(231, 191, 130, 0.5);
+        }
+        .tgt-mark.lock.gun .c { border-color: var(--coil); }
+        .tgt-lead {
+            position: absolute;
+            width: 12px; height: 12px;
+            margin: -6px 0 0 -6px;
+            border: 1px solid var(--amber);
+            border-radius: 50%;
+            opacity: 0;
+            box-shadow: 0 0 8px rgba(242, 163, 79, 0.5);
+        }
+        .tgt-lead::after {
+            content: "";
+            position: absolute;
+            left: 50%; top: 50%;
+            width: 3px; height: 3px;
+            margin: -1.5px 0 0 -1.5px;
+            background: var(--amber);
+            border-radius: 50%;
+        }
+        .tune-check {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 10px;
+            color: var(--muted);
+            letter-spacing: 0.06em;
+        }
+        .tune-check input { accent-color: var(--coil); }
 
         /* ---- Top-center combo + heat ---- */
         .combo-wrap {
@@ -586,7 +668,7 @@
         #fallback h2 { font-size: 20px; margin: 0 0 10px; }
         #fallback p { color: var(--muted); font-size: 13px; line-height: 1.5; }
 
-        /* Touch movement pad — left thumb steers, right thumb thrust/brake. Fire = tap the field. */
+        /* Touch flight pad — drag the field to pitch/yaw; buttons provide coarse yaw, thrust, brake, and missiles. */
         .touch-pad {
             position: fixed;
             left: 0;
@@ -649,7 +731,7 @@
 </head>
 <body>
     <div id="stage"></div>
-    <div class="arena-badge" id="arena-badge">Cerulean giant · seeker deck</div>
+    <div class="arena-badge" id="arena-badge">Cerulean giant · freeflight shell</div>
     <div class="charge-scrim"></div>
     <div class="coil-flash" id="coil-flash"></div>
     <div class="scan"></div>
@@ -658,6 +740,7 @@
     <div class="letterbox"></div>
 
     <div id="rim-arrows"></div>
+    <div id="tgt-hud"></div>
     <div id="popups"></div>
 
     <div class="crosshair" id="crosshair">
@@ -682,7 +765,7 @@
             <div class="brand-mark"></div>
             <div>
                 <h1>Tempest Meridian</h1>
-                <div class="sub">Cerulean Ring · 5.6</div>
+                <div class="sub">Cerulean Shell · 3D</div>
             </div>
         </div>
         <div class="panel">
@@ -702,7 +785,7 @@
         <div class="panel">
             <div class="head">Mission</div>
             <div class="mission-title" id="mission-title">First Lock</div>
-            <div class="mission-copy" id="mission-copy">Skim the rings above the blue giant. Hold missile to paint locks. Release to send seekers home.</div>
+            <div class="mission-copy" id="mission-copy">Fly the full shell around the blue giant. Mouse steers; W thrusts; S brakes; Q/E rolls; Shift boosts.</div>
         </div>
     </div>
 
@@ -712,11 +795,15 @@
             <div class="v coil" id="score-val">0</div>
         </div>
         <div class="panel">
-            <div class="head">Ring Band</div>
+            <div class="head">Flight Vector</div>
             <div class="stat-grid">
                 <div class="stat"><div class="k">Wave</div><div class="v" id="wave-val">1</div></div>
-                <div class="stat"><div class="k">Rocks</div><div class="v" id="rocks-val">0</div></div>
-                <div class="stat"><div class="k">Velocity</div><div class="v coil" id="vel-val">0</div></div>
+                <div class="stat"><div class="k">Contacts</div><div class="v" id="rocks-val">0</div></div>
+                <div class="stat"><div class="k">Speed</div><div class="v coil" id="vel-val">0</div></div>
+                <div class="stat"><div class="k">Thrust</div><div class="v" id="thrust-val">Coast</div></div>
+                <div class="stat"><div class="k">Climb</div><div class="v" id="climb-val">0</div></div>
+                <div class="stat"><div class="k">Altitude</div><div class="v" id="alt-val">0</div></div>
+                <div class="stat"><div class="k">Ring Δ</div><div class="v" id="depth-val">0</div></div>
                 <div class="stat"><div class="k">Best Vector</div><div class="v amber" id="best-val">0</div></div>
             </div>
         </div>
@@ -732,8 +819,9 @@
 
     <div class="touch-pad" id="touch-pad">
         <div class="touch-cluster">
-            <button class="touch-btn" id="mv-left" aria-label="Turn left">&#9664;</button>
-            <button class="touch-btn" id="mv-right" aria-label="Turn right">&#9654;</button>
+            <button class="touch-btn" id="mv-left" aria-label="Yaw left">&#9664;</button>
+            <button class="touch-btn" id="mv-camera" aria-label="Cycle camera">CAM</button>
+            <button class="touch-btn" id="mv-right" aria-label="Yaw right">&#9654;</button>
         </div>
         <div class="touch-cluster">
             <button class="touch-btn missile" id="mv-tether" aria-label="Missile">&#9678;</button>
@@ -747,8 +835,8 @@
             <div class="head">Flight</div>
             <div class="btn-row">
                 <button class="control-btn primary" id="new-run">New Run</button>
-                <button class="control-btn amber" id="fire" title="Tap or hold: fire railguns">Fire</button>
-                <button class="control-btn" id="tether" title="Hold to lock · Release to fire seekers · Full charge: Tempest">Missile</button>
+                <button class="control-btn amber" id="fire" title="Left click or F: fire railguns">Fire</button>
+                <button class="control-btn" id="tether" title="Hold M to lock · Release to fire seekers · Full charge: Tempest">Missile</button>
                 <button class="control-btn" id="pause">Pause</button>
                 <button class="control-btn" id="debug">Debug</button>
             </div>
@@ -776,8 +864,8 @@
 
     <div class="debug-modal" id="debug-modal">
         <div class="debug-panel">
-            <h3>Tempest Meridian — Director Console</h3>
-            <div class="desc">Live counters and feel levers. Tune movement, lock, and seeker agility while paused.</div>
+            <h3>Tempest Meridian 3D — Director Console</h3>
+            <div class="desc">Live counters and flight levers. Tune six-axis response, lock behavior, and presentation while paused.</div>
             <div class="debug-grid">
                 <div class="debug-stat"><div class="k">State</div><div class="v" id="debug-state">run</div></div>
                 <div class="debug-stat"><div class="k">Rocks</div><div class="v" id="debug-rocks">0</div></div>
@@ -802,8 +890,12 @@
             <div class="debug-tuning">
                 <div class="tune"><label>Thrust <b id="thrust-label">24</b></label><input type="range" id="thrust-slider" min="10" max="38" step="1" value="24"></div>
                 <div class="tune"><label>Coast Drag <b id="drag-label">0.62</b></label><input type="range" id="drag-slider" min="0.3" max="0.92" step="0.01" value="0.62"></div>
-                <div class="tune"><label>Turn Rate <b id="turn-label">4.2</b></label><input type="range" id="turn-slider" min="2.5" max="6.5" step="0.1" value="4.2"></div>
-                <div class="tune"><label>Max Speed <b id="speed-label">28</b></label><input type="range" id="speed-slider" min="10" max="42" step="1" value="28"></div>
+                <div class="tune"><label>Yaw Response <b id="turn-label">4.2</b></label><input type="range" id="turn-slider" min="2.5" max="6.5" step="0.1" value="4.2"></div>
+                <div class="tune"><label>Max Speed <b id="speed-label">48</b></label><input type="range" id="speed-slider" min="18" max="72" step="1" value="48"></div>
+                <div class="tune"><label>Mouse Sensitivity <b id="mouse-label">1.00x</b></label><input type="range" id="mouse-slider" min="0.35" max="2.2" step="0.05" value="1"></div>
+                <div class="tune"><label>Pitch Response <b id="pitch-label">1.00x</b></label><input type="range" id="pitch-slider" min="0.35" max="2.2" step="0.05" value="1"></div>
+                <div class="tune"><label>Roll Response <b id="roll-label">1.00x</b></label><input type="range" id="roll-slider" min="0.35" max="2.2" step="0.05" value="1"></div>
+                <div class="tune tune-check"><label><input type="checkbox" id="invert-pitch"> Invert Pitch (mouse Y)</label></div>
             </div>
 
             <div class="debug-section-title">Presentation</div>
@@ -835,7 +927,7 @@
     <div id="fallback">
         <div>
             <h2>WebGL unavailable</h2>
-            <p>Tempest Meridian needs a WebGL2-capable browser with hardware acceleration enabled. Try a recent Chrome, Firefox, Safari, or Edge.</p>
+            <p>Tempest Meridian 3D needs a WebGL2-capable browser with hardware acceleration enabled. Try a recent Chrome, Firefox, Safari, or Edge.</p>
         </div>
     </div>
 
@@ -857,15 +949,18 @@
         import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
         // ---- Constants ----
-        // True ring arena: planet at origin, play in an annular band. Rocks wrap radially, never through a square boundary.
-        // Scale chosen so the giant is always large in frame while you skim a clear annular lane
+        // The rings are a visual/navigation landmark inside a genuine spherical flight shell.
         const PLANET_R = 90;
         const RING_R0 = 156;          // nominal flight radius (close enough to read planet curvature)
-        const RING_R_MIN = 116;       // inner rail — outside planet atmosphere
-        const RING_R_MAX = 196;       // outer rail
-        const DECK_Y = 0.55;          // single combat plane — guns, rocks, ship all share this
+        const RING_R_MIN = 116;       // visual ring landmark only
+        const RING_R_MAX = 196;       // visual ring landmark only
+        const RING_PLANE_Y = -0.4;    // visual-only equatorial plane
         const RING_VIS_INNER = 102;
         const RING_VIS_OUTER = 244;
+        const WORLD_R_MIN = PLANET_R + 14;
+        const COMBAT_R_MAX = 286;
+        const WORLD_R_MAX = 620;
+        const WORLD_SOFT_MARGIN = 16;
         const PLAYER_RADIUS = 1.3;
         const SPARK_CAP = 1600;
         const SHARD_CAP = 360;
@@ -890,9 +985,9 @@
         const ROCK_CELL_SIZE = 12;
         const HAS_COARSE_POINTER = window.matchMedia('(pointer: coarse)').matches;
         const FIRE_KEYS = new Set(['KeyF', 'Enter']);
-        const MISSILE_KEYS = new Set(['KeyE', 'KeyM', 'ShiftLeft', 'ShiftRight']);
+        const MISSILE_KEYS = new Set(['KeyM']);
         const ENGINE_SHOULDERS = [-0.72, 0.72];
-        const BEST_SCORE_KEY = 'tempest-meridian-gpt-5.6-sol-best';
+        const BEST_SCORE_KEY = 'tempest-meridian-3d-best';
 
         // ---- DOM cache ----
         const ui = {
@@ -918,6 +1013,10 @@
             waveVal: document.getElementById('wave-val'),
             rocksVal: document.getElementById('rocks-val'),
             velVal: document.getElementById('vel-val'),
+            thrustVal: document.getElementById('thrust-val'),
+            climbVal: document.getElementById('climb-val'),
+            altVal: document.getElementById('alt-val'),
+            depthVal: document.getElementById('depth-val'),
             bestVal: document.getElementById('best-val'),
             gunsVal: document.getElementById('guns-val'),
             tetherVal: document.getElementById('tether-val'),
@@ -1001,13 +1100,12 @@
             `
         };
 
-        // ---- Camera shot presets (every label an honest viewpoint) ----
+        // ---- Camera shot presets (all are ship-relative, roll-aware viewpoints) ----
         const shotModes = {
-            // Classic chase: slightly outside + above so the giant reads without fighting the aim plane
-            chase: { name: 'Pursuit', back: 14.2, up: 7.1, shoulder: 1.15, lookAhead: 17, lookUp: 0.12, lag: 11, planetPull: 0.14 },
-            cockpit: { name: 'Cockpit', eyeForward: 0.7, eyeUp: 0.55, lookAhead: 30, lookUp: 0.2, lag: 22, planetPull: 0.03 },
-            sweep: { name: 'Sweep', height: 26, out: 34, lag: 4.2, drift: 0.04 },
-            drift: { name: 'Drift', height: 42, out: 58, lag: 2.8, drift: 0.1 }
+            chase: { name: 'Pursuit', back: 14.2, up: 6.4, shoulder: 1.15, lookAhead: 18, lag: 11 },
+            cockpit: { name: 'Cockpit', eyeForward: 1.15, eyeUp: 0.12, lag: 24 },
+            sweep: { name: 'Sweep', back: 24, up: 11, shoulder: 22, lookAhead: 10, lag: 5.2 },
+            drift: { name: 'Drift', back: 38, up: 20, shoulder: -30, lookAhead: 16, lag: 3.4 }
         };
         const SHOT_ORDER = ['chase', 'cockpit', 'sweep', 'drift'];
 
@@ -1040,6 +1138,7 @@
             chroma: 0,
             paused: false,
             debugOpen: false,
+            debugWasPaused: false,
             controlsActive: true,
             gameOver: false,
             missionIndex: 0,
@@ -1058,7 +1157,11 @@
             tuneThrust: 24,
             tuneDrag: 0.62,
             tuneTurn: 4.2,
-            tuneMaxSpeed: 28,
+            tuneMaxSpeed: 48,
+            tuneMouse: 1,
+            tunePitch: 1,
+            tuneRoll: 1,
+            invertPitch: false,
             bestScore: 0
         };
 
@@ -1079,20 +1182,31 @@
         const input = {
             keys: Object.create(null),
             thrusting: false,
+            boosting: false,
             firing: false,
             touchLeft: false,
             touchRight: false,
             touchThrust: false,
-            touchBrake: false
+            touchBrake: false,
+            pointerLocked: false,
+            pointerLockFailed: false,
+            suppressPointerPause: false,
+            dragging: false,
+            dragPointerId: -1,
+            dragX: 0,
+            dragY: 0,
+            dragDistance: 0,
+            lookDX: 0,
+            lookDY: 0
         };
 
         const missions = [
-            { title: 'First Lock', copy: 'Skim the rings. Hold missile to paint a lock. Release to send a seeker home.' },
-            { title: 'Ring Field', copy: 'Iron takes more than guns. Spend seekers. Watch the vector build.' },
+            { title: 'First Vector', copy: 'Click for mouse flight. W thrusts, S brakes, Q/E rolls, Shift boosts; hold M to paint locks.' },
+            { title: 'Ring Crossing', copy: 'Climb above the rings, dive below them, and use their edge-on silhouette to judge depth.' },
             { title: 'Jam Tide', copy: 'Jammers steal tempest charge and break locks. Kill them first.' },
-            { title: 'Meridian Pressure', copy: 'Fill the capacitor, then dump a Tempest into the cluster.' },
+            { title: 'Meridian Pressure', copy: 'Use full 3D pursuit to separate the pack, then dump a Tempest into the cluster.' },
             { title: 'Forge Heart', copy: 'A Forge Core spins. Breach the shell with a swarm.' },
-            { title: 'Tempest Meridian', copy: 'Hold the meridian. Let every lock find its storm.' }
+            { title: 'Tempest Meridian', copy: 'Own the whole shell. Let every lock find its storm.' }
         ];
 
         // ---- Three.js globals ----
@@ -1113,9 +1227,13 @@
         const shotPool = [];
         const pendingShatter = [];
         const rimArrows = [];
+        const combatHud = { marks: [], lead: null, used: 0 };
         const threatCollections = [asteroids, hunters];
         const rockGrid = new Map();
         const activeRockBuckets = [];
+        const freeRockBuckets = [];
+        const rockQueryScratch = [];
+        let rockQueryStamp = 1;
 
         const geometries = {};
         const geoPool = {};
@@ -1125,14 +1243,24 @@
         const tempVecC = new THREE.Vector3();
         const tempForward = new THREE.Vector3();
         const tempRight = new THREE.Vector3();
+        const tempUp = new THREE.Vector3();
         const tempDelta = new THREE.Vector3();
         const tempCameraForward = new THREE.Vector3();
         const tempCameraRight = new THREE.Vector3();
         const tempImpact = new THREE.Vector3();
+        const tempQuat = new THREE.Quaternion();
+        const tempQuatB = new THREE.Quaternion();
+        const tempMatrix = new THREE.Matrix4();
+        const tempCamRight = new THREE.Vector3();
+        const tempCamUp = new THREE.Vector3();
+        const tempCamBack = new THREE.Vector3();
         const tempColor = new THREE.Color();
         const trajectoryDummy = new THREE.Object3D();
         const Z_AXIS = new THREE.Vector3(0, 0, 1);
         const Y_AXIS = new THREE.Vector3(0, 1, 0);
+        const X_AXIS = new THREE.Vector3(1, 0, 0);
+        // Three.js cameras look down local -Z; the ship flies local +Z.
+        const CAMERA_ALONG_SHIP = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI);
         const WHITE = new THREE.Color(0xffffff);
         const projectileHit = { list: null, index: -1, target: null, point: new THREE.Vector3(), time: Infinity };
         const renderQuality = {
@@ -1156,13 +1284,13 @@
             // gunsLevel = number of parallel barrels (1..7); each tier also tightens cooldown / adds damage + pierce
             guns: [
                 null,
-                { cooldown: 0.17, heat: 6, damage: 1, speed: 54, pierce: 0 },
-                { cooldown: 0.16, heat: 6, damage: 1, speed: 56, pierce: 0 },
-                { cooldown: 0.15, heat: 7, damage: 1, speed: 58, pierce: 0 },
-                { cooldown: 0.14, heat: 7, damage: 1.5, speed: 60, pierce: 1 },
-                { cooldown: 0.13, heat: 8, damage: 1.5, speed: 62, pierce: 1 },
-                { cooldown: 0.12, heat: 8, damage: 2, speed: 64, pierce: 2 },
-                { cooldown: 0.11, heat: 9, damage: 2.5, speed: 66, pierce: 3 }
+                { cooldown: 0.17, heat: 6, damage: 1, speed: 108, pierce: 0 },
+                { cooldown: 0.16, heat: 6, damage: 1, speed: 112, pierce: 0 },
+                { cooldown: 0.15, heat: 7, damage: 1, speed: 116, pierce: 0 },
+                { cooldown: 0.14, heat: 7, damage: 1.5, speed: 120, pierce: 1 },
+                { cooldown: 0.13, heat: 8, damage: 1.5, speed: 124, pierce: 1 },
+                { cooldown: 0.12, heat: 8, damage: 2, speed: 128, pierce: 2 },
+                { cooldown: 0.11, heat: 9, damage: 2.5, speed: 134, pierce: 3 }
             ],
             shield: [
                 { max: 100, regen: 3.4, absorb: 1, restore: 0 },
@@ -1171,11 +1299,11 @@
                 { max: 205, regen: 7.2, absorb: 0.64, restore: 70 }
             ],
             missiles: [
-                { label: 'seeker', salvo: 1, maxLocks: 1, cooldown: 0.48, damage: 2.4, speed: 30, turnRate: 4.4, lockRange: 44, blastRadius: 5.4, blastDamage: 1.3, capacity: 8, resupply: 3, helix: 0.55 },
-                { label: 'fast lock', salvo: 1, maxLocks: 2, cooldown: 0.42, damage: 2.6, speed: 33, turnRate: 5.1, lockRange: 48, blastRadius: 5.8, blastDamage: 1.5, capacity: 10, resupply: 3, helix: 0.62 },
-                { label: 'twin helix', salvo: 2, maxLocks: 2, cooldown: 0.44, damage: 2.6, speed: 34, turnRate: 5.4, lockRange: 52, blastRadius: 6.2, blastDamage: 1.6, capacity: 12, resupply: 4, helix: 0.7 },
-                { label: 'breach helix', salvo: 2, maxLocks: 3, cooldown: 0.38, damage: 3.4, speed: 36, turnRate: 5.8, lockRange: 56, blastRadius: 7.2, blastDamage: 1.9, capacity: 14, resupply: 4, helix: 0.78 },
-                { label: 'siege swarm', salvo: 3, maxLocks: 4, cooldown: 0.34, damage: 3.6, speed: 38, turnRate: 6.2, lockRange: 62, blastRadius: 8.2, blastDamage: 2.2, capacity: 16, resupply: 5, helix: 0.88 }
+                { label: 'seeker', salvo: 1, maxLocks: 1, cooldown: 0.48, damage: 2.4, speed: 58, turnRate: 6.2, lockRange: 92, blastRadius: 5.4, blastDamage: 1.3, capacity: 8, resupply: 3, helix: 0.55 },
+                { label: 'fast lock', salvo: 1, maxLocks: 2, cooldown: 0.42, damage: 2.6, speed: 62, turnRate: 6.6, lockRange: 100, blastRadius: 5.8, blastDamage: 1.5, capacity: 10, resupply: 3, helix: 0.62 },
+                { label: 'twin helix', salvo: 2, maxLocks: 2, cooldown: 0.44, damage: 2.6, speed: 66, turnRate: 7.0, lockRange: 108, blastRadius: 6.2, blastDamage: 1.6, capacity: 12, resupply: 4, helix: 0.7 },
+                { label: 'breach helix', salvo: 2, maxLocks: 3, cooldown: 0.38, damage: 3.4, speed: 70, turnRate: 7.4, lockRange: 116, blastRadius: 7.2, blastDamage: 1.9, capacity: 14, resupply: 4, helix: 0.78 },
+                { label: 'siege swarm', salvo: 3, maxLocks: 4, cooldown: 0.34, damage: 3.6, speed: 76, turnRate: 7.8, lockRange: 126, blastRadius: 8.2, blastDamage: 2.2, capacity: 16, resupply: 5, helix: 0.88 }
             ]
         };
 
@@ -1188,81 +1316,186 @@
         function lerp(a, b, t) { return a + (b - a) * t; }
         function randomRange(min, max) { return min + Math.random() * (max - min); }
         function chancePerSecond(rate, dt) { return Math.random() < 1 - Math.exp(-rate * dt); }
-        function randomPlanarVector(scale) {
+        function randomUnitVector(out = new THREE.Vector3()) {
+            const y = randomRange(-1, 1);
             const a = Math.random() * Math.PI * 2;
-            const r = Math.random() * scale;
-            // Strictly horizontal — never leave the combat deck
-            return new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r);
+            const r = Math.sqrt(Math.max(0, 1 - y * y));
+            return out.set(Math.cos(a) * r, y, Math.sin(a) * r);
         }
-        function getForward(rot) { return tempForward.set(Math.sin(rot), 0, Math.cos(rot)); }
-        function getRight(rot) { return tempRight.set(Math.cos(rot), 0, -Math.sin(rot)); }
-        function ringRadius(p) { return Math.hypot(p.x, p.z); }
-        function ringTheta(p) { return Math.atan2(p.z, p.x); }
-        function setOnRing(p, theta, r, y) {
-            p.set(Math.cos(theta) * r, y == null ? DECK_Y : y, Math.sin(theta) * r);
-            return p;
+        function randomVector3(scale, out = new THREE.Vector3()) {
+            return randomUnitVector(out).multiplyScalar(Math.cbrt(Math.random()) * scale);
         }
-        // Annular clamp + hard deck plane for the player and guided entities.
-        function wrapPosition(p, vel) {
-            p.y = DECK_Y;
-            if (vel) vel.y = 0;
-            let r = Math.hypot(p.x, p.z);
-            if (r < 1e-4) {
-                p.x = RING_R0;
-                p.z = 0;
-                r = RING_R0;
+        function randomShellPoint(inner = WORLD_R_MIN + 8, outer = COMBAT_R_MAX - 8, out = new THREE.Vector3()) {
+            const inner3 = inner * inner * inner;
+            const outer3 = outer * outer * outer;
+            return randomUnitVector(out).multiplyScalar(Math.cbrt(lerp(inner3, outer3, Math.random())));
+        }
+        function orientationOf(source) {
+            if (source && source.isQuaternion) return source;
+            if (source && source.orientation) return source.orientation;
+            if (source && source.quaternion) return source.quaternion;
+            if (source && source.group && source.group.quaternion) return source.group.quaternion;
+            return player ? player.orientation : tempQuat.identity();
+        }
+        function getForward(source = player, out = tempForward) {
+            return out.set(0, 0, 1).applyQuaternion(orientationOf(source)).normalize();
+        }
+        function getRight(source = player, out = tempRight) {
+            return out.set(1, 0, 0).applyQuaternion(orientationOf(source)).normalize();
+        }
+        function getUp(source = player, out = tempUp) {
+            return out.set(0, 1, 0).applyQuaternion(orientationOf(source)).normalize();
+        }
+        function setOrientationFromForward(orientation, forward, upHint = Y_AXIS) {
+            tempForward.copy(forward).normalize();
+            tempRight.crossVectors(upHint, tempForward);
+            if (tempRight.lengthSq() < 1e-5) tempRight.crossVectors(X_AXIS, tempForward);
+            tempRight.normalize();
+            tempUp.crossVectors(tempForward, tempRight).normalize();
+            tempMatrix.makeBasis(tempRight, tempUp, tempForward);
+            orientation.setFromRotationMatrix(tempMatrix).normalize();
+            return orientation;
+        }
+        function boresightDistance() {
+            return 24 + Math.min(10, player.velocity.length() * 0.4);
+        }
+        function orientationToCamera(orientation, out) {
+            return out.copy(orientation).multiply(CAMERA_ALONG_SHIP);
+        }
+        function makePerpendicularBasis(forward, rightOut, upOut) {
+            const reference = Math.abs(forward.y) < 0.88 ? Y_AXIS : X_AXIS;
+            rightOut.crossVectors(reference, forward).normalize();
+            upOut.crossVectors(forward, rightOut).normalize();
+        }
+        function hunterOrbitFrame(axis, toPlayer, rightOut, upOut) {
+            rightOut.crossVectors(axis, toPlayer);
+            if (rightOut.lengthSq() < 1e-5) {
+                const fallback = Math.abs(axis.dot(X_AXIS)) < 0.9 ? X_AXIS : Z_AXIS;
+                rightOut.crossVectors(fallback, toPlayer);
             }
-            const clamped = clamp(r, RING_R_MIN, RING_R_MAX);
-            if (clamped !== r) {
-                const s = clamped / r;
-                p.x *= s;
-                p.z *= s;
-                if (vel) {
-                    const nx = p.x / clamped;
-                    const nz = p.z / clamped;
-                    const vr = vel.x * nx + vel.z * nz;
-                    if ((r > RING_R_MAX && vr > 0) || (r < RING_R_MIN && vr < 0)) {
-                        vel.x -= nx * vr;
-                        vel.z -= nz * vr;
+            rightOut.normalize();
+            upOut.crossVectors(toPlayer, rightOut).normalize();
+        }
+        function isInsideWorldPoint(p, margin = 0) {
+            const r = p.length();
+            return r >= WORLD_R_MIN + margin && r <= WORLD_R_MAX - margin;
+        }
+        function applyBoundaryForces(position, velocity, dt, allowInner = true) {
+            const r = position.length();
+            if (r < 1e-5) return;
+            const nx = position.x / r;
+            const ny = position.y / r;
+            const nz = position.z / r;
+            if (allowInner && r < WORLD_R_MIN + WORLD_SOFT_MARGIN) {
+                const strength = 1 - clamp((r - WORLD_R_MIN) / WORLD_SOFT_MARGIN, 0, 1);
+                velocity.x += nx * strength * strength * 30 * dt;
+                velocity.y += ny * strength * strength * 30 * dt;
+                velocity.z += nz * strength * strength * 30 * dt;
+            } else if (r > WORLD_R_MAX - WORLD_SOFT_MARGIN) {
+                const strength = 1 - clamp((WORLD_R_MAX - r) / WORLD_SOFT_MARGIN, 0, 1);
+                velocity.x -= nx * strength * strength * 24 * dt;
+                velocity.y -= ny * strength * strength * 24 * dt;
+                velocity.z -= nz * strength * strength * 24 * dt;
+            }
+        }
+        // Spherical hard-stop used only after the readable soft return force has had a chance to act.
+        function constrainToWorld(position, velocity, emitFx = false, fxRadius = 1, allowInner = true) {
+            let r = position.length();
+            if (r < 1e-5) {
+                position.set(WORLD_R_MIN + WORLD_SOFT_MARGIN, 0, 0);
+                if (velocity) velocity.set(0, 0, 0);
+                return -1;
+            }
+            let boundary = 0;
+            let targetRadius = r;
+            if (allowInner && r < WORLD_R_MIN) { boundary = -1; targetRadius = WORLD_R_MIN; }
+            else if (r > WORLD_R_MAX) { boundary = 1; targetRadius = WORLD_R_MAX; }
+            if (!boundary) return 0;
+            const nx = position.x / r;
+            const ny = position.y / r;
+            const nz = position.z / r;
+            position.multiplyScalar(targetRadius / r);
+            if (velocity) {
+                const radialSpeed = velocity.x * nx + velocity.y * ny + velocity.z * nz;
+                if ((boundary < 0 && radialSpeed < 0) || (boundary > 0 && radialSpeed > 0)) {
+                    velocity.x -= nx * radialSpeed * 1.22;
+                    velocity.y -= ny * radialSpeed * 1.22;
+                    velocity.z -= nz * radialSpeed * 1.22;
+                }
+            }
+            if (emitFx) {
+                tempVecC.set(nx, ny, nz);
+                spawnRing(position, tempColor.set(boundary < 0 ? 0x63c6df : 0x8edfff), 2.2 + fxRadius, 0.38, tempVecC);
+                spawnSparks(position, tempColor.set(0xbcecff), 5, fxRadius * 0.2, 0.45, { speed: 6, life: 0.3 });
+            }
+            return boundary;
+        }
+        function delta3(a, b, out = tempDelta) {
+            return out.set(b.x - a.x, b.y - a.y, b.z - a.z);
+        }
+        function distance3(a, b) { return a.distanceTo(b); }
+        function spatialCell(value) { return Math.floor(value / ROCK_CELL_SIZE); }
+        function spatialKey(x, y, z) {
+            return x + ':' + y + ':' + z;
+        }
+        // Three.js cameras look down local -Z. Build the same basis Object3D.lookAt would,
+        // but from the ship's up hint so roll never snaps to world-Y.
+        function composeCameraLook(eye, target, upHint, out) {
+            tempCamUp.copy(upHint);
+            tempCamBack.subVectors(eye, target);
+            if (tempCamBack.lengthSq() < 1e-8) tempCamBack.copy(tempCamUp).multiplyScalar(-1);
+            tempCamBack.normalize();
+            tempCamRight.crossVectors(tempCamUp, tempCamBack);
+            if (tempCamRight.lengthSq() < 1e-6) {
+                const fallback = Math.abs(tempCamBack.dot(X_AXIS)) < 0.92 ? X_AXIS : Y_AXIS;
+                tempCamRight.crossVectors(fallback, tempCamBack);
+            }
+            tempCamRight.normalize();
+            tempCamUp.crossVectors(tempCamBack, tempCamRight).normalize();
+            tempMatrix.makeBasis(tempCamRight, tempCamUp, tempCamBack);
+            return out.setFromRotationMatrix(tempMatrix).normalize();
+        }
+        function collectRocksNearSegment(start, end, radius, out) {
+            out.length = 0;
+            if (rockGrid.size === 0) {
+                for (let i = 0; i < asteroids.length; i++) {
+                    const rock = asteroids[i];
+                    if (rock && !rock.dying) out.push(rock);
+                }
+                return out;
+            }
+            rockQueryStamp++;
+            const pad = radius + 3.5;
+            const minX = spatialCell(Math.min(start.x, end.x) - pad);
+            const maxX = spatialCell(Math.max(start.x, end.x) + pad);
+            const minY = spatialCell(Math.min(start.y, end.y) - pad);
+            const maxY = spatialCell(Math.max(start.y, end.y) + pad);
+            const minZ = spatialCell(Math.min(start.z, end.z) - pad);
+            const maxZ = spatialCell(Math.max(start.z, end.z) + pad);
+            for (let x = minX; x <= maxX; x++) {
+                for (let y = minY; y <= maxY; y++) {
+                    for (let z = minZ; z <= maxZ; z++) {
+                        const bucket = rockGrid.get(spatialKey(x, y, z));
+                        if (!bucket) continue;
+                        for (let i = 0; i < bucket.length; i++) {
+                            const rock = bucket[i];
+                            if (!rock || rock.dying || rock.queryStamp === rockQueryStamp) continue;
+                            rock.queryStamp = rockQueryStamp;
+                            out.push(rock);
+                        }
                     }
                 }
             }
+            return out;
         }
-        // Asteroids preserve their velocity and re-enter from the opposite radial edge.
-        function wrapAsteroidPosition(a) {
-            const p = a.group.position;
-            p.y = DECK_Y;
-            a.velocity.y = 0;
-            const r = Math.hypot(p.x, p.z);
-            if (r >= RING_R_MIN && r <= RING_R_MAX) return false;
-
-            const theta = r > 1e-4 ? Math.atan2(p.z, p.x) : 0;
-            const exitsOuter = r > RING_R_MAX;
-            const edgeRadius = exitsOuter ? RING_R_MAX : RING_R_MIN;
-            const inset = clamp(a.radius * 0.32, 0.65, 1.5);
-            tempImpact.set(Math.cos(theta) * edgeRadius, DECK_Y, Math.sin(theta) * edgeRadius);
-
-            if (a.wrapFxCd <= 0) {
-                spawnSparks(tempImpact, tempColor.set(0x8edfff), 3, a.radius * 0.15, 0.42, { speed: 5, life: 0.24 });
-                spawnRing(tempImpact, tempColor.set(0x73c9f2), 0.8 + a.radius * 0.25, 0.16);
-            }
-
-            setOnRing(p, theta, exitsOuter ? RING_R_MIN + inset : RING_R_MAX - inset, DECK_Y);
-            if (a.wrapFxCd <= 0) {
-                spawnSparks(p, tempColor.set(0xe7fbff), 5, a.radius * 0.18, 0.5, { speed: 6, life: 0.28 });
-                spawnRing(p, tempColor.set(0xbcecff), 1.0 + a.radius * 0.3, 0.24);
-                a.wrapFxCd = 0.14;
-            }
-            return true;
+        function targetInAimCone(origin, forward, target, range, cosCone) {
+            delta3(origin, target, tempVecC);
+            const distSq = tempVecC.lengthSq();
+            if (distSq < 1e-6 || distSq > range * range) return false;
+            return tempVecC.dot(forward) / Math.sqrt(distSq) >= cosCone;
         }
-        // Planar (XZ) delta for combat — ignores any residual height error
-        function wrapDelta(a, b) {
-            return tempDelta.set(b.x - a.x, 0, b.z - a.z);
-        }
-        function planarDist(a, b) {
-            const dx = b.x - a.x;
-            const dz = b.z - a.z;
-            return Math.hypot(dx, dz);
+        function hasLineOfSight(origin, target) {
+            return projectileSegmentHitTime(origin, target, tempVec.set(0, 0, 0), PLANET_R + 2) < 0;
         }
         function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
         function preferredMaxPixelRatio() {
@@ -1371,6 +1604,7 @@
             buildRingDust();
             buildSparks();
             buildRimArrows();
+            buildCombatHud();
             buildAsteroidPool();
             buildShardPool();
             buildRingPool();
@@ -1395,11 +1629,14 @@
                     }, 700);
                 }
             } catch (_) {}
+            installDiagnostics();
             window.__tempestMeridianReady = true;
-            window.__asteroidsGpt56SolReady = true;
-            window.__tempestMeridianArena = 'tempest-meridian-5.6';
-            document.documentElement.dataset.ready = 'tempest-meridian';
-            console.info('[Tempest Meridian] tempest-meridian-5.6 — blue gas giant, fractal storm, orbital moons');
+            window.__asteroids3DReady = true;
+            window.__tempestMeridianArena = 'tempest-meridian-3d-gauntlet';
+            document.documentElement.dataset.ready = 'tempest-meridian-3d';
+            window.__asteroids3DDiagnosticsLast = window.__asteroids3DDiagnostics.run();
+            console.info('[Tempest Meridian] 3D gauntlet ready — quaternion flight, spherical combat shell, full-XYZ collision');
+            console.info('[Tempest Meridian] diagnostics', window.__asteroids3DDiagnosticsLast);
         }
 
         function buildGeometries() {
@@ -1455,7 +1692,6 @@
             geometries.missileFin = new THREE.BoxGeometry(0.42, 0.04, 0.28);
             geometries.missileGlow = new THREE.SphereGeometry(0.2, 10, 8);
             geometries.lockRing = new THREE.RingGeometry(0.72, 0.92, 4);
-            geometries.lockRing.rotateX(-Math.PI / 2);
             geometries.pickup = new THREE.OctahedronGeometry(0.62, 0);
             geometries.hunter = new THREE.ConeGeometry(0.55, 1.8, 5);
             geometries.hunter.rotateX(Math.PI / 2);
@@ -2321,6 +2557,7 @@
                 moons.push({
                     mesh,
                     radius: spec.radius,
+                    collideRadius: spec.size,
                     inclination: spec.inclination,
                     nodeCos: Math.cos(spec.node),
                     nodeSin: Math.sin(spec.node),
@@ -2354,13 +2591,17 @@
             }
         }
 
-        // Visual ring bands around the planet (equatorial, playable band is a subset)
+        // Double-sided visual ring bands around the planet; the combat shell extends far beyond them.
         function buildRingSystem() {
             const group = new THREE.Group();
             group.position.set(0, 0, 0);
-            // Flat equatorial rings — you fly along them, not above a tipped card
+            // Equatorial landmark with real vertical volume so edge-on crossings still read.
             group.rotation.x = 0;
             group.rotation.z = 0;
+            const ringHalfHeight = (inner, outer) => {
+                const span = outer - inner;
+                return clamp(2.8 + span * 0.045, 3.2, 7.5);
+            };
 
             const bands = [
                 { inner: RING_VIS_INNER, outer: RING_R_MIN - 2, color: 0x183c70, opacity: 0.22, density: 0.68 },
@@ -2414,13 +2655,14 @@
                             float u = vRadial;
                             float angle = atan(vLocal.z, vLocal.x);
                             float edge = smoothstep(0.0, 0.07, u) * (1.0 - smoothstep(0.9, 1.0, u));
+                            float wall = max(smoothstep(0.08, 0.0, u), smoothstep(0.92, 1.0, u));
                             float radius = mix(inner, outer, u);
                             float broadLane = 0.88 + 0.09 * sin(radius * 0.54);
                             float fineLane = 0.93 + 0.05 * sin(radius * 1.62 + 0.35);
                             float continuousGrain = 0.96
                                 + 0.025 * sin(angle * 17.0 + radius * 0.07)
                                 + 0.015 * sin(angle * 37.0 - radius * 0.04);
-                            float dens = edge * density * broadLane * fineLane * continuousGrain;
+                            float dens = max(edge, wall * 0.8) * density * broadLane * fineLane * continuousGrain;
                             vec3 L = normalize(sunDir);
                             vec3 V = normalize(cameraPosition - vWorld);
                             float rayB = dot(vWorld, L);
@@ -2448,24 +2690,29 @@
                     blending: THREE.NormalBlending,
                     dithering: true
                 });
-                const geo = new THREE.RingGeometry(b.inner, b.outer, 320, 8);
-                geo.rotateX(-Math.PI / 2);
+                const halfH = ringHalfHeight(b.inner, b.outer);
+                const profile = [
+                    new THREE.Vector2(b.inner, -halfH),
+                    new THREE.Vector2(b.outer, -halfH),
+                    new THREE.Vector2(b.outer, halfH),
+                    new THREE.Vector2(b.inner, halfH),
+                    new THREE.Vector2(b.inner, -halfH)
+                ];
+                const geo = new THREE.LatheGeometry(profile, 160);
                 const mesh = new THREE.Mesh(geo, mat);
                 mesh.renderOrder = -3;
-                mesh.position.y = -0.4;
+                mesh.position.y = RING_PLANE_Y;
                 group.add(mesh);
                 bandMeshes.push({ mesh, material: mat });
             }
 
             // Subtle structure lines inherit the same blue/warm material language.
             const structures = [
-                { radius: RING_R_MIN, color: 0x4d7eae },
-                { radius: RING_R0, color: 0x6daebc },
-                { radius: RING_R_MAX, color: 0x9b5b3e }
+                { radius: RING_R0, color: 0x6daebc }
             ];
             for (const structure of structures) {
                 const line = new THREE.Mesh(
-                    new THREE.TorusGeometry(structure.radius, 0.18, 6, 320),
+                    new THREE.TorusGeometry(structure.radius, 0.55, 8, 256),
                     new THREE.MeshBasicMaterial({
                         color: structure.color,
                         transparent: true,
@@ -2483,33 +2730,11 @@
             ringSystem = { group, bandMeshes };
         }
 
-        // Tall translucent rails — make the annulus unmissable (inner wall = toward planet)
+        // Visual navigation traces only; they do not constrain flight or collision.
         function buildRingRails() {
             const group = new THREE.Group();
-            const specs = [
-                { r: RING_R_MIN, color: 0xe2a35e, name: 'inner' },
-                { r: RING_R_MAX, color: 0x75d5ce, name: 'outer' }
-            ];
-            for (const s of specs) {
-                // Low curb only — marks the ring lane without lamp-post clutter
-                const curb = new THREE.Mesh(
-                    new THREE.TorusGeometry(s.r, 0.38, 8, 320),
-                    new THREE.MeshBasicMaterial({
-                        color: s.color,
-                        transparent: true,
-                        opacity: 0.28,
-                        depthWrite: false,
-                        blending: THREE.AdditiveBlending
-                    })
-                );
-                curb.rotation.x = Math.PI / 2;
-                curb.position.y = DECK_Y - 0.45;
-                curb.renderOrder = -1;
-                group.add(curb);
-            }
-            // Midline dashed feel: thin torus at RING_R0
             const mid = new THREE.Mesh(
-                new THREE.TorusGeometry(RING_R0, 0.16, 6, 320),
+                new THREE.TorusGeometry(RING_R0, 0.42, 6, 256),
                 new THREE.MeshBasicMaterial({
                     color: 0x6daebc,
                     transparent: true,
@@ -2519,14 +2744,14 @@
                 })
             );
             mid.rotation.x = Math.PI / 2;
-            mid.position.y = DECK_Y - 0.5;
+            mid.position.y = RING_PLANE_Y + 0.45;
             group.add(mid);
             scene.add(group);
             if (!ringSystem) ringSystem = { group: new THREE.Group(), bandMeshes: [] };
             ringSystem.rails = group;
         }
 
-        // No square floor — only a faint local glow under the skiff (follows player via update)
+        // No floor: this faint ship-relative drive wash follows the craft in full 3D.
         function buildRingPlane() {
             const material = new THREE.ShaderMaterial({
                 uniforms: {
@@ -2562,8 +2787,6 @@
                 side: THREE.DoubleSide
             });
             const mesh = new THREE.Mesh(new THREE.CircleGeometry(22, 48), material);
-            mesh.rotation.x = -Math.PI / 2;
-            mesh.position.y = -0.6;
             mesh.renderOrder = -1;
             fieldGroup.add(mesh);
             beltBackdrop = { mesh, material };
@@ -2582,8 +2805,8 @@
                 const r = Math.random() < 0.7
                     ? randomRange(RING_R_MIN - 4, RING_R_MAX + 8)
                     : randomRange(RING_VIS_INNER, RING_VIS_OUTER);
-                // keep combat deck clear so nearby grains never become giant sprites
-                let y = randomRange(1.15, 2.8) * (Math.random() < 0.5 ? 1 : -1);
+                // keep the thin visual ring volume clear enough that nearby grains never become giant sprites
+                let y = randomRange(-11.5, 11.5);
                 positions[i * 3] = Math.cos(ang) * r;
                 positions[i * 3 + 1] = y;
                 positions[i * 3 + 2] = Math.sin(ang) * r;
@@ -2851,7 +3074,6 @@
             scene.add(group);
 
             const reticule = new THREE.Mesh(geometries.reticule, materials.reticule.clone());
-            reticule.rotation.x = Math.PI / 2;
             reticule.rotation.z = Math.PI / 4;
             scene.add(reticule);
 
@@ -2863,9 +3085,11 @@
                 engine: group,
                 position: new THREE.Vector3(0, 0.8, 0),
                 velocity: new THREE.Vector3(),
-                rotation: 0,
+                orientation: new THREE.Quaternion(),
+                previousPosition: new THREE.Vector3(),
                 radius: PLAYER_RADIUS,
-                shieldPulse: 0
+                shieldPulse: 0,
+                boundaryFxCd: 0
             };
         }
 
@@ -2927,10 +3151,9 @@
         }
 
         function updateThrusterTrails(dt, emitting) {
-            const forwardX = Math.sin(player.rotation);
-            const forwardZ = Math.cos(player.rotation);
-            const rightX = Math.cos(player.rotation);
-            const rightZ = -Math.sin(player.rotation);
+            const forward = getForward(player, tempForward);
+            const right = getRight(player, tempRight);
+            const up = getUp(player, tempUp);
 
             for (const trail of thrusterTrails) {
                 for (let i = 0; i < THRUSTER_TRAIL_POINTS; i++) {
@@ -2938,9 +3161,9 @@
                 }
 
                 const sample = trail.head;
-                trail.centers[sample * 3] = player.position.x - forwardX * 2.12 + rightX * trail.shoulder;
-                trail.centers[sample * 3 + 1] = DECK_Y + 0.04;
-                trail.centers[sample * 3 + 2] = player.position.z - forwardZ * 2.12 + rightZ * trail.shoulder;
+                trail.centers[sample * 3] = player.position.x - forward.x * 2.12 + right.x * trail.shoulder - up.x * 0.1;
+                trail.centers[sample * 3 + 1] = player.position.y - forward.y * 2.12 + right.y * trail.shoulder - up.y * 0.1;
+                trail.centers[sample * 3 + 2] = player.position.z - forward.z * 2.12 + right.z * trail.shoulder - up.z * 0.1;
                 trail.lives[sample] = emitting
                     ? THRUSTER_TRAIL_LIFE * (0.9 + Math.sin(state.visualTime * 31 + trail.shoulder * 4) * 0.1)
                     : 0;
@@ -2958,15 +3181,34 @@
                     const centerY = trail.centers[source * 3 + 1];
                     const centerZ = trail.centers[source * 3 + 2];
                     let tangentX = trail.centers[next * 3] - trail.centers[previous * 3];
+                    let tangentY = trail.centers[next * 3 + 1] - trail.centers[previous * 3 + 1];
                     let tangentZ = trail.centers[next * 3 + 2] - trail.centers[previous * 3 + 2];
-                    let tangentLength = Math.hypot(tangentX, tangentZ);
+                    let tangentLength = Math.hypot(tangentX, tangentY, tangentZ);
                     if (tangentLength < 0.0001) {
-                        tangentX = forwardX;
-                        tangentZ = forwardZ;
+                        tangentX = forward.x;
+                        tangentY = forward.y;
+                        tangentZ = forward.z;
                         tangentLength = 1;
                     }
-                    const sideX = -tangentZ / tangentLength;
-                    const sideZ = tangentX / tangentLength;
+                    tangentX /= tangentLength;
+                    tangentY /= tangentLength;
+                    tangentZ /= tangentLength;
+                    const viewX = camera.position.x - centerX;
+                    const viewY = camera.position.y - centerY;
+                    const viewZ = camera.position.z - centerZ;
+                    let sideX = tangentY * viewZ - tangentZ * viewY;
+                    let sideY = tangentZ * viewX - tangentX * viewZ;
+                    let sideZ = tangentX * viewY - tangentY * viewX;
+                    let sideLength = Math.hypot(sideX, sideY, sideZ);
+                    if (sideLength < 0.0001) {
+                        sideX = right.x;
+                        sideY = right.y;
+                        sideZ = right.z;
+                        sideLength = 1;
+                    }
+                    sideX /= sideLength;
+                    sideY /= sideLength;
+                    sideZ /= sideLength;
                     const along = trail.count > 1 ? i / (trail.count - 1) : 1;
                     const width = 0.025 + along * 0.19;
                     const life = clamp(trail.lives[source] / THRUSTER_TRAIL_LIFE, 0, 1);
@@ -2974,10 +3216,10 @@
                     const vertex = i * 2;
 
                     trail.positions[vertex * 3] = centerX - sideX * width;
-                    trail.positions[vertex * 3 + 1] = centerY;
+                    trail.positions[vertex * 3 + 1] = centerY - sideY * width;
                     trail.positions[vertex * 3 + 2] = centerZ - sideZ * width;
                     trail.positions[(vertex + 1) * 3] = centerX + sideX * width;
-                    trail.positions[(vertex + 1) * 3 + 1] = centerY;
+                    trail.positions[(vertex + 1) * 3 + 1] = centerY + sideY * width;
                     trail.positions[(vertex + 1) * 3 + 2] = centerZ + sideZ * width;
                     trail.alphas[vertex] = alpha;
                     trail.alphas[vertex + 1] = alpha;
@@ -3002,23 +3244,72 @@
             const playSurface = renderer.domElement;
             playSurface.addEventListener('pointerdown', (event) => {
                 if (event.button !== 0) return;
-                if (!state.controlsActive) { state.controlsActive = true; hideBanner(); }
-                try { playSurface.setPointerCapture(event.pointerId); } catch (_) {}
+                event.preventDefault();
+                ensureAudio();
+                const useDragSteer = HAS_COARSE_POINTER || !input.pointerLocked;
+                if (useDragSteer) {
+                    input.dragging = true;
+                    input.dragPointerId = event.pointerId;
+                    input.dragX = event.clientX;
+                    input.dragY = event.clientY;
+                    input.dragDistance = 0;
+                    try { playSurface.setPointerCapture(event.pointerId); } catch (_) {}
+                    if (state.paused && !state.debugOpen && !state.gameOver) setPaused(false);
+                    if (!state.controlsActive) { state.controlsActive = true; hideBanner(); }
+                    if (!HAS_COARSE_POINTER && !input.pointerLocked) requestFlightPointerLock();
+                    return;
+                }
                 onFireDown();
             });
-            playSurface.addEventListener('pointerup', onFireUp);
-            playSurface.addEventListener('pointercancel', onFireUp);
-            playSurface.addEventListener('lostpointercapture', onFireUp);
-            window.addEventListener('blur', cancelTransientInput);
+            playSurface.addEventListener('pointermove', (event) => {
+                if (!input.dragging || event.pointerId !== input.dragPointerId) return;
+                const dx = event.clientX - input.dragX;
+                const dy = event.clientY - input.dragY;
+                input.dragX = event.clientX;
+                input.dragY = event.clientY;
+                input.dragDistance += Math.hypot(dx, dy);
+                input.lookDX += dx * 1.35;
+                input.lookDY += dy * 1.35;
+            });
+            const finishSurfacePointer = (event, cancelled = false) => {
+                if (input.dragging && event.pointerId === input.dragPointerId) {
+                    const tapped = !cancelled && input.dragDistance < 8;
+                    input.dragging = false;
+                    input.dragPointerId = -1;
+                    if (tapped && HAS_COARSE_POINTER && !state.paused && !state.debugOpen && !state.gameOver) fireGuns();
+                }
+                onFireUp();
+            };
+            playSurface.addEventListener('pointerup', (event) => finishSurfacePointer(event));
+            playSurface.addEventListener('pointercancel', (event) => finishSurfacePointer(event, true));
+            playSurface.addEventListener('lostpointercapture', (event) => finishSurfacePointer(event, true));
+            document.addEventListener('mousemove', (event) => {
+                if (!input.pointerLocked) return;
+                input.lookDX += event.movementX || 0;
+                input.lookDY += event.movementY || 0;
+            });
+            document.addEventListener('pointerlockchange', onPointerLockChange);
+            document.addEventListener('pointerlockerror', onPointerLockError);
+            window.addEventListener('blur', () => {
+                cancelTransientInput();
+                persistBestScore();
+                if (!state.gameOver && !state.debugOpen) {
+                    setPaused(true, 'Flight Paused', 'Window focus changed. Click the field to resume flight control.');
+                }
+            });
             window.addEventListener('pagehide', persistBestScore);
             document.addEventListener('visibilitychange', () => {
                 if (document.hidden) {
                     cancelTransientInput();
                     persistBestScore();
+                    if (!state.gameOver) setPaused(true, 'Flight Paused', 'Window focus changed. Click the field to resume flight control.');
                 }
             });
 
-            ui.newRun.addEventListener('click', resetRun);
+            ui.newRun.addEventListener('click', () => {
+                resetRun();
+                if (!HAS_COARSE_POINTER) requestFlightPointerLock();
+            });
             bindActionButton(ui.fire, onFireDown, onFireUp, onFireUp);
             bindActionButton(ui.tetherBtn, onMissileDown, onMissileUp, cancelMissilePaint);
             const mvTether = document.getElementById('mv-tether');
@@ -3027,7 +3318,20 @@
             bindHold(ui.mvRight, 'touchRight');
             bindHold(ui.mvThrust, 'touchThrust');
             bindHold(ui.mvBrake, 'touchBrake');
-            ui.pause.addEventListener('click', () => setPaused(!state.paused, 'Paused', 'Press Space or Pause to resume.'));
+            const mvCamera = document.getElementById('mv-camera');
+            if (mvCamera) mvCamera.addEventListener('click', (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (player) cycleShot();
+            });
+            ui.pause.addEventListener('click', () => {
+                if (state.paused && !state.gameOver) {
+                    setPaused(false);
+                    if (!HAS_COARSE_POINTER) requestFlightPointerLock();
+                } else {
+                    setPaused(true, 'Paused', 'Click the field or press Space to resume.');
+                }
+            });
             ui.debug.addEventListener('click', toggleDebug);
             ui.debugClose.addEventListener('click', () => closeDebug(false));
             ui.debugResume.addEventListener('click', () => closeDebug(true));
@@ -3047,8 +3351,67 @@
             bindSlider('drag-slider', 'drag-label', 'tuneDrag', (v) => v.toFixed(2));
             bindSlider('turn-slider', 'turn-label', 'tuneTurn', (v) => v.toFixed(1));
             bindSlider('speed-slider', 'speed-label', 'tuneMaxSpeed', (v) => v.toFixed(0));
+            bindSlider('mouse-slider', 'mouse-label', 'tuneMouse', (v) => v.toFixed(2) + 'x');
+            bindSlider('pitch-slider', 'pitch-label', 'tunePitch', (v) => v.toFixed(2) + 'x');
+            bindSlider('roll-slider', 'roll-label', 'tuneRoll', (v) => v.toFixed(2) + 'x');
+            const invertPitch = document.getElementById('invert-pitch');
+            if (invertPitch) {
+                invertPitch.checked = state.invertPitch;
+                invertPitch.addEventListener('change', () => { state.invertPitch = invertPitch.checked; });
+            }
             bindSlider('bloom-slider', 'bloom-label', 'bloom', (v) => v.toFixed(2));
             bindSlider('grade-slider', 'grade-label', 'grade', (v) => v.toFixed(2));
+        }
+
+        function requestFlightPointerLock() {
+            if (HAS_COARSE_POINTER || !renderer || !renderer.domElement.requestPointerLock) {
+                if (!HAS_COARSE_POINTER) input.pointerLockFailed = true;
+                return;
+            }
+            try {
+                const result = renderer.domElement.requestPointerLock();
+                if (result && typeof result.catch === 'function') result.catch(onPointerLockError);
+            } catch (_) {
+                onPointerLockError();
+            }
+        }
+
+        function releaseFlightPointerLock(suppressPause = false) {
+            if (document.pointerLockElement !== renderer.domElement) return;
+            input.suppressPointerPause = suppressPause;
+            document.exitPointerLock();
+        }
+
+        function onPointerLockChange() {
+            const locked = document.pointerLockElement === renderer.domElement;
+            input.pointerLocked = locked;
+            document.body.classList.toggle('pointer-locked', locked);
+            if (locked) {
+                input.pointerLockFailed = false;
+                input.dragging = false;
+                input.dragPointerId = -1;
+                state.controlsActive = true;
+                if (state.paused && !state.debugOpen && !state.gameOver) setPaused(false);
+                else hideBanner();
+                return;
+            }
+            cancelTransientInput();
+            if (input.suppressPointerPause) {
+                input.suppressPointerPause = false;
+                return;
+            }
+            if (!state.debugOpen && !state.gameOver && !document.hidden) {
+                state.controlsActive = false;
+                setPaused(true, 'Flight Paused', 'Pointer released. Click the field to recapture mouse flight.');
+            }
+        }
+
+        function onPointerLockError() {
+            input.pointerLockFailed = true;
+            input.pointerLocked = false;
+            state.controlsActive = true;
+            showBanner('Drag Flight Ready', 'Pointer lock is unavailable. Drag the field to pitch and yaw; use F to fire.');
+            setTimeout(() => { if (!state.paused && !state.debugOpen) hideBanner(); }, 1800);
         }
 
         // Hold-button wiring that survives finger drift off the button
@@ -3149,6 +3512,7 @@
                 chroma: 0,
                 paused: false,
                 debugOpen: false,
+                debugWasPaused: false,
                 controlsActive: true,
                 gameOver: false,
                 missionIndex: 0
@@ -3158,10 +3522,14 @@
             state.shieldMax = sShield.max;
             state.shield = sShield.max;
 
-            // Start on the ring, facing prograde (counter-clockwise tangent)
-            setOnRing(player.position, 0, RING_R0, DECK_Y);
+            // Start just above the ring landmark, nose tangent to the orbit and free to leave it.
+            player.position.set(RING_R0, 12, 0);
             player.velocity.set(0, 0, 0);
-            player.rotation = Math.PI * 0.5; // +X at theta=0
+            player.orientation.identity(); // local +Z is tangent at the +X start point
+            player.group.position.copy(player.position);
+            player.group.quaternion.copy(player.orientation);
+            player.previousPosition.copy(player.position);
+            player.boundaryFxCd = 0;
             cancelTransientInput();
             seeker.holding = false;
             seeker.mode = 'idle';
@@ -3213,18 +3581,36 @@
         }
 
         function edgeSpawn() {
-            // Spread around the ring so you see curvature, not a local square cluster
-            const baseTheta = player ? ringTheta(player.position) : 0;
-            let theta;
-            if (Math.random() < 0.55) {
-                // nearby combat threat (still curved arc, not a flat box)
-                theta = baseTheta + randomRange(0.5, 2.4) * (Math.random() < 0.5 ? 1 : -1);
-            } else {
-                // anywhere on the orbit — sells the full ring
-                theta = Math.random() * Math.PI * 2;
+            // Fair arrivals fill the shell, stay away from the player/planet, and avoid the dead-aft cone.
+            const result = new THREE.Vector3();
+            const forward = player ? getForward(player, tempForward) : Z_AXIS;
+            const fair = (point) => {
+                const radius = point.length();
+                if (radius <= WORLD_R_MIN + 10 || radius >= COMBAT_R_MAX - 10) return false;
+                if (!player) return true;
+                const away = delta3(player.position, point, tempDelta);
+                const dist = away.length();
+                if (dist < 48) return false;
+                return away.dot(forward) / dist > -0.35;
+            };
+            for (let attempt = 0; attempt < 24; attempt++) {
+                randomUnitVector(tempVecC);
+                if (player && tempVecC.dot(forward) < -0.45) continue;
+                if (player) result.copy(player.position).addScaledVector(tempVecC, randomRange(58, 118));
+                else randomShellPoint(WORLD_R_MIN + 18, COMBAT_R_MAX - 18, result);
+                if (fair(result)) return result;
             }
-            const r = randomRange(RING_R_MIN + 3, RING_R_MAX - 3);
-            return new THREE.Vector3(Math.cos(theta) * r, DECK_Y, Math.sin(theta) * r);
+            for (let attempt = 0; attempt < 20; attempt++) {
+                randomShellPoint(WORLD_R_MIN + 22, COMBAT_R_MAX - 22, result);
+                if (fair(result)) return result;
+            }
+            if (player) {
+                result.copy(player.position).addScaledVector(forward, 72);
+                if (result.lengthSq() < 1e-5) result.copy(forward);
+                result.multiplyScalar(((WORLD_R_MIN + COMBAT_R_MAX) * 0.5) / result.length());
+                return result;
+            }
+            return randomShellPoint(WORLD_R_MIN + 22, COMBAT_R_MAX - 22, result);
         }
 
         const asteroidSpecs = {
@@ -3288,15 +3674,18 @@
             const group = new THREE.Group();
             group.add(mesh);
             group.position.copy(position);
-            wrapPosition(group.position);
+            constrainToWorld(group.position, null, false);
             fieldGroup.add(group);
 
             const speed = randomRange(2.2, 5.4) / Math.sqrt(radius) * speedScale;
             let velocity;
-            // Prefer tangential drift so rocks orbit the ring instead of flying into the planet
-            const th = ringTheta(group.position);
-            const tangent = new THREE.Vector3(-Math.sin(th), 0, Math.cos(th));
-            const radial = new THREE.Vector3(Math.cos(th), 0, Math.sin(th));
+            // Prefer a random tangent around the spherical shell, with enough radial drift to cross ring depth.
+            const radial = group.position.clone().normalize();
+            const tangent = randomUnitVector(new THREE.Vector3());
+            tangent.addScaledVector(radial, -tangent.dot(radial));
+            if (tangent.lengthSq() < 1e-5) tangent.crossVectors(radial, Y_AXIS);
+            if (tangent.lengthSq() < 1e-5) tangent.crossVectors(radial, X_AXIS);
+            tangent.normalize();
             if (inheritedVelocity) {
                 velocity = inheritedVelocity.clone().multiplyScalar(0.65)
                     .addScaledVector(tangent, randomRange(-speed, speed) * 0.5)
@@ -3305,12 +3694,10 @@
                 velocity = tangent.multiplyScalar(randomRange(speed * 0.65, speed) * (Math.random() < 0.5 ? 1 : -1))
                     .addScaledVector(radial, randomRange(-0.55, 0.55) * speed);
             }
-            velocity.y = 0;
             const minimumSpeed = speed * 0.55;
             if (velocity.lengthSq() < minimumSpeed * minimumSpeed) {
                 velocity.copy(tangent).normalize().multiplyScalar(minimumSpeed * (Math.random() < 0.5 ? 1 : -1));
             }
-            group.position.y = DECK_Y;
 
             const rock = {
                 kind: 'asteroid',
@@ -3407,14 +3794,11 @@
             const group = new THREE.Group();
             group.add(mesh);
             {
-                const th = (player ? ringTheta(player.position) : 0) + Math.PI * 0.55;
-                setOnRing(group.position, th, RING_R0, DECK_Y);
+                group.position.copy(edgeSpawn());
             }
             fieldGroup.add(group);
 
-            const velocityAngle = Math.random() * Math.PI * 2;
-            const coreVelocity = new THREE.Vector3(Math.cos(velocityAngle), 0, Math.sin(velocityAngle))
-                .multiplyScalar(randomRange(0.85, 1.4));
+            const coreVelocity = randomUnitVector(new THREE.Vector3()).multiplyScalar(randomRange(0.85, 1.4));
 
             const rock = {
                 kind: 'asteroid',
@@ -3465,7 +3849,6 @@
             const group = new THREE.Group();
             group.add(mesh);
             group.position.copy(edgeSpawn());
-            group.position.y = DECK_Y;
             fieldGroup.add(group);
             hunters.push({
                 kind: 'hunter',
@@ -3474,7 +3857,7 @@
                 material,
                 edges,
                 spike,
-                velocity: randomPlanarVector(2),
+                velocity: randomVector3(2),
                 radius: 1.3,
                 hp: 2,
                 maxHp: 2,
@@ -3483,7 +3866,15 @@
                 dying: false,
                 shatterTimer: 0,
                 speed: 9 * speedScale,
-                lockPulse: 0
+                lockPulse: 0,
+                orbitSign: Math.random() < 0.5 ? -1 : 1,
+                orbitAxis: randomUnitVector(new THREE.Vector3()),
+                orbitLat: randomRange(0.36, 0.58),
+                orbitLift: randomRange(0.34, 0.56),
+                precess: randomRange(-0.4, 0.4),
+                phase: Math.random() * Math.PI * 2,
+                preferredRange: randomRange(10, 26),
+                boundaryFxCd: 0
             });
         }
 
@@ -3522,6 +3913,7 @@
             updateBackdropTime(state.visualTime);
             updatePostProcessing();
             updateRimArrows();
+            updateCombatHud();
             updateUi(rawDt);
 
             fpsAccum += frameDt;
@@ -3583,37 +3975,79 @@
         }
 
         function updatePlayer(worldDt) {
-            const keyLeft = input.keys.KeyA || input.keys.ArrowLeft || input.touchLeft;
-            const keyRight = input.keys.KeyD || input.keys.ArrowRight || input.touchRight;
-            const keyUp = input.keys.KeyW || input.keys.ArrowUp || input.touchThrust;
-            const keyDown = input.keys.KeyS || input.keys.ArrowDown || input.touchBrake;
+            const yawLeft = input.keys.KeyA || input.keys.ArrowLeft || input.touchLeft;
+            const yawRight = input.keys.KeyD || input.keys.ArrowRight || input.touchRight;
+            const pitchUp = input.keys.ArrowUp;
+            const pitchDown = input.keys.ArrowDown;
+            const rollLeft = input.keys.KeyQ;
+            const rollRight = input.keys.KeyE;
+            const thrust = input.keys.KeyW || input.touchThrust;
+            const brake = input.keys.KeyS || input.touchBrake;
+            const boostKey = input.keys.ShiftLeft || input.keys.ShiftRight;
 
-            {
-                const boost = state.overdriveTimer > 0 ? 1.4 : 1;
-                const rotate = (keyLeft ? 1 : 0) - (keyRight ? 1 : 0);
-                const speed = player.velocity.length();
-                player.rotation += rotate * worldDt * (state.tuneTurn + speed * 0.012);
+            const mouseYaw = clamp(input.lookDX, -180, 180) * -0.0018 * state.tuneMouse * (state.tuneTurn / 4.2);
+            const pitchSign = state.invertPitch ? -1 : 1;
+            const mousePitch = clamp(input.lookDY, -180, 180) * 0.00165 * state.tuneMouse * state.tunePitch * pitchSign;
+            input.lookDX = 0;
+            input.lookDY = 0;
+            const keyYaw = ((yawLeft ? 1 : 0) + (yawRight ? -1 : 0)) * worldDt * state.tuneTurn * 0.72;
+            const keyPitch = ((pitchUp ? -1 : 0) + (pitchDown ? 1 : 0)) * worldDt * 2.2 * state.tunePitch;
+            const yawAngle = mouseYaw + keyYaw;
+            const pitchAngle = mousePitch + keyPitch;
+            const explicitRoll = ((rollLeft ? 1 : 0) + (rollRight ? -1 : 0)) * worldDt * 2.45 * state.tuneRoll;
 
-                const forward = getForward(player.rotation);
-                input.thrusting = Boolean(keyUp);
-                if (input.thrusting) {
-                    player.velocity.addScaledVector(forward, worldDt * state.tuneThrust * boost);
-                }
-                if (keyDown) player.velocity.multiplyScalar(Math.pow(0.03, worldDt));
-                player.velocity.multiplyScalar(Math.pow(input.thrusting ? Math.min(0.92, state.tuneDrag + 0.12) : state.tuneDrag, worldDt));
-                player.velocity.y = 0;
-                player.velocity.clampLength(0, state.overdriveTimer > 0 ? state.tuneMaxSpeed * 1.4 : state.tuneMaxSpeed);
-                player.position.addScaledVector(player.velocity, worldDt);
-                wrapPosition(player.position, player.velocity);
+            if (Math.abs(yawAngle) > 1e-7) {
+                tempQuat.setFromAxisAngle(Y_AXIS, yawAngle);
+                player.orientation.multiply(tempQuat);
+            }
+            if (Math.abs(pitchAngle) > 1e-7) {
+                tempQuat.setFromAxisAngle(X_AXIS, pitchAngle);
+                player.orientation.multiply(tempQuat);
+            }
+            if (Math.abs(explicitRoll) > 1e-7) {
+                tempQuat.setFromAxisAngle(Z_AXIS, explicitRoll);
+                player.orientation.multiply(tempQuat);
+            }
+            player.orientation.normalize();
+
+            const forward = getForward(player, tempForward);
+            const up = getUp(player, tempUp);
+            input.thrusting = Boolean(thrust);
+            input.boosting = Boolean(thrust && boostKey);
+            const overdriveBoost = state.overdriveTimer > 0 ? 1.35 : 1;
+            const manualBoost = input.boosting ? 1.58 : 1;
+            if (input.thrusting) {
+                player.velocity.addScaledVector(forward, worldDt * state.tuneThrust * overdriveBoost * manualBoost);
+            }
+            if (brake) {
+                player.velocity.addScaledVector(forward, -worldDt * state.tuneThrust * 1.28 * overdriveBoost);
+            }
+            const coastDrag = input.thrusting || brake ? Math.min(0.965, state.tuneDrag + 0.2) : state.tuneDrag;
+            player.velocity.multiplyScalar(Math.pow(coastDrag, worldDt));
+            applyBoundaryForces(player.position, player.velocity, worldDt, false);
+            const radial = player.position.length();
+            if (radial > PLANET_R && radial < PLANET_R + 38) {
+                const pull = Math.pow(1 - clamp((radial - PLANET_R) / 38, 0, 1), 2) * 26;
+                player.velocity.addScaledVector(player.position, -pull * worldDt / radial);
+            }
+            const maxSpeed = state.tuneMaxSpeed * overdriveBoost * (input.boosting ? 1.32 : 1);
+            player.velocity.clampLength(0, maxSpeed);
+            player.previousPosition.copy(player.position);
+            player.position.addScaledVector(player.velocity, worldDt);
+            player.boundaryFxCd = Math.max(0, player.boundaryFxCd - worldDt);
+            const boundaryHit = constrainToWorld(player.position, player.velocity, player.boundaryFxCd <= 0, player.radius, false);
+            if (boundaryHit) {
+                player.boundaryFxCd = 0.24;
+                state.shake = Math.max(state.shake, 0.24);
+            }
+            if (!state.gameOver && !state.forceInvuln) {
+                const bodyHit = hitWorldBody();
+                if (bodyHit) crashAndBurn(bodyHit);
             }
 
             player.group.position.copy(player.position);
             player.group.visible = state.shot !== 'cockpit';
-            player.group.rotation.y = player.rotation;
-            const rotate = (keyLeft ? 1 : 0) - (keyRight ? 1 : 0);
-            // light bank into turn; keep skiff reading level on the deck
-            player.group.rotation.z = -rotate * 0.22;
-            player.group.rotation.x = 0;
+            player.group.quaternion.copy(player.orientation);
 
             updateEngineAnimation();
 
@@ -3628,18 +4062,15 @@
             player.gravityAura.material.opacity = state.overdriveTimer > 0 ? 0.16 : 0.1;
 
             // reticule: range/direction tick, not glued to the nose
-            const forward = getForward(player.rotation);
-            const speed = player.velocity.length();
-            const reticuleDist = 8.4 + Math.min(4.4, speed * 0.3);
             player.reticule.visible = state.shot !== 'cockpit';
-            player.reticule.position.copy(player.position).addScaledVector(forward, reticuleDist);
-            player.reticule.position.y = DECK_Y;
-            player.reticule.rotation.z = state.visualTime * 0.6;
+            player.reticule.position.copy(player.position).addScaledVector(forward, boresightDistance());
+            player.reticule.quaternion.copy(player.orientation);
+            player.reticule.rotateZ(Math.PI / 4 + state.visualTime * 0.6);
             player.reticule.scale.setScalar(clamp(0.9 - state.heat * 0.002, 0.6, 1));
             player.reticule.material.opacity = clamp(0.42 - state.heat * 0.002, 0.2, 0.46);
 
-            thrustLight.position.copy(player.position).addScaledVector(forward, -2);
-            thrustLight.intensity = input.thrusting ? 4.2 : 1.3;
+            thrustLight.position.copy(player.position).addScaledVector(forward, -2).addScaledVector(up, -0.1);
+            thrustLight.intensity = input.thrusting ? (input.boosting ? 5.4 : 4.2) : 1.3;
             updateThrusterTrails(worldDt, input.thrusting);
         }
 
@@ -3689,22 +4120,30 @@
             if (state.heat >= 100) return;
             state.heat = Math.min(112, state.heat + spec.heat);
 
-            const forward = tempCameraForward.copy(getForward(player.rotation));
-            const right = tempCameraRight.copy(getRight(player.rotation));
+            const forward = getForward(player, tempCameraForward);
+            const right = getRight(player, tempCameraRight);
+            const up = getUp(player, tempUp);
             const muzzle = tempImpact.copy(player.position).addScaledVector(forward, 1.7);
-            muzzle.y = DECK_Y;
-            // V-shaped spread in the deck plane only
+            const aim = tempVecB.copy(forward);
+            const tracked = bestGunTarget();
+            if (tracked) {
+                const to = delta3(muzzle, tracked.group.position, tempVecC);
+                const dist = to.length();
+                const tof = dist / Math.max(8, spec.speed);
+                if (tracked.velocity) to.addScaledVector(tracked.velocity, tof);
+                if (to.lengthSq() > 1e-6) {
+                    to.normalize();
+                    if (to.dot(forward) > 0.62) aim.copy(to);
+                }
+            }
             const barrels = Math.min(state.gunsLevel, 7);
-            const halfAngle = 0.13;
+            const halfAngle = 0.09;
             const wing = 0.5;
             for (let i = 0; i < barrels; i++) {
                 const frac = barrels > 1 ? (i - (barrels - 1) / 2) / ((barrels - 1) / 2) : 0;
-                tempVecB.copy(forward).applyAxisAngle(Y_AXIS, frac * halfAngle);
-                tempVecB.y = 0;
-                tempVecB.normalize();
-                tempVec.copy(muzzle).addScaledVector(right, frac * wing);
-                tempVec.y = DECK_Y;
-                spawnShot(tempVec, tempVecB, spec);
+                tempVec.copy(aim).applyAxisAngle(up, frac * halfAngle).normalize();
+                tempVecC.copy(muzzle).addScaledVector(right, frac * wing);
+                spawnShot(tempVecC, tempVec, spec);
             }
             spawnSparks(muzzle, tempColor.set(0xffd79a), 3, 0.2, 0.5, { speed: 6, life: 0.25 });
             sfxFire();
@@ -3712,22 +4151,34 @@
 
         // is any rock/hunter inside the ship's forward cone + range? (drives target-gated auto-fire)
         function hasForwardTarget() {
-            const forward = getForward(player.rotation);
-            const fx = forward.x;
-            const fz = forward.z;
-            const range = 46;
-            const cosCone = 0.9; // ~25deg half-cone
+            return !!bestGunTarget();
+        }
+
+        function bestGunTarget() {
+            const forward = getForward(player, tempForward);
+            const range = 140;
+            const minHeading = 0.38;
+            let best = null;
+            let bestScore = -Infinity;
             for (let k = 0; k < 2; k++) {
                 const list = k === 0 ? asteroids : hunters;
                 for (const t of list) {
-                    if (t.dying) continue;
-                    const d = wrapDelta(player.position, t.group.position);
-                    const dist = Math.hypot(d.x, d.z);
-                    if (dist > range || dist < 0.001) continue;
-                    if ((d.x * fx + d.z * fz) / dist > cosCone) return true;
+                    if (!t || t.dying) continue;
+                    const d = delta3(player.position, t.group.position, tempVecC);
+                    const dist = d.length();
+                    if (dist < 0.4 || dist > range) continue;
+                    const heading = d.dot(forward) / dist;
+                    if (heading < minHeading || !hasLineOfSight(player.position, t.group.position)) continue;
+                    const locked = seeker.locks.indexOf(t) !== -1;
+                    const score = heading * 2.6 + missileTargetPriority(t) * 0.45
+                        + (1 - dist / range) * 1.1 + (locked ? 0.4 : 0);
+                    if (score > bestScore) {
+                        bestScore = score;
+                        best = t;
+                    }
                 }
             }
-            return false;
+            return best;
         }
 
         function buildShotPool() {
@@ -3765,21 +4216,17 @@
             shot.active = true;
             mesh.visible = true;
             mesh.position.copy(position);
-            mesh.position.y = DECK_Y;
             shot.previousPosition.copy(mesh.position);
             const velocity = shot.velocity.copy(dir);
-            velocity.y = 0;
-            if (velocity.lengthSq() < 1e-6) velocity.copy(getForward(player.rotation));
+            if (velocity.lengthSq() < 1e-6) velocity.copy(getForward(player, tempForward));
             velocity.normalize();
-            mesh.quaternion.setFromUnitVectors(Z_AXIS, velocity);
-            // carry only planar ship velocity so shots stay on the deck
+            // Guns travel along the nose. Inertial carry would walk shots off the crosshair.
             velocity.multiplyScalar(spec.speed);
-            velocity.x += player.velocity.x * 0.4;
-            velocity.z += player.velocity.z * 0.4;
-            velocity.y = 0;
+            tempVecC.copy(velocity).normalize();
+            mesh.quaternion.setFromUnitVectors(Z_AXIS, tempVecC);
             shot.damage = spec.damage;
             shot.pierce = spec.pierce;
-            shot.life = 1.15;
+            shot.life = 2.45;
             shots.push(shot);
             return true;
         }
@@ -3836,6 +4283,7 @@
                     speed: 30,
                     turnRate: 4.4,
                     lockRange: 44,
+                    accel: 80,
                     radius: 0.95,
                     trailHead: 0,
                     trailCount: 0,
@@ -3964,8 +4412,8 @@
             for (const list of threatCollections) {
                 for (const target of list) {
                     if (!targetAlive(target)) continue;
-                    const distance = planarDist(position, target.group.position);
-                    if (distance > maxDistance) continue;
+                    const distance = distance3(position, target.group.position);
+                    if (distance > maxDistance || !hasLineOfSight(position, target.group.position)) continue;
                     const hpRatio = target.maxHp > 0 ? clamp(target.hp / target.maxHp, 0, 1) : 1;
                     const load = missileTargetLoad(target, exclude);
                     const score = missileTargetPriority(target) * 0.9
@@ -3985,21 +4433,31 @@
             const spec = missileSpec();
             const maxLocks = Math.min(spec.maxLocks, state.missileAmmo, lockPool.length);
             if (seeker.locks.length >= maxLocks) return false;
-            const forward = getForward(player.rotation);
+            const forward = getForward(player, tempForward);
+            const rightAxis = getRight(player, tempCameraRight);
+            const upAxis = getUp(player, tempUp);
             const range = spec.lockRange * state.tunePull;
-            const cosCone = 0.55;
             let best = null;
             let bestScore = -Infinity;
             for (const list of threatCollections) {
                 for (const t of list) {
                     if (!targetAlive(t) || seeker.locks.indexOf(t) !== -1) continue;
-                    const d = wrapDelta(player.position, t.group.position);
-                    const dist = Math.hypot(d.x, d.z);
-                    if (dist > range || dist < 0.2) continue;
-                    const heading = (d.x * forward.x + d.z * forward.z) / dist;
-                    if (heading < cosCone) continue;
+                    const d = delta3(player.position, t.group.position, tempVecC);
+                    const dist = d.length();
+                    if (dist > range || dist < 0.2 || !hasLineOfSight(player.position, t.group.position)) continue;
+                    const heading = d.dot(forward) / dist;
+                    const ahead = d.dot(forward);
+                    const boresight = ahead > 0.2
+                        ? 1 - clamp(Math.hypot(d.dot(rightAxis), d.dot(upAxis)) / ahead / 1.45, 0, 1)
+                        : 0;
+                    tempVecB.copy(t.group.position).project(camera);
+                    const onScreen = tempVecB.z >= -1 && tempVecB.z <= 1
+                        && Math.abs(tempVecB.x) <= 1.15 && Math.abs(tempVecB.y) <= 1.15;
+                    const screenCenter = onScreen ? 1 - clamp(Math.hypot(tempVecB.x, tempVecB.y) / 1.45, 0, 1) : 0;
                     const threatBias = missileTargetPriority(t) * 0.34;
-                    const score = heading * 2.4 + threatBias - dist / range;
+                    const existingLoad = missileTargetLoad(t, null);
+                    const score = heading * 1.35 + boresight * 1.2 + screenCenter * 0.9 + threatBias
+                        + (1 - dist / range) * 0.8 - existingLoad * 0.5;
                     if (score > bestScore) { bestScore = score; best = t; }
                 }
             }
@@ -4081,8 +4539,8 @@
             for (const list of threatCollections) {
                 for (const t of list) {
                     if (!targetAlive(t)) continue;
-                    const dist = planarDist(player.position, t.group.position);
-                    if (dist > 76) continue;
+                    const dist = distance3(player.position, t.group.position);
+                    if (dist > 140 || !hasLineOfSight(player.position, t.group.position)) continue;
                     const weight = missileTargetPriority(t) * 1.8 - dist * 0.018;
                     scored.push({ t, weight });
                 }
@@ -4094,32 +4552,36 @@
         function spawnMissile(target, spec, index, salvoSize, tempest) {
             const m = acquireMissile();
             if (!m) return null;
-            const forward = tempCameraForward.copy(getForward(player.rotation));
-            const right = tempCameraRight.copy(getRight(player.rotation));
+            const forward = getForward(player, tempCameraForward);
+            const right = getRight(player, tempCameraRight);
+            const up = getUp(player, tempUp);
             const spread = salvoSize > 1
                 ? ((index / (salvoSize - 1)) * 2 - 1) * Math.min(0.32, 0.08 * salvoSize)
                 : 0;
             const yaw = tempest ? (index / Math.max(1, salvoSize)) * Math.PI * 2 : spread;
-            tempVec.copy(forward).applyAxisAngle(Y_AXIS, tempest ? yaw : spread);
-            tempVec.y = 0;
+            if (tempest) {
+                tempVec.copy(forward)
+                    .addScaledVector(right, Math.cos(yaw) * 0.68)
+                    .addScaledVector(up, Math.sin(yaw) * 0.68);
+            } else {
+                tempVec.copy(forward).applyAxisAngle(up, spread);
+            }
             if (tempVec.lengthSq() < 1e-6) tempVec.copy(forward);
             tempVec.normalize();
             const muzzle = tempImpact.copy(player.position).addScaledVector(tempVec, tempest ? 1.4 : 1.85);
             if (!tempest) muzzle.addScaledVector(right, spread * 0.8);
-            muzzle.y = DECK_Y;
 
             m.active = true;
             m.group.visible = true;
             m.trail.visible = true;
             m.group.position.copy(muzzle);
             m.previousPosition.copy(muzzle);
-            m.velocity.copy(tempVec).multiplyScalar(spec.speed * (tempest ? 0.92 : 1));
-            m.velocity.x += player.velocity.x * 0.28;
-            m.velocity.z += player.velocity.z * 0.28;
-            m.velocity.y = 0;
+            m.velocity.copy(tempVec).multiplyScalar(spec.speed * (tempest ? 0.5 : 0.38));
+            m.velocity.addScaledVector(player.velocity, 0.18);
             m.target = target && targetAlive(target) ? target : null;
-            m.life = tempest ? 4.8 : 5.6;
-            m.boost = tempest ? 0.12 : 0.28;
+            m.life = tempest ? 5.4 : 6.4;
+            m.boost = tempest ? 0.1 : 0.18;
+            m.accel = spec.speed * (tempest ? 2.8 : 3.4);
             m.helix = spec.helix * (0.75 + (index % 2) * 0.35);
             m.phase = index * 1.7 + Math.random();
             m.damage = spec.damage * (tempest ? 1.15 : 1);
@@ -4151,16 +4613,16 @@
         }
 
         function findForwardTarget(range) {
-            const forward = getForward(player.rotation);
+            const forward = getForward(player, tempForward);
             let best = null;
             let bestScore = -Infinity;
             for (const list of threatCollections) {
                 for (const t of list) {
                     if (!targetAlive(t)) continue;
-                    const d = wrapDelta(player.position, t.group.position);
-                    const dist = Math.hypot(d.x, d.z);
-                    if (dist > range || dist < 0.2) continue;
-                    const heading = (d.x * forward.x + d.z * forward.z) / dist;
+                    const d = delta3(player.position, t.group.position, tempVecC);
+                    const dist = d.length();
+                    if (dist > range || dist < 0.2 || !hasLineOfSight(player.position, t.group.position)) continue;
+                    const heading = d.dot(forward) / dist;
                     if (heading < 0.35) continue;
                     const score = heading * 2 + missileTargetPriority(t) * 0.32
                         - dist / range - missileTargetLoad(t, null) * 0.55;
@@ -4173,14 +4635,16 @@
         function missileInterceptDirection(missile, out) {
             const target = missile.target;
             const rx = target.group.position.x - missile.group.position.x;
+            const ry = target.group.position.y - missile.group.position.y;
             const rz = target.group.position.z - missile.group.position.z;
             const velocity = target.velocity;
             const vx = velocity ? velocity.x : 0;
+            const vy = velocity ? velocity.y : 0;
             const vz = velocity ? velocity.z : 0;
             const speed = Math.max(1, missile.speed);
-            const a = vx * vx + vz * vz - speed * speed;
-            const b = 2 * (rx * vx + rz * vz);
-            const c = rx * rx + rz * rz;
+            const a = vx * vx + vy * vy + vz * vz - speed * speed;
+            const b = 2 * (rx * vx + ry * vy + rz * vz);
+            const c = rx * rx + ry * ry + rz * rz;
             let interceptTime = -1;
 
             if (Math.abs(a) < 0.0001) {
@@ -4199,8 +4663,8 @@
             if (interceptTime <= 0 || !Number.isFinite(interceptTime)) {
                 interceptTime = Math.sqrt(c) / speed * 0.55;
             }
-            interceptTime = clamp(interceptTime, 0, 1.15);
-            out.set(rx + vx * interceptTime, 0, rz + vz * interceptTime);
+            interceptTime = clamp(interceptTime, 0, 2.1);
+            out.set(rx + vx * interceptTime, ry + vy * interceptTime, rz + vz * interceptTime);
             return out;
         }
 
@@ -4235,10 +4699,10 @@
                 mark.target = t;
                 mark.mesh.visible = true;
                 mark.mesh.position.copy(t.group.position);
-                mark.mesh.position.y = DECK_Y + 0.15;
                 const s = (t.radius || 1.4) * 1.35 + Math.sin(state.visualTime * 10 + i) * 0.08;
                 mark.mesh.scale.setScalar(s);
-                mark.mesh.rotation.z = state.visualTime * 2.4 + i;
+                mark.mesh.quaternion.copy(camera.quaternion);
+                mark.mesh.rotateZ(state.visualTime * 2.4 + i);
                 mark.mesh.material.opacity = 0.55 + Math.sin(state.visualTime * 14 + i) * 0.25;
             }
 
@@ -4261,36 +4725,43 @@
                 m.life -= dt;
                 m.boost = Math.max(0, m.boost - dt);
                 if (!targetAlive(m.target)) {
-                    m.target = findBestMissileTarget(m.group.position, Math.max(72, m.lockRange * 1.45), m);
+                    m.target = findBestMissileTarget(m.group.position, Math.max(120, m.lockRange * 1.45), m);
                 }
                 if (m.boost <= 0 && m.target) {
                     const desired = missileInterceptDirection(m, tempVecB);
                     if (desired.lengthSq() > 1e-6) {
-                        desired.normalize().multiplyScalar(m.speed);
+                        desired.normalize();
                         const turn = 1 - Math.exp(-dt * m.turnRate);
-                        m.velocity.lerp(desired, turn);
+                        tempVec.copy(m.velocity);
+                        if (tempVec.lengthSq() > 1e-6) tempVec.normalize();
+                        else tempVec.copy(desired);
+                        tempVec.lerp(desired, turn).normalize();
+                        const spd = m.velocity.length();
+                        m.velocity.copy(tempVec).multiplyScalar(Math.max(spd, 1));
                     }
                 }
-                m.velocity.y = 0;
                 if (m.velocity.lengthSq() > 0.0001) {
+                    tempVec.copy(m.velocity).normalize();
+                    m.velocity.addScaledVector(tempVec, (m.accel || m.speed * 2.8) * dt);
+                    const maxSpd = m.speed * (m.boost > 0 ? 0.72 : 1);
                     const spd = m.velocity.length();
-                    if (spd > m.speed * 1.15) m.velocity.multiplyScalar(m.speed / spd);
+                    if (spd > maxSpd) m.velocity.multiplyScalar(maxSpd / spd);
                 }
-                // corkscrew offset after boost — a readable helix, not a wobble
+                // Corkscrew in an orthonormal plane around the actual 3D flight vector.
                 m.previousPosition.copy(m.group.position);
                 m.phase += dt * 14;
                 tempVec.copy(m.velocity);
                 if (tempVec.lengthSq() > 0.01) {
                     tempVec.normalize();
                     m.group.quaternion.setFromUnitVectors(Z_AXIS, tempVec);
-                    const side = tempVecC.set(-tempVec.z, 0, tempVec.x);
-                    const helix = Math.sin(m.phase) * m.helix * (m.boost > 0 ? 0.2 : 1);
+                    makePerpendicularBasis(tempVec, tempRight, tempUp);
+                    const helixScale = m.helix * (m.boost > 0 ? 0.2 : 1) * dt * 7;
                     m.group.position.addScaledVector(m.velocity, dt);
-                    m.group.position.addScaledVector(side, helix * dt * 8);
+                    m.group.position.addScaledVector(tempRight, Math.sin(m.phase) * helixScale);
+                    m.group.position.addScaledVector(tempUp, Math.cos(m.phase) * helixScale);
                 } else {
                     m.group.position.addScaledVector(m.velocity, dt);
                 }
-                m.group.position.y = DECK_Y;
                 m.glow.scale.setScalar(0.85 + Math.sin(state.visualTime * 28 + m.phase) * 0.18);
 
                 m.trailHistory[m.trailHead * 3] = m.group.position.x;
@@ -4317,7 +4788,9 @@
                 }
 
                 const hit = findProjectileHit(m.group.position, m.radius, null, m.previousPosition);
-                if (hit || m.life <= 0) {
+                const boundaryExpired = !isInsideWorldPoint(m.group.position);
+                if (boundaryExpired) constrainToWorld(m.group.position, null, false);
+                if (hit || boundaryExpired || m.life <= 0) {
                     if (hit) m.group.position.copy(hit.point);
                     detonateMissile(m, hit);
                     m.active = false;
@@ -4333,12 +4806,12 @@
             const pos = tempImpact.copy(m.group.position);
             spawnSparks(pos, tempColor.set(0xffa04d), 16, 0.45, 1.0, { speed: 12, life: 0.45 });
             spawnSparks(pos, tempColor.set(0xffffff), 6, 0.2, 0.7, { speed: 7, life: 0.28 });
-            spawnRing(pos, tempColor.set(0xf2a34f), m.blastRadius * 0.55, 0.7);
-            spawnRing(pos, tempColor.set(0x74e2dc), m.blastRadius * 0.85, 0.4);
+            spawnRing(pos, tempColor.set(0xf2a34f), m.blastRadius * 0.55, 0.7, m.velocity);
+            spawnRing(pos, tempColor.set(0x74e2dc), m.blastRadius * 0.85, 0.4, m.velocity);
             state.shake = Math.max(state.shake, 0.72);
             state.camPunch = Math.max(state.camPunch, 0.32);
             sfxBoom();
-            if (hit) {
+            if (hit && hit.index >= 0) {
                 if (hit.list === hunters) hitHunter(hit.index, pos, m.damage, true);
                 else hitAsteroid(hit.index, pos, m.damage, true, true, m.blastRadius);
             }
@@ -4350,10 +4823,10 @@
                 const a = asteroids[i];
                 if (!a || a.dying) continue;
                 if (primary && primary.target === a) continue;
-                const d = planarDist(a.group.position, pos);
+                const d = distance3(a.group.position, pos);
                 if (d < a.radius + radius) {
                     const falloff = 1 - clamp((d - a.radius) / radius, 0, 1);
-                    a.velocity.add(randomPlanarVector(3.2 + falloff * 3.5));
+                    a.velocity.add(randomVector3(3.2 + falloff * 3.5, tempVecB));
                     hitAsteroid(i, tempVecC.copy(a.group.position), damage * (0.45 + falloff * 0.7), true, true, 0);
                 }
             }
@@ -4361,7 +4834,7 @@
                 const h = hunters[i];
                 if (!h || h.dying) continue;
                 if (primary && primary.target === h) continue;
-                const d = planarDist(h.group.position, pos);
+                const d = distance3(h.group.position, pos);
                 if (d < h.radius + radius * 0.7) {
                     hitHunter(i, tempVecC.copy(h.group.position), damage * 0.7, true);
                 }
@@ -4371,39 +4844,46 @@
         // ---- Rock-on-rock bounce (ambient mass, not the signature verb) ----
         function updateRockCollisions(dt) {
             const n = asteroids.length;
-            for (const bucket of activeRockBuckets) bucket.length = 0;
+            for (const bucket of activeRockBuckets) {
+                bucket.length = 0;
+                freeRockBuckets.push(bucket);
+            }
             activeRockBuckets.length = 0;
-            if (n < 2) return;
+            rockGrid.clear();
 
             for (let i = 0; i < n; i++) {
                 const a = asteroids[i];
                 if (!a || a.dying) continue;
                 if (a.collideCd > 0) a.collideCd -= dt;
                 a.collisionIndex = i;
-                a.collisionCellX = Math.floor(a.group.position.x / ROCK_CELL_SIZE);
-                a.collisionCellZ = Math.floor(a.group.position.z / ROCK_CELL_SIZE);
-                const key = (a.collisionCellX + 64) * 256 + a.collisionCellZ + 64;
+                a.collisionCellX = spatialCell(a.group.position.x);
+                a.collisionCellY = spatialCell(a.group.position.y);
+                a.collisionCellZ = spatialCell(a.group.position.z);
+                const key = spatialKey(a.collisionCellX, a.collisionCellY, a.collisionCellZ);
                 let bucket = rockGrid.get(key);
                 if (!bucket) {
-                    bucket = [];
+                    bucket = freeRockBuckets.pop() || [];
                     rockGrid.set(key, bucket);
                 }
                 if (bucket.length === 0) activeRockBuckets.push(bucket);
                 bucket.push(a);
             }
+            if (n < 2) return;
 
             for (let i = 0; i < n; i++) {
                 const a = asteroids[i];
                 if (!a || a.dying) continue;
                 for (let ox = -1; ox <= 1; ox++) {
-                    for (let oz = -1; oz <= 1; oz++) {
-                        const key = (a.collisionCellX + ox + 64) * 256 + a.collisionCellZ + oz + 64;
-                        const bucket = rockGrid.get(key);
-                        if (!bucket) continue;
-                        for (let j = 0; j < bucket.length; j++) {
-                            const b = bucket[j];
-                            if (!b || b.dying || b.collisionIndex <= i) continue;
-                            resolveRockPair(a, b);
+                    for (let oy = -1; oy <= 1; oy++) {
+                        for (let oz = -1; oz <= 1; oz++) {
+                            const key = spatialKey(a.collisionCellX + ox, a.collisionCellY + oy, a.collisionCellZ + oz);
+                            const bucket = rockGrid.get(key);
+                            if (!bucket) continue;
+                            for (let j = 0; j < bucket.length; j++) {
+                                const b = bucket[j];
+                                if (!b || b.dying || b.collisionIndex <= i) continue;
+                                resolveRockPair(a, b);
+                            }
                         }
                     }
                 }
@@ -4412,29 +4892,37 @@
 
         function resolveRockPair(a, b) {
             const dx = b.group.position.x - a.group.position.x;
+            const dy = b.group.position.y - a.group.position.y;
             const dz = b.group.position.z - a.group.position.z;
-            const dist = Math.hypot(dx, dz);
+            const dist = Math.hypot(dx, dy, dz);
             const minDist = a.radius + b.radius;
             if (dist >= minDist || dist < 1e-4) return;
 
             const nx = dx / dist;
+            const ny = dy / dist;
             const nz = dz / dist;
             const overlap = (minDist - dist) * 0.5;
             a.group.position.x -= nx * overlap;
+            a.group.position.y -= ny * overlap;
             a.group.position.z -= nz * overlap;
             b.group.position.x += nx * overlap;
+            b.group.position.y += ny * overlap;
             b.group.position.z += nz * overlap;
-            wrapAsteroidPosition(a);
-            wrapAsteroidPosition(b);
+            constrainToWorld(a.group.position, a.velocity, false);
+            constrainToWorld(b.group.position, b.velocity, false);
 
-            const vn = (b.velocity.x - a.velocity.x) * nx + (b.velocity.z - a.velocity.z) * nz;
+            const vn = (b.velocity.x - a.velocity.x) * nx
+                + (b.velocity.y - a.velocity.y) * ny
+                + (b.velocity.z - a.velocity.z) * nz;
             if (vn >= 0) return;
 
             const impact = -vn;
             const bounce = 0.55;
             a.velocity.x += nx * vn * bounce;
+            a.velocity.y += ny * vn * bounce;
             a.velocity.z += nz * vn * bounce;
             b.velocity.x -= nx * vn * bounce;
+            b.velocity.y -= ny * vn * bounce;
             b.velocity.z -= nz * vn * bounce;
 
             if (impact > 11 && a.collideCd <= 0 && b.collideCd <= 0) {
@@ -4446,17 +4934,11 @@
         }
 
         function updateShots(dt) {
-            for (let i = shots.length - 1; i >= 0; i--) {
+            for (let i = 0; i < shots.length; i++) {
                 const s = shots[i];
                 s.life -= dt;
-                s.velocity.y = 0;
                 s.previousPosition.copy(s.group.position);
                 s.group.position.addScaledVector(s.velocity, dt);
-                s.group.position.y = DECK_Y;
-                if (s.life <= 0) {
-                    deactivateShot(s);
-                    shots.splice(i, 1);
-                }
             }
         }
 
@@ -4511,10 +4993,10 @@
         function updateAsteroids(dt) {
             for (const a of asteroids) {
                 a.wrapFxCd = Math.max(0, a.wrapFxCd - dt);
-                a.velocity.y = 0;
+                applyBoundaryForces(a.group.position, a.velocity, dt);
                 a.group.position.addScaledVector(a.velocity, dt);
-                wrapAsteroidPosition(a);
-                a.group.position.y = DECK_Y;
+                const boundaryHit = constrainToWorld(a.group.position, a.velocity, a.wrapFxCd <= 0, a.radius);
+                if (boundaryHit) a.wrapFxCd = 0.18;
                 a.mesh.rotation.x += a.spin.x * dt;
                 a.mesh.rotation.y += a.spin.y * dt;
                 a.mesh.rotation.z += a.spin.z * dt;
@@ -4523,7 +5005,7 @@
                     a.spawnTimer -= dt;
                     if (a.spawnTimer <= 0 && asteroids.length < 40) {
                         a.spawnTimer = 3.2;
-                        createAsteroid('small', a.group.position.clone().add(randomPlanarVector(a.radius + 1)), a.velocity, 1.2, 'slag');
+                        createAsteroid('small', a.group.position.clone().add(randomVector3(a.radius + 1)), a.velocity, 1.2, 'slag');
                     }
                     if (a.core) {
                         const exposed = 1 - a.hp / a.maxHp;
@@ -4550,14 +5032,31 @@
 
         function updateHunters(dt) {
             for (const h of hunters) {
-                const toPlayer = wrapDelta(h.group.position, player.position);
+                const toPlayer = delta3(h.group.position, player.position, tempVecC);
                 const dist = toPlayer.length();
-                const desired = toPlayer.normalize().multiplyScalar(h.speed);
-                h.velocity.lerp(desired, 1 - Math.exp(-dt * 1.6));
-                h.velocity.y = 0;
+                h.phase += dt * (0.7 + h.speed * 0.025);
+                if (dist > 1e-4) toPlayer.multiplyScalar(1 / dist);
+                else toPlayer.copy(getForward(player, tempForward)).multiplyScalar(-1);
+                if (h.orbitAxis.lengthSq() < 0.5) randomUnitVector(h.orbitAxis);
+                h.orbitAxis.applyAxisAngle(toPlayer, dt * h.precess);
+                h.orbitAxis.addScaledVector(toPlayer, -h.orbitAxis.dot(toPlayer));
+                if (h.orbitAxis.lengthSq() < 1e-5) randomUnitVector(h.orbitAxis);
+                else h.orbitAxis.normalize();
+                hunterOrbitFrame(h.orbitAxis, toPlayer, tempRight, tempUp);
+                const rangeDrive = clamp((dist - h.preferredRange) / Math.max(6, h.preferredRange), -0.7, 1);
+                tempVecB.copy(toPlayer).multiplyScalar(h.speed * rangeDrive)
+                    .addScaledVector(tempRight, h.speed * h.orbitLat * h.orbitSign)
+                    .addScaledVector(tempUp, Math.sin(h.phase) * h.speed * h.orbitLift);
+                h.velocity.lerp(tempVecB, 1 - Math.exp(-dt * 1.45));
+                applyBoundaryForces(h.group.position, h.velocity, dt);
                 h.group.position.addScaledVector(h.velocity, dt);
-                wrapPosition(h.group.position, h.velocity);
-                h.group.position.y = DECK_Y;
+                h.boundaryFxCd = Math.max(0, h.boundaryFxCd - dt);
+                const boundaryHit = constrainToWorld(h.group.position, h.velocity, h.boundaryFxCd <= 0, h.radius);
+                if (boundaryHit) h.boundaryFxCd = 0.22;
+                if (h.velocity.lengthSq() > 0.01) {
+                    tempVecB.copy(h.velocity).normalize();
+                    h.group.quaternion.setFromUnitVectors(Z_AXIS, tempVecB);
+                }
                 h.mesh.rotation.y += dt * 2;
                 h.mesh.rotation.x += dt * 1.4;
                 h.lockPulse = dist < 26 ? Math.min(1, h.lockPulse + dt * 2) : Math.max(0, h.lockPulse - dt * 2);
@@ -4591,7 +5090,7 @@
             if (!h) return;
             spawnShardBurst(pos, tempColor.set(0xff6848), 1.4, false);
             spawnSparks(pos, tempColor.set(0xffa06a), 16, 0.5, 0.9, { speed: 9, life: 0.5 });
-            spawnRing(pos, tempColor.set(0xff704c), 2.4, 0.5);
+            spawnRing(pos, tempColor.set(0xff704c), 2.4, 0.5, h.velocity);
             registerKill(h.score, pos, viaSpecial);
             bankCharge(10);
             // hunters live in fieldGroup, not the scene root
@@ -4610,7 +5109,7 @@
                     if (s.hitCount < s.hitTargets.length) s.hitTargets[s.hitCount++] = hit.target;
                     if (hit.list === hunters) {
                         hitHunter(hit.index, s.group.position, s.damage);
-                    } else {
+                    } else if (hit.index >= 0) {
                         hitAsteroid(hit.index, s.group.position, s.damage, false, false);
                     }
                     if (s.pierce > 0) {
@@ -4618,15 +5117,21 @@
                     } else {
                         deactivateShot(s);
                         shots.splice(i, 1);
+                        continue;
                     }
+                }
+                if (s.life <= 0 || !isInsideWorldPoint(s.group.position)) {
+                    deactivateShot(s);
+                    shots.splice(i, 1);
                 }
             }
 
             if (state.invulnerable <= 0 && !state.forceInvuln && seeker.mode !== 'tempest') {
+                const start = player.previousPosition || player.position;
                 for (let i = asteroids.length - 1; i >= 0; i--) {
                     const a = asteroids[i];
                     if (a.dying) continue;
-                    if (planarDist(a.group.position, player.position) < a.radius + player.radius) {
+                    if (projectileSegmentHitTime(start, player.position, a.group.position, a.radius + player.radius) >= 0) {
                         handlePlayerImpact(a.radius);
                         return;
                     }
@@ -4634,7 +5139,7 @@
                 for (let i = hunters.length - 1; i >= 0; i--) {
                     const h = hunters[i];
                     if (h.dying) continue;
-                    if (planarDist(h.group.position, player.position) < h.radius + player.radius) {
+                    if (projectileSegmentHitTime(start, player.position, h.group.position, h.radius + player.radius) >= 0) {
                         const pos = h.group.position.clone();
                         killHunter(i, pos, false);
                         handlePlayerImpact(h.radius);
@@ -4646,38 +5151,43 @@
 
         function projectileSegmentHitTime(start, end, center, radius) {
             const dx = end.x - start.x;
+            const dy = end.y - start.y;
             const dz = end.z - start.z;
-            const lengthSq = dx * dx + dz * dz;
+            const lengthSq = dx * dx + dy * dy + dz * dz;
             if (lengthSq < 1e-8) {
                 const px = center.x - end.x;
+                const py = center.y - end.y;
                 const pz = center.z - end.z;
-                return px * px + pz * pz <= radius * radius ? 0 : -1;
+                return px * px + py * py + pz * pz <= radius * radius ? 0 : -1;
             }
             const cx = center.x - start.x;
+            const cy = center.y - start.y;
             const cz = center.z - start.z;
-            const time = clamp((cx * dx + cz * dz) / lengthSq, 0, 1);
+            const time = clamp((cx * dx + cy * dy + cz * dz) / lengthSq, 0, 1);
             const closestX = start.x + dx * time;
+            const closestY = start.y + dy * time;
             const closestZ = start.z + dz * time;
             const missX = center.x - closestX;
+            const missY = center.y - closestY;
             const missZ = center.z - closestZ;
-            return missX * missX + missZ * missZ <= radius * radius ? time : -1;
+            return missX * missX + missY * missY + missZ * missZ <= radius * radius ? time : -1;
         }
 
         function findProjectileHit(position, radius, shot = null, previousPosition = null) {
-            // Swept XZ collision keeps fast shots reliable without pulling combat off the deck.
+            // Swept XYZ collision keeps fast shots reliable without altitude false positives.
             projectileHit.list = null;
             projectileHit.index = -1;
             projectileHit.target = null;
             projectileHit.time = Infinity;
             const start = previousPosition || position;
-            for (let i = asteroids.length - 1; i >= 0; i--) {
-                const a = asteroids[i];
-                if (a.dying) continue;
+            const nearby = collectRocksNearSegment(start, position, radius, rockQueryScratch);
+            for (let i = 0; i < nearby.length; i++) {
+                const a = nearby[i];
                 if (shot && shotHasHit(shot, a)) continue;
                 const hitTime = projectileSegmentHitTime(start, position, a.group.position, a.radius + radius);
                 if (hitTime >= 0 && hitTime < projectileHit.time) {
                     projectileHit.list = asteroids;
-                    projectileHit.index = i;
+                    projectileHit.index = asteroids.indexOf(a);
                     projectileHit.target = a;
                     projectileHit.time = hitTime;
                 }
@@ -4694,9 +5204,8 @@
                     projectileHit.time = hitTime;
                 }
             }
-            if (!projectileHit.target) return null;
+            if (!projectileHit.target || projectileHit.index < 0) return null;
             projectileHit.point.copy(start).lerp(position, projectileHit.time);
-            projectileHit.point.y = DECK_Y;
             return projectileHit;
         }
 
@@ -4757,8 +5266,8 @@
             spawnSparks(impactPos || position, color, explosive ? 14 : 8, a.radius * 0.34, explosive ? 1.0 : 0.66, { speed: 11, life: 0.55 });
             spawnSparks(position, tempColor.set(0xffffff), 5, a.radius * 0.2, 0.7, { speed: 7, life: 0.35 });
             spawnShardBurst(position, color, a.radius, explosive);
-            spawnRing(position, color, a.radius * 1.1, explosive ? 0.72 : 0.44);
-            spawnRing(position, tempColor.set(0xdff8ff), a.radius * 1.55, explosive ? 0.42 : 0.24);
+            spawnRing(position, color, a.radius * 1.1, explosive ? 0.72 : 0.44, velocity);
+            spawnRing(position, tempColor.set(0xdff8ff), a.radius * 1.55, explosive ? 0.42 : 0.24, velocity);
 
             state.shake = Math.max(state.shake, explosive ? 0.8 : viaSpecial ? 0.4 : 0.32);
             state.camPunch = Math.max(state.camPunch, viaSpecial ? 0.18 : 0.28);
@@ -4772,27 +5281,29 @@
                 state.camPunch = Math.max(state.camPunch, 1.0);
                 spawnSparks(position, tempColor.set(0xffffff), 22, a.radius * 0.5, 1.2, { speed: 16, life: 0.7 });
                 for (let i = 0; i < 3; i++) {
-                    createAsteroid('medium', position.clone().add(randomPlanarVector(2)), velocity, 1.1, 'glass');
+                    createAsteroid('medium', position.clone().add(randomVector3(2)), velocity, 1.1, 'glass');
                 }
                 spawnPopup(position.clone(), 'FORGE CORE +' + a.score, true);
                 bankCharge(28);
             } else if (a.size === 'large') {
                 const childType = a.type === 'iron' ? 'glass' : a.type;
                 for (let i = 0; i < 2; i++) {
-                    createAsteroid('medium', position.clone().add(randomPlanarVector(1.2)), velocity, childKick, childType);
+                    createAsteroid('medium', position.clone().add(randomVector3(1.2)), velocity, childKick, childType);
                 }
             } else if (a.size === 'medium') {
                 const childType = a.type === 'iron' ? 'glass' : a.type;
                 for (let i = 0; i < 3; i++) {
-                    createAsteroid('small', position.clone().add(randomPlanarVector(0.9)), velocity, childKick * 1.05, childType);
+                    createAsteroid('small', position.clone().add(randomVector3(0.9)), velocity, childKick * 1.05, childType);
                 }
             }
 
             if (explosive && blastRadius) {
                 for (const other of asteroids) {
                     if (other === a || other.dying) continue;
-                    if (wrapDelta(position, other.group.position).length() < a.radius + other.radius + blastRadius) {
-                        other.velocity.add(randomPlanarVector(4.5));
+                    const blastDelta = delta3(position, other.group.position, tempVecB);
+                    if (blastDelta.length() < a.radius + other.radius + blastRadius) {
+                        if (blastDelta.lengthSq() < 1e-5) randomUnitVector(blastDelta);
+                        other.velocity.addScaledVector(blastDelta.normalize(), 4.5);
                     }
                 }
             }
@@ -4841,8 +5352,31 @@
             }
         }
 
-        function handlePlayerImpact(radius) {
-            if (state.shield > 0) {
+        function hitWorldBody() {
+            const planetHit = PLANET_R + player.radius + 1.15;
+            if (player.position.length() <= planetHit) return 'planet';
+            for (let i = 0; i < moons.length; i++) {
+                const moon = moons[i];
+                const hitR = (moon.collideRadius || moon.mesh.scale.x) + player.radius + 0.4;
+                if (player.position.distanceToSquared(moon.mesh.position) <= hitR * hitR) return 'moon';
+            }
+            return null;
+        }
+
+        function crashAndBurn(kind) {
+            spawnSparks(player.position, tempColor.set(0xff7038), 64, 3.2, 1.35, { speed: 18, life: 0.85 });
+            spawnSparks(player.position, tempColor.set(0xffe0a8), 28, 1.6, 1.1, { speed: 11, life: 0.55 });
+            spawnShardBurst(player.position, tempColor.set(0xff6848), 4.2, true);
+            spawnRing(player.position, tempColor.set(0xff5138), 7.5, 0.85, player.position);
+            spawnRing(player.position, tempColor.set(0xf2a34f), 11, 0.55, player.position);
+            sfxBoom();
+            sfxBoom();
+            handlePlayerImpact(14, true, kind);
+        }
+
+        function handlePlayerImpact(radius, lethal = false, kind = 'combat') {
+            if (lethal) state.shield = 0;
+            if (!lethal && state.shield > 0) {
                 const spec = shieldSpec();
                 state.shield = Math.max(0, state.shield - Math.ceil(radius * 9 * spec.absorb));
                 state.shieldRegenDelay = Math.max(state.shieldRegenDelay, 1.8);
@@ -4870,13 +5404,22 @@
             if (state.lives <= 0) {
                 state.gameOver = true;
                 persistBestScore();
-                setPaused(true, 'Run Complete', 'Score ' + state.score.toLocaleString() + ' · Best chain x' + state.bestCombo + '. New Run to dive again.');
+                const cause = kind === 'planet' ? 'Burned in the giant.' : kind === 'moon' ? 'Shattered on a moon.' : 'Run Complete.';
+                setPaused(true, 'Run Complete', cause + ' Score ' + state.score.toLocaleString() + ' · Best chain x' + state.bestCombo + '. New Run to dive again.');
                 return;
             }
 
-            setOnRing(player.position, ringTheta(player.position), RING_R0, DECK_Y);
+            tempVecC.copy(player.position);
+            if (tempVecC.lengthSq() < 1e-5) tempVecC.set(1, 0, 0);
+            tempVecC.normalize();
+            const recoverRadius = lethal
+                ? (WORLD_R_MIN + COMBAT_R_MAX) * 0.5
+                : clamp(player.position.length(), WORLD_R_MIN + 18, COMBAT_R_MAX - 18);
+            player.position.copy(tempVecC).multiplyScalar(recoverRadius);
             player.velocity.set(0, 0, 0);
-            player.rotation = ringTheta(player.position) + Math.PI * 0.5;
+            player.previousPosition.copy(player.position);
+            player.group.position.copy(player.position);
+            player.group.quaternion.copy(player.orientation);
             snapCameraToShot(true);
             state.shield = Math.max(state.shield, Math.round(state.shieldMax * 0.34));
         }
@@ -4907,7 +5450,6 @@
             halo.scale.setScalar(1.1);
             group.add(core, halo);
             group.position.copy(position);
-            group.position.y = DECK_Y;
             scene.add(group);
             pickups.push({ kind: 'pickup', type, group, core, halo, life: 12, radius: 1.1, spin: randomRange(1, 2.5) });
         }
@@ -4919,12 +5461,12 @@
                 p.life -= dt;
                 p.group.rotation.y += p.spin * dt;
                 p.halo.scale.setScalar(1.1 + Math.sin(state.visualTime * 4 + i) * 0.12);
-                const delta = wrapDelta(p.group.position, player.position);
+                const delta = delta3(p.group.position, player.position, tempVecC);
                 const dist = delta.length();
                 if (dist < gravityRadius) {
                     const pull = (1 - dist / gravityRadius);
                     p.group.position.addScaledVector(delta.normalize(), pull * pull * 26 * dt);
-                    wrapPosition(p.group.position);
+                    constrainToWorld(p.group.position, null, false);
                 }
                 if (dist < player.radius + p.radius + 0.6) {
                     applyPickup(p.type, p.group.position.clone());
@@ -4991,12 +5533,20 @@
                 const s = pool[sparks.head];
                 sparks.head = (sparks.head + 1) % SPARK_CAP;
                 s.active = true;
+                const oy = randomRange(-1, 1);
                 const oa = Math.random() * Math.PI * 2;
+                const oxz = Math.sqrt(Math.max(0, 1 - oy * oy));
                 const orr = Math.random() * spread;
-                s.pos.set(position.x + Math.cos(oa) * orr, position.y, position.z + Math.sin(oa) * orr);
+                s.pos.set(
+                    position.x + Math.cos(oa) * oxz * orr,
+                    position.y + oy * orr,
+                    position.z + Math.sin(oa) * oxz * orr
+                );
                 const sp = randomRange(0.4, 1) * speed * power;
                 const va = Math.random() * Math.PI * 2;
-                s.vel.set(Math.cos(va) * sp, randomRange(-0.4, 1.2) * power, Math.sin(va) * sp);
+                const vy = randomRange(-1, 1);
+                const vxz = Math.sqrt(Math.max(0, 1 - vy * vy));
+                s.vel.set(Math.cos(va) * vxz * sp, vy * sp, Math.sin(va) * vxz * sp);
                 s.color.copy(color).lerp(WHITE, Math.random() * 0.3);
                 s.life = randomRange(life * 0.7, life);
                 s.maxLife = life;
@@ -5066,8 +5616,7 @@
             for (let i = 0; i < count; i++) {
                 const s = shards[shardHead];
                 shardHead = (shardHead + 1) % SHARD_CAP;
-                const a = Math.random() * Math.PI * 2;
-                tempVecC.set(Math.cos(a), randomRange(-0.2, 0.7), Math.sin(a)).normalize();
+                randomUnitVector(tempVecC);
                 const off = randomRange(0.2, radius * 0.5);
                 s.mesh.position.set(position.x + tempVecC.x * off, position.y + tempVecC.y * off, position.z + tempVecC.z * off);
                 s.mesh.rotation.set(Math.random() * 6.28, Math.random() * 6.28, Math.random() * 6.28);
@@ -5110,7 +5659,6 @@
             for (let i = 0; i < RING_CAP; i++) {
                 const material = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
                 const mesh = new THREE.Mesh(geometries.ring, material);
-                mesh.rotation.x = Math.PI / 2;
                 mesh.visible = false;
                 effectRoot.add(mesh);
                 rings.push({ mesh, material, life: 0, maxLife: 0.72, start: 0.1, expansion: 1, opacity: 1, active: false });
@@ -5122,10 +5670,14 @@
             for (let i = 0; i < rings.length; i++) { rings[i].active = false; rings[i].mesh.visible = false; }
         }
 
-        function spawnRing(position, color, expansion, opacity) {
+        function spawnRing(position, color, expansion, opacity, normal = null) {
             const r = rings[ringHead];
             ringHead = (ringHead + 1) % RING_CAP;
-            r.mesh.position.set(position.x, Math.max(0.18, position.y), position.z);
+            r.mesh.position.copy(position);
+            if (normal && normal.lengthSq() > 1e-6) tempVecB.copy(normal).normalize();
+            else if (position.lengthSq() > 1e-6) tempVecB.copy(position).normalize();
+            else tempVecB.set(0, 0, 1);
+            r.mesh.quaternion.setFromUnitVectors(Z_AXIS, tempVecB);
             r.mesh.scale.setScalar(0.1);
             r.mesh.visible = true;
             r.material.color.copy(color);
@@ -5220,8 +5772,12 @@
                 disposeEntity(item);
             }
             if (collection === asteroids) {
-                for (const bucket of activeRockBuckets) bucket.length = 0;
+                for (const bucket of activeRockBuckets) {
+                    bucket.length = 0;
+                    freeRockBuckets.push(bucket);
+                }
                 activeRockBuckets.length = 0;
+                rockGrid.clear();
                 if (asteroidTrajectoryMesh) {
                     asteroidTrajectoryMesh.count = 0;
                     asteroidTrajectoryMesh.visible = false;
@@ -5232,10 +5788,9 @@
         function updateBackdropTime(time) {
             if (beltBackdrop && player) {
                 beltBackdrop.material.uniforms.heat.value = state.cascadeLevel * state.tuneCascade * 0.5;
-                // local deck glow under the skiff
-                beltBackdrop.mesh.position.x = player.position.x;
-                beltBackdrop.mesh.position.z = player.position.z;
-                beltBackdrop.mesh.position.y = player.position.y - 1.1;
+                // Ship-relative drive wash; it never implies a hidden horizontal play surface.
+                beltBackdrop.mesh.position.copy(player.position).addScaledVector(getForward(player, tempForward), -2.7);
+                beltBackdrop.mesh.quaternion.copy(player.orientation);
             }
             if (nebulaDome) nebulaDome.material.uniforms.time.value = time;
             if (skyGroup) skyGroup.rotation.y = time * 0.0018;
@@ -5261,85 +5816,81 @@
             else broadcastCam(dt, instant);
         }
 
-        function applyShake(vec, amount) {
+        function applyLocalShake(position, right, up, forward, amount) {
             if (state.shake <= 0) return;
             const s = state.shake * state.tuneShake * amount;
-            vec.x += randomRange(-1, 1) * s;
-            vec.y += randomRange(-0.4, 0.4) * s;
-            vec.z += randomRange(-1, 1) * s;
+            position.addScaledVector(right, randomRange(-1, 1) * s);
+            position.addScaledVector(up, randomRange(-0.45, 0.45) * s);
+            position.addScaledVector(forward, randomRange(-0.35, 0.35) * s);
+        }
+
+        function protectCameraPosition(position) {
+            const radius = position.length();
+            const safeRadius = PLANET_R + 5;
+            if (radius < safeRadius) {
+                if (radius < 1e-5) position.set(safeRadius, 0, 0);
+                else position.multiplyScalar(safeRadius / radius);
+            }
+        }
+
+        function applyCameraPose(desiredPos, desiredQuat, dt, instant, lag, snapOrient = false) {
+            protectCameraPosition(desiredPos);
+            const t = instant ? 1 : 1 - Math.exp(-dt * lag);
+            camera.position.lerp(desiredPos, t);
+            if (instant || snapOrient) camera.quaternion.copy(desiredQuat);
+            else camera.quaternion.slerp(desiredQuat, t);
+            camera.up.set(0, 1, 0).applyQuaternion(camera.quaternion).normalize();
         }
 
         function chaseCam(dt, instant) {
             const shot = shotModes.chase;
-            const forward = tempCameraForward.copy(getForward(player.rotation));
-            const right = tempCameraRight.copy(getRight(player.rotation));
+            const forward = getForward(player, tempCameraForward);
+            const right = getRight(player, tempCameraRight);
+            const upAxis = getUp(player, tempUp);
             const speed = player.velocity.length();
             const coilBlend = seeker.mode === 'tempest' ? 1 : seeker.mode === 'painting' ? 0.28 : 0;
-
             const back = shot.back + speed * 0.07 - state.camPunch * 1.4 - coilBlend * 1.2;
             const up = shot.up - state.camPunch * 0.3 - coilBlend * 0.5;
             const lag = shot.lag + coilBlend * 3;
-
-            // Mild outward bias so the planet peeks into frame without skewing aim
-            const radial = tempVecC.set(player.position.x, 0, player.position.z);
-            if (radial.lengthSq() > 1e-4) radial.normalize();
-            else radial.set(1, 0, 0);
-
             tempVec.copy(player.position)
                 .addScaledVector(forward, -back)
                 .addScaledVector(right, shot.shoulder)
-                .addScaledVector(radial, 2.2);
-            tempVec.y = DECK_Y + up;
-            applyShake(tempVec, seeker.mode === 'tempest' ? 0.55 : 0.28);
-
-            camera.position.lerp(tempVec, instant ? 1 : 1 - Math.exp(-dt * lag));
-            tempVecB.copy(player.position).addScaledVector(forward, shot.lookAhead + speed * 0.2);
-            tempVecB.addScaledVector(radial, -shot.planetPull * 12);
-            tempVecB.y = DECK_Y + shot.lookUp;
-            camera.lookAt(tempVecB);
+                .addScaledVector(upAxis, up);
+            applyLocalShake(tempVec, right, upAxis, forward, seeker.mode === 'tempest' ? 0.55 : 0.28);
+            orientationToCamera(player.orientation, tempQuatB);
+            applyCameraPose(tempVec, tempQuatB, dt, instant, lag, true);
         }
 
         function cockpitCam(dt, instant) {
             const shot = shotModes.cockpit;
-            const forward = tempCameraForward.copy(getForward(player.rotation));
+            const forward = getForward(player, tempCameraForward);
+            const right = getRight(player, tempCameraRight);
+            const upAxis = getUp(player, tempUp);
             const speed = player.velocity.length();
             const bob = input.thrusting ? Math.sin(state.visualTime * 18) * 0.03 : Math.sin(state.visualTime * 7) * 0.015;
-
-            tempVec.copy(player.position).addScaledVector(forward, shot.eyeForward + speed * 0.014);
-            tempVec.y = DECK_Y + shot.eyeUp + bob;
-            applyShake(tempVec, 0.14);
-            camera.position.lerp(tempVec, instant ? 1 : 1 - Math.exp(-dt * shot.lag));
-
-            tempVecB.copy(player.position).addScaledVector(forward, shot.lookAhead + speed * 0.25);
-            tempVecB.y = DECK_Y + shot.lookUp + bob * 0.3;
-            camera.lookAt(tempVecB);
+            tempVec.copy(player.position)
+                .addScaledVector(forward, shot.eyeForward + speed * 0.014)
+                .addScaledVector(upAxis, shot.eyeUp + bob);
+            applyLocalShake(tempVec, right, upAxis, forward, 0.14);
+            tempVecB.copy(player.position).addScaledVector(forward, 36);
+            composeCameraLook(tempVec, tempVecB, upAxis, tempQuatB);
+            // Instant ship-relative look so the centered crosshair matches the gun axis.
+            applyCameraPose(tempVec, tempQuatB, dt, true, shot.lag);
         }
 
         function broadcastCam(dt, instant) {
-            // Stable exterior: sit outside the lane, look at the skiff (planet stays in the bowl)
             const shot = shotModes[state.shot] || shotModes.sweep;
-            const th = ringTheta(player.position);
-            const r = ringRadius(player.position);
-            const drift = Math.sin(state.visualTime * 0.08) * (shot.drift || 0) * 5;
-            const camR = r + (shot.out || 34) + drift;
-            // Keep camera roughly behind the ship's heading for readability
-            const heading = player.rotation;
-            const camTh = th + Math.sin(heading - th) * 0.15 + 0.55;
-
-            tempVec.set(
-                Math.cos(camTh) * camR,
-                DECK_Y + (shot.height || 26) - state.camPunch * 1.2,
-                Math.sin(camTh) * camR
-            );
-            applyShake(tempVec, 0.28);
-            camera.position.lerp(tempVec, instant ? 1 : 1 - Math.exp(-dt * (shot.lag || 3.5)));
-
-            tempVecB.copy(player.position);
-            tempVecB.y = DECK_Y;
-            // soft look toward planet so the giant stays in frame
-            tempVecB.x *= 0.82;
-            tempVecB.z *= 0.82;
-            camera.lookAt(tempVecB);
+            const forward = getForward(player, tempCameraForward);
+            const right = getRight(player, tempCameraRight);
+            const upAxis = getUp(player, tempUp);
+            const tempestPull = seeker.mode === 'tempest' ? 4 : 0;
+            tempVec.copy(player.position)
+                .addScaledVector(forward, -(shot.back - state.camPunch * 1.2 - tempestPull))
+                .addScaledVector(right, shot.shoulder)
+                .addScaledVector(upAxis, shot.up);
+            applyLocalShake(tempVec, right, upAxis, forward, 0.28);
+            orientationToCamera(player.orientation, tempQuatB);
+            applyCameraPose(tempVec, tempQuatB, dt, instant, shot.lag || 3.5, true);
         }
 
         function snapCameraToShot(instant) {
@@ -5384,13 +5935,13 @@
         }
 
         // ---- Off-screen rim threat arrows ----
-        const RIM_COLORS = { prism: '#70c9f2', iron: '#8fcce8', large: '#dff8ff', hunter: '#ff6248' };
+        const RIM_COLORS = { prism: '#70c9f2', iron: '#8fcce8', large: '#dff8ff', hunter: '#ff6248', lock: '#74e2dc', pickup: '#f2cf88' };
         let rimUsed = 0;
 
         function placeRimArrow(pos, color, cx, cy, margin) {
             if (rimUsed >= rimArrows.length) return;
             tempVec.copy(pos).project(camera);
-            const behind = tempVec.z > 1;
+            const behind = tempVec.z > 1 || tempVec.z < 0;
             if (!behind && Math.abs(tempVec.x) <= 1 && Math.abs(tempVec.y) <= 1) return; // on-screen: no arrow
             let nx = tempVec.x;
             let ny = tempVec.y;
@@ -5411,18 +5962,130 @@
             const cy = window.innerHeight / 2;
             const margin = 40;
             rimUsed = 0;
+            for (const target of seeker.locks) {
+                if (rimUsed >= rimArrows.length) break;
+                if (targetAlive(target)) placeRimArrow(target.group.position, RIM_COLORS.lock, cx, cy, margin);
+            }
+            for (const pickup of pickups) {
+                if (rimUsed >= rimArrows.length) break;
+                placeRimArrow(pickup.group.position, RIM_COLORS.pickup, cx, cy, margin);
+            }
             for (const a of asteroids) {
                 if (rimUsed >= rimArrows.length) break;
                 if (a.dying) continue;
+                if (seeker.locks.indexOf(a) !== -1) continue;
                 if (a.type === 'prism') placeRimArrow(a.group.position, RIM_COLORS.prism, cx, cy, margin);
                 else if (a.type === 'iron') placeRimArrow(a.group.position, RIM_COLORS.iron, cx, cy, margin);
                 else if (a.size === 'large') placeRimArrow(a.group.position, RIM_COLORS.large, cx, cy, margin);
             }
             for (const hu of hunters) {
                 if (rimUsed >= rimArrows.length) break;
+                if (seeker.locks.indexOf(hu) !== -1) continue;
                 if (!hu.dying) placeRimArrow(hu.group.position, RIM_COLORS.hunter, cx, cy, margin);
             }
             for (let i = rimUsed; i < rimArrows.length; i++) rimArrows[i].style.opacity = '0';
+        }
+
+        function buildCombatHud() {
+            const host = document.getElementById('tgt-hud');
+            if (!host) return;
+            host.innerHTML = '';
+            combatHud.marks.length = 0;
+            for (let i = 0; i < 18; i++) {
+                const el = document.createElement('div');
+                el.className = 'tgt-mark';
+                el.innerHTML = '<span class="c tl"></span><span class="c tr"></span><span class="c bl"></span><span class="c br"></span><span class="lbl"></span>';
+                host.appendChild(el);
+                combatHud.marks.push({ el, label: el.querySelector('.lbl') });
+            }
+            const lead = document.createElement('div');
+            lead.className = 'tgt-lead';
+            host.appendChild(lead);
+            combatHud.lead = lead;
+        }
+
+        function placeCombatMark(worldPos, kind, label, size) {
+            if (combatHud.used >= combatHud.marks.length) return false;
+            camera.updateMatrixWorld();
+            tempVec.copy(worldPos);
+            camera.worldToLocal(tempVec);
+            if (tempVec.z > -0.35) return false;
+            tempVecB.copy(worldPos).project(camera);
+            if (Math.abs(tempVecB.x) > 1.25 || Math.abs(tempVecB.y) > 1.25) return false;
+            const mark = combatHud.marks[combatHud.used++];
+            const x = (tempVecB.x * 0.5 + 0.5) * window.innerWidth;
+            const y = (-tempVecB.y * 0.5 + 0.5) * window.innerHeight;
+            const px = Math.round(size || 36);
+            mark.el.style.width = px + 'px';
+            mark.el.style.height = px + 'px';
+            mark.el.style.margin = (-px / 2) + 'px 0 0 ' + (-px / 2) + 'px';
+            mark.el.style.left = x + 'px';
+            mark.el.style.top = y + 'px';
+            mark.el.style.opacity = '0.92';
+            mark.el.className = 'tgt-mark' + (kind ? ' ' + kind : '');
+            mark.label.textContent = label || '';
+            return true;
+        }
+
+        function updateCombatHud() {
+            if (!combatHud.lead) return;
+            combatHud.used = 0;
+            if (state.paused || state.debugOpen || state.gameOver || !player) {
+                for (const mark of combatHud.marks) mark.el.style.opacity = '0';
+                combatHud.lead.style.opacity = '0';
+                return;
+            }
+            const gunTarget = bestGunTarget();
+            const painted = new Set(seeker.locks);
+            if (gunTarget) painted.add(gunTarget);
+            const forward = getForward(player, tempForward);
+            for (const t of seeker.locks) {
+                if (!targetAlive(t)) continue;
+                const dist = Math.round(distance3(player.position, t.group.position));
+                const kind = t === gunTarget ? 'lock gun' : 'lock';
+                placeCombatMark(t.group.position, kind, 'MSSL ' + dist, 48);
+            }
+            if (gunTarget && seeker.locks.indexOf(gunTarget) === -1) {
+                const dist = Math.round(distance3(player.position, gunTarget.group.position));
+                placeCombatMark(gunTarget.group.position, 'gun', 'GUN ' + dist, 44);
+            }
+            for (const list of threatCollections) {
+                if (combatHud.used >= combatHud.marks.length) break;
+                for (const t of list) {
+                    if (combatHud.used >= combatHud.marks.length) break;
+                    if (!targetAlive(t) || painted.has(t)) continue;
+                    const d = delta3(player.position, t.group.position, tempVecC);
+                    const dist = d.length();
+                    if (dist > 160) continue;
+                    const heading = d.dot(forward) / Math.max(dist, 0.001);
+                    if (heading < 0.12) continue;
+                    placeCombatMark(t.group.position, '', String(Math.round(dist)), 32);
+                }
+            }
+            for (let i = combatHud.used; i < combatHud.marks.length; i++) combatHud.marks[i].el.style.opacity = '0';
+
+            if (gunTarget && gunTarget.group) {
+                const spec = gunSpec();
+                const to = delta3(player.position, gunTarget.group.position, tempVecC);
+                const dist = to.length();
+                const tof = dist / Math.max(8, spec.speed);
+                tempVec.copy(gunTarget.group.position);
+                if (gunTarget.velocity) tempVec.addScaledVector(gunTarget.velocity, tof);
+                camera.updateMatrixWorld();
+                tempVecB.copy(tempVec);
+                camera.worldToLocal(tempVecB);
+                const ahead = tempVecB.z < -0.35;
+                tempVecB.copy(tempVec).project(camera);
+                if (ahead && Math.abs(tempVecB.x) <= 1.2 && Math.abs(tempVecB.y) <= 1.2) {
+                    combatHud.lead.style.left = ((tempVecB.x * 0.5 + 0.5) * window.innerWidth) + 'px';
+                    combatHud.lead.style.top = ((-tempVecB.y * 0.5 + 0.5) * window.innerHeight) + 'px';
+                    combatHud.lead.style.opacity = '0.9';
+                } else {
+                    combatHud.lead.style.opacity = '0';
+                }
+            } else {
+                combatHud.lead.style.opacity = '0';
+            }
         }
 
         // ---- HUD (only touch the DOM on change to avoid per-frame style recalc) ----
@@ -5485,6 +6148,15 @@
             if (rocks !== uiCache.rocks) { ui.rocksVal.textContent = rocks; uiCache.rocks = rocks; }
             const vel = player.velocity.length().toFixed(1);
             if (vel !== uiCache.vel) { ui.velVal.textContent = vel; uiCache.vel = vel; }
+            const thrustState = (input.keys.KeyS || input.touchBrake) ? 'Brake'
+                : input.boosting ? 'Boost' : input.thrusting ? 'Burn' : 'Coast';
+            if (thrustState !== uiCache.thrustState) { ui.thrustVal.textContent = thrustState; uiCache.thrustState = thrustState; }
+            const climb = player.velocity.dot(getUp(player, tempUp)).toFixed(1);
+            if (climb !== uiCache.climb) { ui.climbVal.textContent = (climb > 0 ? '+' : '') + climb; uiCache.climb = climb; }
+            const altitude = Math.round(player.position.length() - PLANET_R);
+            if (altitude !== uiCache.altitude) { ui.altVal.textContent = altitude; uiCache.altitude = altitude; }
+            const ringDepth = Math.round(player.position.y - RING_PLANE_Y);
+            if (ringDepth !== uiCache.ringDepth) { ui.depthVal.textContent = (ringDepth > 0 ? '+' : '') + ringDepth; uiCache.ringDepth = ringDepth; }
             if (state.bestCombo !== uiCache.best) { ui.bestVal.textContent = state.bestCombo; uiCache.best = state.bestCombo; }
             const chargeR = Math.round(state.charge);
             if (chargeR !== uiCache.chargeChip) { ui.chargeVal.textContent = chargeR; uiCache.chargeChip = chargeR; }
@@ -5542,7 +6214,10 @@
         // ---- Banners / flashes ----
         function setPaused(paused, title, copy) {
             state.paused = paused;
-            if (paused) cancelTransientInput();
+            if (paused) {
+                cancelTransientInput();
+                if (input.pointerLocked) releaseFlightPointerLock(true);
+            }
             ui.pause.textContent = paused && !state.gameOver ? 'Resume' : 'Pause';
             if (paused) showBanner(title || 'Paused', copy || 'Press Space to resume.');
             else hideBanner();
@@ -5572,15 +6247,27 @@
 
         // ---- Debug ----
         function toggleDebug() {
-            state.debugOpen = !state.debugOpen;
-            if (state.debugOpen) cancelTransientInput();
-            ui.debugModal.classList.toggle('show', state.debugOpen);
-            if (state.debugOpen) updateDebugReadout();
+            if (state.debugOpen) {
+                closeDebug(false);
+                return;
+            }
+            state.debugWasPaused = state.paused;
+            state.debugOpen = true;
+            state.paused = true;
+            cancelTransientInput();
+            if (input.pointerLocked) releaseFlightPointerLock(true);
+            ui.debugModal.classList.add('show');
+            updateDebugReadout();
         }
         function closeDebug(resume) {
             state.debugOpen = false;
             ui.debugModal.classList.remove('show');
-            if (resume && state.paused && !state.gameOver) setPaused(false);
+            if (resume && !state.gameOver) {
+                setPaused(false);
+                if (!HAS_COARSE_POINTER) requestFlightPointerLock();
+            } else {
+                setPaused(true, 'Flight Paused', 'Click the field to resume mouse flight.');
+            }
         }
         function runDebugAction(action) {
             if (action === 'shield') applyPickup('shield', player.position.clone());
@@ -5606,9 +6293,13 @@
             if (event.code === 'Escape') {
                 event.preventDefault();
                 if (state.debugOpen) { closeDebug(false); return; }
+                if (input.pointerLocked) {
+                    releaseFlightPointerLock(false);
+                    return;
+                }
                 state.controlsActive = false;
                 cancelTransientInput();
-                showBanner('Controls Released', 'Click the field or press a key to re-engage.');
+                setPaused(true, 'Flight Paused', 'Click the field to capture mouse flight.');
                 return;
             }
             if (event.code === 'Backquote') {
@@ -5618,7 +6309,14 @@
             }
             if (event.code === 'Space') {
                 event.preventDefault();
-                if (!event.repeat && !state.gameOver) setPaused(!state.paused, 'Paused', 'Press Space or Pause to resume.');
+                if (!event.repeat && !state.gameOver) {
+                    if (state.paused) {
+                        setPaused(false);
+                        if (!HAS_COARSE_POINTER) requestFlightPointerLock();
+                    } else {
+                        setPaused(true, 'Paused', 'Click the field or press Space to resume.');
+                    }
+                }
                 return;
             }
             if (state.paused || state.debugOpen || state.gameOver) return;
@@ -5641,10 +6339,15 @@
             input.keys = Object.create(null);
             input.firing = false;
             input.thrusting = false;
+            input.boosting = false;
             input.touchLeft = false;
             input.touchRight = false;
             input.touchThrust = false;
             input.touchBrake = false;
+            input.dragging = false;
+            input.dragPointerId = -1;
+            input.lookDX = 0;
+            input.lookDY = 0;
             cancelMissilePaint();
         }
 
@@ -5695,6 +6398,169 @@
                 renderQuality.highFrames = 0;
                 renderQuality.cooldown = 3;
             }
+        }
+
+        // ---- Deterministic, non-mutating spatial diagnostics ----
+        function installDiagnostics() {
+            const makeResult = (name, pass, details) => ({ name, pass: Boolean(pass), details });
+            const snapshot = () => ({
+                ready: window.__asteroids3DReady === true,
+                world: { innerRadius: WORLD_R_MIN, outerRadius: WORLD_R_MAX },
+                active: {
+                    asteroids: asteroids.length,
+                    hunters: hunters.length,
+                    shots: shots.length,
+                    missiles: missiles.length,
+                    pickups: pickups.length,
+                    sparks: sparks ? sparks.activeCount : 0,
+                    shards: shardActiveCount
+                },
+                pools: {
+                    shots: shotPool.length,
+                    missiles: missilePool.length,
+                    locks: lockPool.length,
+                    sparks: sparks ? sparks.pool.length : 0,
+                    shards: shards.length,
+                    rings: rings.length
+                }
+            });
+
+            const run = () => {
+                const results = [];
+                const q = player.orientation.clone().normalize();
+                const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
+                const right = new THREE.Vector3(1, 0, 0).applyQuaternion(q);
+                const up = new THREE.Vector3(0, 1, 0).applyQuaternion(q);
+                const lengths = [forward.length(), right.length(), up.length()];
+                const dots = [forward.dot(right), forward.dot(up), right.dot(up)];
+                const basisPass = lengths.every((v) => Math.abs(v - 1) < 1e-6)
+                    && dots.every((v) => Math.abs(v) < 1e-6);
+                results.push(makeResult('orthonormal_ship_basis', basisPass, { lengths, dots }));
+
+                const pitched = new THREE.Quaternion().setFromAxisAngle(X_AXIS, -Math.PI / 4);
+                const thrustForward = new THREE.Vector3(0, 0, 1).applyQuaternion(pitched);
+                const thrustVelocity = thrustForward.clone().multiplyScalar(12);
+                results.push(makeResult(
+                    'pitched_forward_thrust_has_expected_y',
+                    thrustVelocity.y > 0.1,
+                    { forwardY: thrustForward.y, velocityY: thrustVelocity.y }
+                ));
+
+                const segmentStart = new THREE.Vector3(-5, 0, 0);
+                const segmentEnd = new THREE.Vector3(5, 0, 0);
+                const trueHit = projectileSegmentHitTime(segmentStart, segmentEnd, new THREE.Vector3(0, 0, 0), 1);
+                const altitudeMiss = projectileSegmentHitTime(segmentStart, segmentEnd, new THREE.Vector3(0, 8, 0), 1);
+                results.push(makeResult(
+                    'swept_xyz_collision',
+                    trueHit >= 0 && altitudeMiss < 0,
+                    { trueHitTime: trueHit, xzOnlyFalsePositiveRejected: altitudeMiss < 0 }
+                ));
+
+                const midRadius = (WORLD_R_MIN + WORLD_R_MAX) * 0.5;
+                const axisPoints = [
+                    new THREE.Vector3(midRadius, 0, 0), new THREE.Vector3(-midRadius, 0, 0),
+                    new THREE.Vector3(0, midRadius, 0), new THREE.Vector3(0, -midRadius, 0),
+                    new THREE.Vector3(0, 0, midRadius), new THREE.Vector3(0, 0, -midRadius)
+                ];
+                results.push(makeResult(
+                    'spherical_boundary_all_axes',
+                    axisPoints.every((point) => isInsideWorldPoint(point)),
+                    { tested: ['+x', '-x', '+y', '-y', '+z', '-z'], radius: midRadius }
+                ));
+
+                const localGrid = new Map();
+                const low = { id: 'low', position: new THREE.Vector3(0, 0, 0) };
+                const high = { id: 'high', position: new THREE.Vector3(0, ROCK_CELL_SIZE * 3, 0) };
+                for (const entity of [low, high]) {
+                    const key = spatialKey(spatialCell(entity.position.x), spatialCell(entity.position.y), spatialCell(entity.position.z));
+                    if (!localGrid.has(key)) localGrid.set(key, []);
+                    localGrid.get(key).push(entity);
+                }
+                const lowCell = [spatialCell(low.position.x), spatialCell(low.position.y), spatialCell(low.position.z)];
+                const queried = [];
+                for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) {
+                    const bucket = localGrid.get(spatialKey(lowCell[0] + x, lowCell[1] + y, lowCell[2] + z));
+                    if (bucket) queried.push(...bucket.map((entity) => entity.id));
+                }
+                results.push(makeResult(
+                    'spatial_hash_separates_y',
+                    queried.includes('low') && !queried.includes('high'),
+                    { queried }
+                ));
+
+                const coneOrigin = new THREE.Vector3(0, 0, 0);
+                const coneForward = new THREE.Vector3(0, 0, 1);
+                const coneInside = targetInAimCone(coneOrigin, coneForward, new THREE.Vector3(0, 3, 20), 30, 0.9);
+                const coneOutside = targetInAimCone(coneOrigin, coneForward, new THREE.Vector3(20, 0, 0), 30, 0.9);
+                results.push(makeResult(
+                    'three_dimensional_aim_cone',
+                    coneInside && !coneOutside,
+                    { insideAccepted: coneInside, outsideRejected: !coneOutside }
+                ));
+
+                const yawOnly = new THREE.Quaternion().setFromAxisAngle(Y_AXIS, 0.45);
+                const yawUp = new THREE.Vector3(0, 1, 0).applyQuaternion(yawOnly);
+                const yawRight = new THREE.Vector3(1, 0, 0).applyQuaternion(yawOnly);
+                results.push(makeResult(
+                    'yaw_only_does_not_roll_basis',
+                    Math.abs(yawUp.y - 1) < 1e-6 && Math.abs(yawRight.y) < 1e-6,
+                    { upY: yawUp.y, rightY: yawRight.y }
+                ));
+
+                const rollQ = new THREE.Quaternion().setFromAxisAngle(Z_AXIS, Math.PI / 2);
+                const rolledUp = new THREE.Vector3(0, 1, 0).applyQuaternion(rollQ);
+                const camEye = new THREE.Vector3(0, 0, -10);
+                const camTarget = new THREE.Vector3(0, 0, 20);
+                const camQuat = composeCameraLook(camEye, camTarget, rolledUp, new THREE.Quaternion());
+                const look = new THREE.Vector3(0, 0, -1).applyQuaternion(camQuat).normalize();
+                const toTarget = camTarget.clone().sub(camEye).normalize();
+                const camUpWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(camQuat);
+                results.push(makeResult(
+                    'camera_look_matches_ship_forward',
+                    look.dot(toTarget) > 0.98 && camUpWorld.dot(rolledUp) > 0.98,
+                    { lookDot: look.dot(toTarget), upDot: camUpWorld.dot(rolledUp), rolledUp: [rolledUp.x, rolledUp.y, rolledUp.z] }
+                ));
+
+                const polarChase = new THREE.Vector3(0, 0, 1);
+                const verticalAxis = new THREE.Vector3(1, 0, 0);
+                const orbitRight = new THREE.Vector3();
+                const orbitUp = new THREE.Vector3();
+                hunterOrbitFrame(verticalAxis, polarChase, orbitRight, orbitUp);
+                results.push(makeResult(
+                    'hunter_orbit_uses_non_horizontal_planes',
+                    Math.abs(orbitRight.y) > 0.7 && Math.abs(orbitRight.x) < 0.2,
+                    { orbitRight: orbitRight.toArray(), orbitUp: orbitUp.toArray() }
+                ));
+
+                const boreOrigin = new THREE.Vector3();
+                const boreForward = new THREE.Vector3(0, 0, 1);
+                const onBore = targetInAimCone(boreOrigin, boreForward, new THREE.Vector3(0, 0, 20), 40, 0.98);
+                const offBore = targetInAimCone(boreOrigin, boreForward, new THREE.Vector3(18, 0, 8), 40, 0.98);
+                results.push(makeResult(
+                    'lock_and_guns_share_forward_boresight',
+                    onBore && !offBore,
+                    { onBore, offBore }
+                ));
+
+                const criticalReady = window.__asteroids3DReady === true
+                    && scene && camera && renderer && composer && player && gasGiant && ringSystem
+                    && shotPool.length === SHOT_POOL && missilePool.length === MISSILE_POOL
+                    && sparks && sparks.pool.length === SPARK_CAP;
+                results.push(makeResult(
+                    'readiness_pools_and_scene',
+                    criticalReady,
+                    snapshot()
+                ));
+
+                return {
+                    suite: 'tempest-meridian-3d-spatial-invariants',
+                    version: 1,
+                    passed: results.every((result) => result.pass),
+                    results
+                };
+            };
+
+            window.__asteroids3DDiagnostics = Object.freeze({ version: 1, run, snapshot });
         }
 
         // ---- Bootstrap last, so every top-level const/let is initialized before init()/animate() run ----

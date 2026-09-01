@@ -364,3 +364,42 @@ The source of record should live in this git repository, especially under `webgl
 - For simulations, visible cause and effect matter more than raw object count.
 - For visualizers, signal response should shape structure rather than decorate it.
 - Manual playtesting remains the source of truth for feel and visual judgment unless browser automation is explicitly requested.
+
+## Tempest Meridian 3D Gauntlet
+
+File: `asteroids-3d.html`
+
+The byte-identical Tempest Meridian baseline was converted from an annular XZ combat deck into a real 3D flight-combat shell without changing `asteroids-gpt-5.6-sol.html`.
+
+Implemented spatial contract:
+
+- Mouse-relative pitch/yaw, Q/E roll, coordinated banking, W thrust, S braking, Shift boost, drag, and speed limiting now drive a normalized quaternion orientation and full XYZ velocity. Pointer lock pauses cleanly on release, director/UI interaction suppresses accidental recapture, and drag steering remains available for coarse pointers or lock failure.
+- The gas giant has a spherical atmosphere exclusion radius and a larger spherical outer boundary. Both use readable soft return forces, a bounded radial rebound, and pooled 3D boundary effects; the rings remain double-sided visual/navigation geometry only.
+- Asteroids, Forge Cores, jammers, and breakup children spawn and move throughout the shell. Jammers use stand-off pursuit plus lateral and vertical offsets instead of collapsing into one planar chase ball.
+- Rock collision uses a pooled three-axis spatial hash and full 3D sphere response. Guns and missiles use swept segment-sphere collision in XYZ, so XZ overlap with an altitude miss is rejected.
+- Gun muzzles, barrel spread, inertial shot carry, forward-cone auto-fire, line of sight, all-sphere lock scoring, intercept prediction, missile helixes, splash damage, pickups, offscreen guidance, trajectory cones, drive ribbons, shards, sparks, and shock rings now preserve 3D direction.
+- Pursuit, Sweep, and Drift inherit the ship quaternion mapped so camera −Z is ship +Z. Cockpit still looks along ship forward from the eye. Position damps; orientation snaps.
+- The HUD adds thrust state, ship-relative climb, atmosphere altitude, and signed ring-plane depth. The director adds mouse sensitivity, pitch response, roll response, and the existing yaw/thrust/drag/speed/presentation controls.
+- `window.__asteroids3DReady` is set only after initialization. `window.__asteroids3DDiagnostics.run()` reports orthonormal basis, pitched thrust, swept XYZ hit/miss, all-axis boundary, Y-separated spatial indexing, 3D aim cone, yaw-without-roll, camera look-axis, readiness, pool, and critical-scene invariants; the initialization result is retained as `window.__asteroids3DDiagnosticsLast`.
+
+Gauntlet continuation after the Codex token stop (2026-08-31). A real builder/critic loop followed: hunters off world-Y, then chase/lock vs guns, then ship-basis cameras, then lathed ring volume. Feel is still unverified; no success declaration.
+
+- Cockpit no longer copies `player.orientation` onto a −Z camera (that aimed aft). Exterior cameras use `orientationToCamera` (180° about ship Y). Cockpit looks along +Z from the eye.
+- Mouse yaw no longer bakes coordinated roll into the quaternion. Q/E is the only roll.
+- Guns travel along heading. Locks score heading + ship boresight + on-screen NDC.
+- Jammers use per-hunter 3D orbit axes with comparable lateral and vertical drive.
+- Rings are lathed equatorial shells with inner/outer walls, not a single pancake; dust occupies Y through the plane.
+- Hull-loss keeps attitude and recovers on the current radial inside the combat shell.
+- Shot collision uses the 3D rock hash; player vs rocks is swept.
+- HUD Climb is ship-up velocity.
+
+Static validation recorded on 2026-08-31 after the continuation wave:
+
+- JavaScript module syntax: pass (`node --check` on extracted module).
+- Embedded shaders: 22 total (11 vertex, 11 fragment), all with `main` and balanced braces, parentheses, and brackets.
+- DOM structure: unique IDs, no duplicates or missing queried controls.
+- Planar-runtime search: no remaining `DECK_Y`, planar delta/distance/spawn helpers, annular wrap functions, scalar player rotation, or forced zero-Y velocity. Remaining `xz` math is confined to equatorial ring rendering and the gas giant's visual ring shadow. The leftover `camera.lookAt` is the pre-player bootstrap pose only.
+- Pinned imports remain Three.js `0.174.0`; visible point fields retain circular fragment discard and capped `gl_PointSize`; no raw `PointsMaterial` was introduced.
+- Source baseline SHA-256 remains `d7b7665fa2e6035e7f7fa9145a908bfe3258d7b7d6323f1653539abd6032fb2f`.
+
+Manual playtesting is still required for flight feel, camera comfort, live WebGL diagnostics output, representative-wave FPS/object counts, visual ring crossings, and the full guns/missiles/Tempest/waves/pickups/pause/reset/mobile regression path. Browser automation was intentionally not used because the gauntlet explicitly reserves those judgments for the user.
