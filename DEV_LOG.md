@@ -403,3 +403,22 @@ Static validation recorded on 2026-08-31 after the continuation wave:
 - Source baseline SHA-256 remains `d7b7665fa2e6035e7f7fa9145a908bfe3258d7b7d6323f1653539abd6032fb2f`.
 
 Manual playtesting is still required for flight feel, camera comfort, live WebGL diagnostics output, representative-wave FPS/object counts, visual ring crossings, and the full guns/missiles/Tempest/waves/pickups/pause/reset/mobile regression path. Browser automation was intentionally not used because the gauntlet explicitly reserves those judgments for the user.
+
+## AetherTwin: Singularity (Gemini 3.8 Flash)
+
+File: `asteroids-gemini-3.8-flash.html`
+
+AetherTwin: Singularity is built by Gemini 3.8 Flash as the ultimate frontier benchmark for asteroids combat in the repository. It evolves the **duality as geometry** identity into a complete, high-fidelity experience matching and surpassing the standard set by `asteroids-gpt-5.6-sol.html`.
+
+Core Systems:
+- **Binary Celestial System**: Features Pulsar Alpha (Cyan Magnetar) and Pulsar Omega (Magenta Singularity) with procedural corona, event horizon shaders, relativistic polar jets, a Doppler-beamed accretion disk, procedural starfields, and orbital dust lanes.
+- **Duality Mechanics & Flight**: Player flies the Alpha Skiff while the Omega Twin is tethered via dynamic spring-damper harmonic physics. The live Entanglement Blade is a continuous multi-frequency quantum ribbon that slices asteroids and enemies with electric arcs and line-segment collision.
+- **Phase Swap Traversal Cleave**: Spacebar / Right-Click / Shift triggers an instantaneous tachyon position swap between Alpha and Omega with a screen-warping flash, tachyon audio drop/rise, and an instantaneous high-energy cleave beam along the traversal vector.
+- **Double-Helix Seekers**: Target locking launches twin cyan and magenta missiles corkscrewing around each other in true 3D double-helix flight paths.
+- **Quad-Superposition Overdrive**: Full overdrive capacitor activates a 4-vessel tesseract laser cage with synchronized 360° spiral salvos.
+- **Swept Continuous Collision Detection**: All projectile shots and ship hulls use continuous segment-sphere collision to prevent tunneling.
+- **Procedural WebAudio Synthesizer**: Zero-dependency audio engine generating dynamic dual engine drone, FM blade buzz modulated by tension and cutting, sub-bass tachyon swap boom, stereo laser pulses, and multi-layer explosion debris.
+- **Cameras & Presentation**: Pursuit (chase), Cockpit (1st-person with 3D reticle), Apex (tactical), and Drift (cinematic letterboxed).
+- **Director Console & Deterministic Diagnostics**: Live tuning of flight physics, blade tension, optics, bloom, and audio; non-visual diagnostics suite under `window.__asteroidsGeminiDiagnostics.run()`.
+- **Readiness Flags**: `window.__asteroidsGemini38FlashReady`, `window.__asteroidsGeminiReady`, and `window.__asteroids38FlashReady`.
+
