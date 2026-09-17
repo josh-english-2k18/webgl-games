@@ -404,6 +404,77 @@ Static validation recorded on 2026-08-31 after the continuation wave:
 
 Manual playtesting is still required for flight feel, camera comfort, live WebGL diagnostics output, representative-wave FPS/object counts, visual ring crossings, and the full guns/missiles/Tempest/waves/pickups/pause/reset/mobile regression path. Browser automation was intentionally not used because the gauntlet explicitly reserves those judgments for the user.
 
+## Astra Meridian (2026-09-09)
+
+File: `asteroids-3d-astra.html`; source: `asteroids-3d.html`.
+
+Started with an exact copy (SHA-256 `827025e437eaf8a126139afb8c6b6ab8894206ea406b04ba37b010977bf9e011`), then developed a separate piloting/fire-control variant. The original, its world art, and its workbench remain intact.
+
+- Rebuilt the control surface as transparent edge instruments: separate nose and velocity markers, exact intercept lead, limited contact brackets, heat and boost state, and mobile boost/camera controls.
+- Added switchable flight assist, inertial turning, reserve-powered boost with smooth momentum retention, and independent all-vector braking. `S` deliberately remains retro thrust; `X` brakes.
+- Added fixed 120 Hz simulation, cadence remainder preservation, real sphere-entry times, relative-motion sweeps, broadphase coverage for bosses and new fragments, and full-segment piercing. Guns converge on the predicted intercept within the assist cone; firing is explicit.
+- Kept the giant, fractal storm, rings, moons, ice asteroid appearance, seeker/Tempest loop, upgrades, and pooled effects. Added speed-responsive camera FOV and a single-batch world-space dust layer, without another postprocessing pass.
+- Split HUD and test work into independent ownership, then commissioned an independent baseline critic and fresh complete-artifact critic. Integration and verification results are tracked in [ASTRA_WORKBENCH.md](ASTRA_WORKBENCH.md).
+- The complete-artifact review caught rearward missile painting, maximum-tier projectile-pool exhaustion, fallback click/focus behavior, mixed-input firing cancellation, and a mislabeled combo readout. The second independent pass reproduced their fixes, including complete salvos at every tier and 161/168 peak slots at MK7. Those checks are CPU/logic evidence, not rendered performance or visual approval.
+- Final verification: 77 production-module Node regressions pass with zero failures/skips, plus JavaScript syntax, unique DOM IDs, and unchanged-source checksum checks. No browser automation or GPU playtesting was performed.
+
+Lesson under test: precise piloting depends on agreement between motion, camera, targeting math, and instrumentation. Distinguish nose direction from velocity, and distinguish a tracked target from a valid firing solution. Production-module Node tests can protect those contracts; they cannot establish visual quality, GPU performance, or fun. Those judgments remain with manual playtesting.
+
+### Astra Combat And Celestial Upgrade
+
+- Added bounded multi-target gun selection and alternating/converging salvos, three simultaneous seeker locks at the initial tier, and up to six with upgrades. A separate pair of modeled wingtip Sidewinders launches with `R` or the desktop/touch control, selects distinct targets, and reloads each rack independently in 4.5 seconds. Failed pool acquisition must not consume a rack.
+- Replaced planar missile launch/impact rings with pooled spherical shells. Tempest launches across a ship-oriented sphere; ordinary seekers spread through a 3D forward cone. Visible forward-facing RCS exhaust responds to retro thrust and forward-motion braking.
+- Returning asteroids cross a 330-unit radius, reappear in the 152-238-unit near-planet region, preserve drift/spin, avoid immediate player/moon overlap, reset their swept-collision histories, and release stale missile locks. Contact identities retire on the same discontinuity.
+- Reworked the HUD around persistent contact slots, per-target intercept cues, closing-speed/collision prediction, peripheral bearings, and individual rocket-rack readiness. Ranking/readouts are throttled to 20 Hz, layout measurement to 2 Hz, while projection follows every rendered frame. Contact counts are bounded at eight desktop/four compact or touch.
+- Reworked the Milky Way, gas giant, ring profiles, and moon surfaces with cached procedural DataTextures, filtered sampling, and inexpensive runtime lighting/animation. Added time-based adaptive resolution, area/dimension caps, particle detail tiers, and slow recovery probes targeting 60 FPS. Kept the giant's visible sphere consistent with its collider.
+- Replaced individual debris meshes with one instanced triangle batch. Pool transforms/colors/alpha remain CPU-inspectable; graphics tests must not mistake a populated buffer for validated GPU pixels.
+- Independent integration review reproduced distorted wide-screen rim bearings, coincident lead-label overlap, ready styling during gun cooldown, and respawn exhaust stretching over 100 world units. All four were fixed and independently rechecked. The debris instancing review also caught missing distance fog, now restored using Three.js shader chunks.
+- Final verification: 111 production-module regressions pass, zero failures/skips, independently rerun by the lead. The suite includes the review corrections, actual wing-rocket impacts, multi-target salvos, pool exhaustion/reuse, spherical effects, retro burns, warp history/lock invalidation, adaptive pixel budgets, instanced debris, and existing flight/input/collision contracts. Measured workloads and manual-only limits are recorded in [ASTRA_WORKBENCH.md](ASTRA_WORKBENCH.md).
+
+Performance lesson: bound actual work and measure the actual production update path. Texture preparation costs startup time and memory but removes repeated fragment work; instancing reduces draw submissions; dynamic resolution reduces pixel load. None establishes a universal FPS guarantee. CPU-only timing, shader inspection, manual visual judgment, and real GPU frame timing are separate kinds of evidence.
+
+### Wing Rocket Interception Follow-up
+
+Manual testing found the new `R` rockets circling without hitting. Production probes reproduced zero impact damage against small stationary rocks at 6 and 30 units, plus a close off-axis rock. The prior impact test used large stationary targets straight ahead and missed this failure mode.
+
+The fast wing rockets had inherited slower seekers' normalized direction interpolation and full-speed approach. Near targets, the guidance allowed repeated overshoots; exact opposite headings also make normalized interpolation stall. Wing rockets now have a short rack-clearance phase, bounded quaternion steering, speed-aware intercept prediction, and terminal deceleration that keeps the turning radius inside the approach. Physical collision sizes, damage, blast radius, lifetime, reloads, and ordinary seeker guidance are unchanged. New regressions require real impacts on small moving targets and cover rolled/pitched launches, rearward reacquisition, and native-health hunter kills followed by reacquisition, not just finite trajectories or eventual expiry.
+
+Independent stress probes produced 394 real impacts from 402 launches in 201 scenarios, including all 72 against production hunters. Remaining misses involved target warps or abrupt reversals at minimum steering tuning. Terminal speed control can lengthen successful approaches; the critic measured about 1.16 seconds versus 0.53 seconds on a stationary 60-unit case. These CPU/geometry checks establish interception behavior, not visual approval or a promise that every possible target maneuver is hittable.
+
+Lesson: test whether a homing weapon actually completes representative interceptions. A plausible trail and a hit on one large target are not sufficient evidence; close, small, crossing, and passed targets expose guidance failures that broad smoke tests miss.
+
+### Gas Giant Cloud Structure
+
+After positive manual playtesting, the user deferred the proposed 3D dogfighting encounter to focus on the planet. That idea is pinned in [ASTRA_WORKBENCH.md](ASTRA_WORKBENCH.md): one interceptor with readable attack runs, evasion, recovery, and combat above/below the rings, before adding missions or more enemy classes.
+
+The cloud pass uses [NASA/Juno cloud imagery](https://www.jpl.nasa.gov/images/pia23610-mocha-swirls-in-jupiters-turbulent-atmosphere/) as a morphology reference while preserving the fictional blue-majority palette, tan/rust accents, and compact red storm. Unequal belts share cloud material with nested vortices, torn boundaries, branching crests, and folded dark channels. The first generated texture revealed overly regular eddy spacing; varied clusters, asymmetric deformation, and smaller daughter vortices replaced it. The red storm remains filled rather than becoming a dark pupil or a clean spiral overlay.
+
+A cached signed flow texture animates that material with two staggered advection phases, bounding distortion and hiding resets. Shallow cloud-top normal relief adds lighting detail without changing the visible sphere or collider. Expensive fractal sampling stays in the startup texture bake; the added flow map costs 0.5 MiB of base texture storage and no additional render pass. This is an artistic flow approximation, not a physical atmosphere simulation. The rings, moons, sky, weapons, and flight rules are unchanged.
+
+New nonbrowser checks cover texture budgets, longitude continuity, neutral polar flow, retained blue/warm material, and animation phase transitions. Raw texture inspection is useful for morphology, but cannot establish the final lighting, temporal appearance, or GPU frame rate. Full verification details and remaining manual checks are recorded in the workbench.
+
+Lesson: natural-looking detail needs a hierarchy of unequal belts, sheared edges, nested eddies, and small cloud structure. Adding more noise or clean spiral lines does not establish that hierarchy. Distort the cloud material itself, preserve the planet's established palette, and evaluate the generated artifact rather than trusting the formula.
+
+### Planet Pixelation Follow-up
+
+Manual feedback approved the direction but found the planet pixelated. Preserve the new composition. The desktop cloud texture increased from 2048x1024 to 4096x2048, with a hardware-size cap and the original 2K budget on coarse-pointer devices. Mipmapped linear filtering remains; anisotropy is capped at the lesser of 4x and device support. Fine-grain contrast/frequency and cloud-height perturbation were reduced; narrow filaments no longer act as embossed height lines. The scene-wide resolution policy, rings, and other art remain unchanged.
+
+The accompanying review also caught two concrete defects: latitude-only candidate culling omitted eddies reachable after earlier cloud deformation, and the shader blended encoded color instead of linear light. Candidate bounds now propagate prior deformation, and temporal color samples decode before blending. The storm's composition and bounded animation model are retained; residual ring-like contours and periodic blending softness remain appearance risks, not independently validated improvements.
+
+The higher-resolution bake measured 3.54 seconds of CPU startup in the production harness. It adds 24 MiB of base cloud texture memory on desktop and no rendering pass. The focused rendering/scene checks pass; exact results and manual-only limits are in the workbench. This is a sampling correction with a measured startup/memory tradeoff, not a universal FPS guarantee or a substitute for judging the close-up planet in-game.
+
+### Ring Striation, Overlap, And Flicker (2026-09-10)
+
+Manual testing reported corduroy-like ring lines, rings apparently superimposed on the planet, and intermittent square flicker. The radial opacity profile contained two regular sine ripples, double-sided closed shells composited the pattern twice, and the planet sampled the same detailed profile as a sharp shadow. The fixes retain the broad color zones but replace the ripple pattern with quiet irregular variation, select one contributing shell surface, and bake a separate soft optical-density shadow. Camera-inside slabs use an exit face so unrestricted 3D flight does not make the rings disappear.
+
+The planet's mipmapped shadow lookup was also inside nonuniform fragment branches, where implicit texture derivatives are undefined. It now samples unconditionally and applies branchless masks afterward, including bounds that prevent coarse mip-edge bleed. The shadow map adds 2 KiB of base storage; the ring draw count remains eight, with no extra postprocessing pass. Cloud resolution, colors, storm, flight, and weapon behavior are unchanged.
+
+Independent review then reproduced two smaller but concrete failures. Float32 normalization could push a normal/view dot product just above one, giving fractional rim-lighting powers a negative base; planet, atmosphere, and spherical missile-pulse rim bases are now clamped. Circular inside/outside tests also disagreed with the ring's actual polygon walls in a thin radial strip; containment now follows those facets. New tests use production mesh normals and real ray intersections to retain both corrections.
+
+Nonbrowser regressions cover profile roughness, shadow texture bounds and shader sampling contracts, actual front/back/inside ray intersections, and the distinction between legitimate foreground rings and far-side planetary occlusion. These identify and protect concrete data/geometry/shader contracts; they do not prove that the reported GPU flicker is gone. Final results and independent review are recorded in [ASTRA_WORKBENCH.md](ASTRA_WORKBENCH.md).
+
+Lesson: translucent top/bottom layers can double a fine pattern, and a physically motivated shadow can still read like a decal if it copies the display texture exactly. Treat visible surface detail, integrated optical depth, and shadow softness as different representations. Keep derivative-dependent texture reads out of divergent fragment control flow; bound fractional powers even when normalized vectors are theoretically safe. A square artifact is not necessarily a particle sprite. Do not equate a passing CPU geometry or arithmetic test with rendered visual approval.
+
 ## AetherTwin: Singularity (Gemini 3.8 Flash)
 
 File: `asteroids-gemini-3.8-flash.html`
@@ -421,4 +492,3 @@ Core Systems:
 - **Cameras & Presentation**: Pursuit (chase), Cockpit (1st-person with 3D reticle), Apex (tactical), and Drift (cinematic letterboxed).
 - **Director Console & Deterministic Diagnostics**: Live tuning of flight physics, blade tension, optics, bloom, and audio; non-visual diagnostics suite under `window.__asteroidsGeminiDiagnostics.run()`.
 - **Readiness Flags**: `window.__asteroidsGemini38FlashReady`, `window.__asteroidsGeminiReady`, and `window.__asteroids38FlashReady`.
-

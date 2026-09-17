@@ -21,6 +21,7 @@ See [DESIGN.md](DESIGN.md) for the shared design philosophy, quality rubric, and
 - [Gyrewake](https://josh-english-2k18.github.io/webgl-games/asteroids-grok-4.6.html) (`asteroids-grok-4.6.html`)
 - [Tempest Meridian](https://josh-english-2k18.github.io/webgl-games/asteroids-gpt-5.6-sol.html) (`asteroids-gpt-5.6-sol.html`)
 - [Tempest Meridian 3D](https://josh-english-2k18.github.io/webgl-games/asteroids-3d.html) (`asteroids-3d.html`)
+- [Astra Meridian](asteroids-3d-astra.html) (`asteroids-3d-astra.html`)
 - [AetherTwin](https://josh-english-2k18.github.io/webgl-games/asteroids-gemini.html) (`asteroids-gemini.html`)
 - [AetherTwin: Singularity](https://josh-english-2k18.github.io/webgl-games/asteroids-gemini-3.8-flash.html) (`asteroids-gemini-3.8-flash.html`)
 - [Crownfield Chess](https://josh-english-2k18.github.io/webgl-games/chess.html) (`chess.html`)
@@ -87,6 +88,32 @@ The Vesper Belt comparison sharpened the process lesson: Codex should not build 
 `asteroids-gemini.html` is AetherTwin, a Gemini-built asteroids variant whose identity is **duality as geometry**. The cyan Gemini Duality Skiff and its magenta quantum twin stay joined by a live Entanglement Blade that damages anything caught between them. Phase Swap exchanges their positions and cleaves the full traversal lane; a charged Quad-Superposition overdrive widens the blade and adds synchronized twin fire. Entangled asteroid pairs detonate through resonance, blade-seeking leeches pressure positioning, and the Gemini Colossus arrives every fifth wave. The binary-pulsar arena includes Pursuit, Cockpit, Tactical, and Drift cameras, full touch controls, procedural WebAudio, a director console for mechanics and optics, shard explosions, and circular-discard shader particles. Canonical readiness flag: `window.__asteroidsGeminiReady`.
 
 `asteroids-gemini-3.8-flash.html` is AetherTwin: Singularity, the frontier Gemini 3.8 Flash asteroids combat game. It deepens the duality-as-geometry identity into a fully realized celestial arena: a Cyan Magnetar and Magenta Singularity binary star system with a Doppler-beamed accretion disk, relativistic polar jets, and volumetric dust lanes. The Alpha Skiff and Omega Twin feature swept continuous collision detection (CCD), high-frequency quantum ribbon blade slicing, instant Phase Swap traversal cleave, double-helix corkscrew homing missiles, and Quad-Superposition overdrive (a 4-node tesseract laser cage with synchronized 360° spiral salvos). It includes full polyphonic WebAudio synthesis (dynamic engine drone, FM blade buzz, tachyon boom, stereo laser pulses), Pursuit, Cockpit (with HUD crosshairs), Apex, and Drift cameras, mobile touch controls, an interactive director console, and deterministic diagnostics. Readiness flags: `window.__asteroidsGemini38FlashReady`, `window.__asteroidsGeminiReady`, and `window.__asteroids38FlashReady`.
+
+## Astra Meridian
+
+`asteroids-3d-astra.html` started as a byte-identical copy of Tempest Meridian 3D. Astra's variant concentrates on piloting and fire control: optional inertial flight, rechargeable boost with retained momentum, fixed 120 Hz simulation, swept collisions, and multi-target converging railguns. Persistent contact IDs, individual intercept cues, range/closing-speed readouts, collision warnings, and off-screen indicators support full-3D combat. Two independently reloading wingtip Sidewinders complement the lock-painted seekers and spherical Tempest launch. Retro braking fires visible forward-facing thrusters; distant asteroids return near the planet without sweeping collisions across the world. The original file is unchanged.
+
+The celestial pass adds turbulent cloud belts, nested vortices, and a compact red storm with bounded flow-map animation to the blue gas giant, stratified two-sided rings, cratered orbiting moons, and a Milky Way with dust lanes and clustered stars. Adaptive render resolution targets 60 FPS with pixel budgets, rolling frame-time measurements, and recovery hysteresis; this is not a hardware-independent FPS guarantee. Instanced triangle debris, pooled spherical missile effects, and bounded particle fields keep transient work controlled. Ice asteroid appearance, progression, upgrades, four cameras, and the director console remain.
+
+Mouse steers after clicking the field. `W` thrusts, `S` applies retro thrust, `Q`/`E` roll, `X` brakes all velocity, `Shift` boosts while thrusting, and `C` toggles flight assist. Hold left mouse or `F` for railguns; hold right mouse or `M` to paint missile locks and release to launch. `R` launches the ready wingtip rockets; each rack reloads in 4.5 seconds. `Tab` cycles cameras, `Space` pauses, and backquote opens the director. Touch supports drag steering, thrust, retro, boost, guns, seekers, wing rockets, and camera cycling.
+
+Readiness: `window.__asteroidsAstraReady`. Diagnostics: `window.__asteroidsAstraDiagnostics.run()`. [ASTRA_WORKBENCH.md](ASTRA_WORKBENCH.md) records the independent reviews and verification limits. GPU rendering, mobile layout, performance, and flight feel still require manual playtesting.
+
+Nonbrowser regressions execute the actual inline module using Three.js r174 and explicit DOM/GPU adapters:
+
+```sh
+node --experimental-vm-modules --test tests/asteroids-astra.test.mjs
+```
+
+Requires Node 22+ and a temporary Three.js r174 cache. Setup commands are at the top of [the test file](tests/asteroids-astra.test.mjs); no build step or runtime dependency was added to the game.
+
+Optional CPU workload measurements exercise the actual animation loop with waves 10/19/20, MK7 flight, rockets, Tempest, and destruction effects:
+
+```sh
+ASTRA_BENCH=1 node --experimental-vm-modules --test --test-reporter=spec --test-name-pattern='CPU benchmark' tests/asteroids-astra.test.mjs
+```
+
+These timings include simulation and CPU render preparation with explicit DOM/GPU adapters, not browser layout, shader execution, or GPU frame rate. `window.__asteroidsAstraDiagnostics.snapshot()` exposes live render scale, frame timing, quality tier, and pixel budget during manual playtesting.
 
 ## License
 
