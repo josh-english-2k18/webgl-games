@@ -161,6 +161,7 @@ The later agent variants prove that a strong identity axis beats feature pile-on
 - Coilwake owns **mass/cascade** on the plane (tether, sling, overcoil).
 - Gyrewake owns **guidance** on the same ring theater (lock-paint, corkscrew seekers, tempest swarm). It is the Grok 4.6 successor, not a hybrid of the other axes.
 - AetherTwin owns **duality/geometry** (a live ship-to-twin blade, phase-swap traversal cleave, and superposition overdrive).
+- ARGON // Armillary owns **constellations** (wake ionization builds a tether graph; the Z-Pinch cashes it in with an n² bonus under a gravitational lens; the Armillary Nova re-seeds the whole field). Its seekers, guns and rockets are inherited from Astra and deliberately stay secondary to the web.
 
 When evaluating or building the next asteroids pass, pick one axis and make every system reinforce it. Do not recombine hitstop + light economy + cascade into one overloaded hybrid.
 

@@ -492,3 +492,97 @@ Core Systems:
 - **Cameras & Presentation**: Pursuit (chase), Cockpit (1st-person with 3D reticle), Apex (tactical), and Drift (cinematic letterboxed).
 - **Director Console & Deterministic Diagnostics**: Live tuning of flight physics, blade tension, optics, bloom, and audio; non-visual diagnostics suite under `window.__asteroidsGeminiDiagnostics.run()`.
 - **Readiness Flags**: `window.__asteroidsGemini38FlashReady`, `window.__asteroidsGeminiReady`, and `window.__asteroids38FlashReady`.
+
+## ARGON // Armillary (Gemini 4 Argon)
+
+File: `asteroids-argon.html`; regressions: `tests/asteroids-argon.test.mjs`
+
+Lineage, stated plainly: the engine is Astra Meridian's, assembled by an anchor-asserted build that copies Astra's module and edits it in place (every anchor must match exactly once or the build aborts). Flight, swept collisions, predictive guns, wingtip rockets, seekers, the combat HUD, celestial bakes, pools and adaptive budgets are Astra's. Earlier "Argon Wake" drafts were overwritten in place, never committed, and judged too close to other agents' variants; none of their claims (Hermite loft, analytic reflections, triplanar grain) describe this build.
+
+Identity: **constellations**. Every authored system feeds one graph.
+
+- **Ion wake**: a 72-node camera-facing ribbon. Rocks near recent nodes gain ion in proportion to proximity and wake strength, so threading close charges fastest. Iron hits that don't kill also ionize.
+- **Tethers**: ionized rocks (ion ≥ 0.35) link shortest-first, within 54 u, at most 3 links each and 56 total. Union-find gives the components. Tethers render as twin plasma filaments that shift from cyan to violet as the web grows.
+- **Z-Pinch** (`V`/`B`/`G`): every component of two or more rocks is drawn toward its centroid for 0.42 s, then implodes. Arc bolts, damage 9 to nodes, collateral damage to nearby rocks and quenchers, a bonus of `round(n² · 25)` scaled by wave, then a cooldown. The grade pass adds a gravitational lens: bend, Einstein ring and shock ripple at the projected centroid.
+- **Lasso**: flying a closed loop (path ≥ 48 u, mean radius ≥ 6, closing gap < 7) fully ionizes and gathers everything inside.
+- **Inheritance**: shattered ice is born charged (parent ion + 0.55, or 0.62 after a pinch), so each pinch seeds the next web. The Forge Core cannot be ionized; it takes pinch collateral instead.
+- **Quenchers** (Astra hunters): drain nearby beacons, but crossing a live tether shears them.
+- **Armillary Nova**: Excimer charge aligns three gimballed rings at radii 332–356. At full charge, `M` launches a lattice shell that implodes from the cage toward the planet and ionizes every rock it passes, then refreshes the pinch.
+- **Presentation**:
+  - an authored Lantern airframe: lathe fuselage, swept wings, fin, nacelles, a lantern ring, hull light pipes and a Cherenkov speed sheath;
+  - six seeded clathrate-ice families with fracture veins that glow with ion;
+  - alternating 488 nm cyan and 514 nm green argon lances;
+  - a lilac gas giant with a cyan storm eye, polar aurora driven by charge and web size, and night-side lightning;
+  - Lydian chimes that climb as beacons light;
+  - a tactical overlay showing ion gauges, the pinch reticle and the lasso polygon.
+
+### Visual pass (screenshot-tuned)
+
+Tuned by screenshot at 1600×900, with the owner's approval, in Cursor's embedded Chromium.
+
+Two bugs it found:
+
+- **Tethers, arc bolts and quench arcs never rendered.** The beam shader builds each quad from a view-space cross product. That winds every quad clockwise, so front-face culling discarded the whole layer, which carries the game's core mechanic. The beam material is now double-sided, and a test asserts it.
+- **White squares beside backlit ice.** Astra's grade clamped colour to 1 before ACES, so the bloom footprint of a single HDR specular firefly became a flat white block. The grade now passes unclipped HDR to the tone curve; a test asserts that the clamp stays out.
+
+Material and lighting changes:
+
+- **Reflection probe**: a small probe scene holds a sky with an argon nebula band, a soft sun, a banded giant and a ring disc. It is baked through PMREM into `scene.environment`, with the giant placed relative to the ship. It rebakes only when the giant's direction moves more than 0.16 rad or its distance changes more than 12%, so hull and ice reflect the giant they fly past. The test renderer is a stub, so the probe stays inert there.
+- **Clathrate ice**: deep-blue glass with clearcoat and sheen.
+  - Faceted families get more tessellation, plus a per-facet tint so cut planes read.
+  - Four parallax planar cracks are ray-traced inside each rock in object space.
+  - Translucency is confined to thin edges, and frost glints are cell-hashed.
+  - Ion veins follow the crack fronts.
+  - Iron and slag keep less translucency.
+- **Shards** are lit by the sun and glint.
+- **Gas giant**: richer bands, limb darkening, a softer terminator and atmospheric forward scatter.
+- **Rings**: ringlet structure and optical depth, lit and transmitted faces, the planet's shadow and near-field glints, on a muted palette.
+- **Armillary bands** are brushed metal with an anisotropic streak and engraved graduations. Their emission scales with alignment and the Nova.
+
+Effects and framing:
+
+- **Shield**: a front-face fresnel lattice. It stays nearly invisible at rest and flares on hits, replacing the glass dome.
+- **Lantern ring**: energy scales with drive. The overdrive aura is hidden otherwise.
+- **Cryo bursts** on every rock, quencher, crash and pinch release. These are 40 pooled, instanced, camera-facing impostors: wispy vapour, a small hot core, a shock rim and glitter motes, with a circular discard and premultiplied blending.
+- **Screen shocks**: up to six projected blasts refract the grade.
+- **Grade**: split-tone, log-space contrast, vignette and grain.
+- **Nova shell**: rewritten as ridged, domain-warped plasma filaments on graduated great-circle cage lines. Back faces are dimmed so the sweep stays readable from outside the shell.
+- **Start frame**: the start yaw now shows the giant's limb.
+
+### First playtest fixes
+
+The owner reported four problems, and each was traced to its source with screenshots:
+
+- **Glowing, blinking squares**: two of the pass's own sparkle effects were the cause.
+  - Ice frost glints and ring near-field glints each lit an entire hashed lattice cell and blinked on a sine. Ice glints are now round sparkles at random sites inside sparse cells. Each has its own facet normal, so they glint as the rock turns rather than on a timer, and they fade out before shrinking below a pixel.
+  - The ring cell glints were removed; the ring dust particles already supply near-field sparkle.
+  - The bloom high-pass also soft-limits peaks above 6 (toward about 8), so a one-pixel HDR spike can't bloom into a block on the coarse mips.
+- **Jittering "soundwave" on the Armillary bands**: this was z-fighting.
+  - The additive halo reused the band's geometry stretched across its width, so the two surfaces coincided and the depth test tore jagged dark glyphs that crawled as the rings turned. The halo now discards the inner 1/2.4 of its width, which is the band's own footprint.
+  - Engraved ticks fade before their spacing drops to a few pixels, and the brushed-metal rows are prefiltered.
+- **Blurry poles**: the equirectangular bake pinches at the poles, and its texture derivatives push lookups onto the blurriest mips. Poles now get a procedural cap in a stereographic frame, which has no singularity: eight circumpolar cyclones ring a counter-rotating central vortex, with footprint-faded gradient-noise clouds. The aurora is a thin curtain oval with a sharp lower hem; it is night-weighted and nearly dark until Excimer or the web lights it.
+- **Pixelated storms**: the bake's value-noise level sets magnify into boxy terraces.
+  - Cloud lookups are domain-warped by sub-texel gradient noise. They use `textureGrad` with the unwarped, seam-corrected UV gradients, so the warp neither blurs the mip choice nor draws the longitude seam.
+  - An unsharp mask against a coarser mip makes the bake's filaments read crisp.
+  - Fine gradient-noise grain is added to the albedo and to the cloud-top relief.
+  - Every detail term fades out with its pixel footprint.
+
+Verification:
+
+- 15 Node tests drive the shipped module against Three.js r174: readiness, 19 diagnostics (Astra's 11 plus 8 Argon invariants), full `animate()` frames, airframe, ice families, wake ionization and tethers, pinch draw and release, refusal with no web, lasso, shatter inheritance, Nova, quencher shear and drain, gun and rocket intercepts, alternating lances, the presentation layers (double-sided beams, a cryo burst and projected screen shock on a kill, a quiet resting shield, the unclamped grade and an inert probe without a GPU), and rendering hygiene (halo discard, no world-cell ring glints, gradient-preserving giant lookups, the stereographic polar cap and the bloom peak limit).
+- Every material was compiled through Three's real WebGL program builder against a fake WebGL2 context. That covers the `onBeforeCompile` hull and ice shaders, the lens grade, the probe scene and environment-mapped variants.
+  - All 81 unique GLSL ES 3.00 shaders (42 programs) passed Khronos glslang 16.6. This check is not committed.
+  - Three's common chunk declares `average()`, which glslang rejects as a redeclaration although browsers accept it, so it was renamed for validation only.
+- Screenshots in the embedded browser cover the start frame, sunlit and backlit ice, a kill burst, a seven-node constellation, a 14-node pinch and a Nova sweep. Screenshots can lag the render by a frame, so take a second capture before judging a layer invisible.
+
+Not verified: other GPUs, frame rate under load (the HUD read 60 fps in the embedded browser), mobile layout, pointer lock and whether the loop is fun.
+
+Playtest questions:
+
+- Is wake reach generous enough at combat speed?
+- Does the wake read from the chase camera on straight runs? It trails toward the camera and fades within 4–15 u of it, so it should mainly show while turning or looping.
+- Do tether webs read at range?
+- Is the lens ring legible without hiding targets?
+- Does the Nova's filament cage still overpower bloom on dimmer displays or at the Bloom slider's upper range?
+- Do probe rebakes hitch on weaker GPUs? The default probe is 128 px and rebakes at most every 0.9 s.
+- Are pinch cooldown and n² scoring the right pressure against the Forge Core?
